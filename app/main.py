@@ -8,12 +8,15 @@ load_dotenv()
 
 app = FastAPI(title="StudyFlash AI API")
 
-# --- CORS (Muito Importante) ---
-# O CORS permite que o Frontend (que vai rodar em outra porta/domínio) 
-# consiga falar com este Backend. Sem isso, o navegador bloqueia tudo.
+origins = [
+    "http://localhost:3000",                   # Local
+    "https://studyflash-ai.vercel.app",        # Vercel
+    "https://studyflash-ai-git-main-gyliardsons-projects.vercel.app/" # Previews
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Em produção, mudaremos para o domínio real do Front
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
