@@ -1,0 +1,30 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"] // <--- ADICIONE ISTO
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Flashcard {
+  id        String   @id @default(uuid())
+  userId    String
+  frente    String
+  verso     String
+  createdAt DateTime @default(now())
+  deckId    String?
+  deck      Deck?    @relation(fields: [deckId], references: [id])
+
+  @@index([userId])
+}
+
+model Deck {
+  id        String      @id @default(uuid())
+  userId    String
+  nome      String
+  createdAt DateTime    @default(now())
+  cards     Flashcard[]
+
+  @@index([userId])
+}
