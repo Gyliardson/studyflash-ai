@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Flashcard from "./components/Flashcard";
-// 1. IMPORTANTE: Importamos o componente novo
 import Header from "./components/Header";
 import { useUser } from "@clerk/nextjs";
-import { salvarFlashcards } from "./actions";
+import { SignInButton } from "@clerk/nextjs"; 
+import SaveModal from "./components/SaveModal";
 
 export default function Home() {
     const { isSignedIn } = useUser();
@@ -13,7 +13,12 @@ export default function Home() {
     const [flashcards, setFlashcards] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadingText, setLoadingText] = useState("Gerando Flashcards ✨");
+
+    // O 'saving' agora é controlado dentro do Modal, mas mantemos aqui caso queira usar no botão principal para efeito visual
     const [saving, setSaving] = useState(false);
+
+    // ESTADO DO MODAL
+    const [showModal, setShowModal] = useState(false);
 
     // --- WAKE UP PING ---
     useEffect(() => {
@@ -80,22 +85,13 @@ export default function Home() {
         }
     }
 
-    // --- FUNÇÃO SALVAR ---
-    async function handleSalvar() {
-        setSaving(true);
-        const resultado = await salvarFlashcards(flashcards);
-        setSaving(false);
-
-        if (resultado.success) {
-            alert("Flashcards salvos com sucesso! 💾");
-        } else {
-            alert(resultado.error);
-        }
+    function handleSalvar() {
+        setShowModal(true);
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 flex flex-col items-center p-6 md:p-12">
-            <Header/>
+        <div className="min-h-screen bg-gray-100 flex flex-col items-center p-6 md:p-12 relative">
+            <Header />
 
             {/* --- ÁREA DE INPUT --- */}
             <div className="w-full max-w-3xl bg-white p-6 rounded-2xl shadow-xl border border-gray-100 mb-10 transition-all hover:shadow-2xl">
@@ -140,22 +136,12 @@ export default function Home() {
                 `}
                             >
                                 <div className="flex items-center gap-3">
-                                    {saving ? (
-                                        <>
-                                            <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-                                            <span>Salvando no cofre...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                                            <span>Salvar na minha Coleção</span>
-                                        </>
-                                    )}
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                                    <span>Salvar na minha Coleção</span>
                                 </div>
                             </button>
                         ) : (
-                            // CTA PARA DESLOGADO (Removemos o SignInButton daqui pois ele já está no Header, ou podemos deixar como incentivo extra)
-                            // Eu mantive aqui como incentivo extra porque funciona bem
+                            // CTA PARA DESLOGADO
                             <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 flex flex-col md:flex-row items-center gap-6 max-w-2xl w-full hover:border-blue-200 transition-colors">
                                 <div className="p-4 bg-blue-50 rounded-full">
                                     <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
@@ -166,7 +152,11 @@ export default function Home() {
                                         Crie uma conta gratuita para salvar estes flashcards e acessá-los de qualquer dispositivo.
                                     </p>
                                 </div>
-                                {/* Nota: Importar SignInButton se quiser manter este botão aqui embaixo também */}
+                                <SignInButton mode="modal">
+                                    <button className="whitespace-nowrap px-6 py-3 rounded-xl bg-gray-900 text-white font-bold text-sm hover:bg-gray-800 transition-all shadow-md active:scale-95">
+                                        Criar conta grátis
+                                    </button>
+                                </SignInButton>
                             </div>
                         )}
                     </div>
@@ -182,6 +172,17 @@ export default function Home() {
                         ))}
                     </div>
                 </div>
+            )}
+
+            {showModal && (
+                <SaveModal
+                    cards={flashcards}
+                    onClose={() => setShowModal(false)}
+                    onSuccess={() => {
+                        setShowModal(false);
+                        alert("Salvo com sucesso na sua coleção! 🎉");
+                    }}
+                />
             )}
         </div>
     );
