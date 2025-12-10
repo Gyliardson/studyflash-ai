@@ -1,11 +1,13 @@
-generator client {
+﻿generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"] // <--- ADICIONE ISTO
+  previewFeatures = ["driverAdapters"] // Necessário para o Vercel Serverless
 }
 
 datasource db {
   provider = "postgresql"
 }
+
+// --- SEUS MODELOS ---
 
 model Flashcard {
   id        String   @id @default(uuid())
