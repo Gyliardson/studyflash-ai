@@ -2,8 +2,12 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
+// Imports do Clerk
 import { ClerkProvider } from '@clerk/nextjs'
-import { ptBR } from '@clerk/localizations'
+import { ptPT } from '@clerk/localizations'
+
+// 1. Importar o Analytics
+import { Analytics } from "@vercel/analytics/react"
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,11 +22,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // Passamos o ptBR para o componente
-    <ClerkProvider localization={ptBR}>
-      {/* Muda o lang para pt-BR para acessibilidade e SEO */}
-      <html lang="pt-BR">
-        <body className={inter.className}>{children}</body>
+    // ClerkProvider envolve tudo
+    <ClerkProvider localization={ptPT}>
+      <html lang="pt">
+        <body className={inter.className}>
+          {children}
+          
+          {/* 2. O Sensor fica aqui, invisível, coletando dados */}
+          <Analytics />
+          
+        </body>
       </html>
     </ClerkProvider>
   );
