@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Flashcard from "./components/Flashcard";
 import Header from "./components/Header";
 import { useUser } from "@clerk/nextjs";
@@ -10,9 +10,12 @@ import SaveModal from "./components/SaveModal";
 export default function Home() {
     const { isSignedIn } = useUser();
     const [texto, setTexto] = useState("");
+    const [arquivo, setArquivo] = useState<File | null>(null);
     const [flashcards, setFlashcards] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadingText, setLoadingText] = useState("Gerando Flashcards ✨");
+    const [erro, setErro] = useState("");
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // O 'saving' agora é controlado dentro do Modal, mas mantemos aqui caso queira usar no botão principal para efeito visual
     const [saving, setSaving] = useState(false);
@@ -46,38 +49,62 @@ export default function Home() {
 
     // --- FUNÇÃO GERAR ---
     async function gerarFlashcards() {
-        if (!texto.trim()) return alert("Digite um texto para estudar!");
+        // Limpa estados anteriores
+        setErro("");
+        setFlashcards([]);
+
+        if (!texto.trim() && !arquivo) {
+            return setErro("Por favor, cole um texto ou anexe um PDF para começar.");
+        }
 
         setLoading(true);
-        setFlashcards([]);
 
         try {
             const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000);
+            const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+            const formData = new FormData();
+            if (arquivo) {
+                formData.append("arquivo", arquivo);
+            } else {
+                formData.append("texto", texto);
+            }
 
             const response = await fetch(`${baseUrl}/api/gerar`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ texto }),
+                body: formData,
                 signal: controller.signal
             });
 
             clearTimeout(timeoutId);
 
+            // Tratamento de Erros da API
             if (!response.ok) {
-                if (response.status === 504) throw new Error("Timeout: O servidor demorou.");
-                throw new Error("Erro no servidor");
+                const errorData = await response.json().catch(() => ({}));
+                // Pega a mensagem exata que mandamos no Python (detail)
+                const mensagemErro = errorData.detail || "Ocorreu um erro ao processar.";
+
+                if (response.status === 504) throw new Error("O servidor demorou muito. Tente um arquivo menor.");
+                if (response.status === 422) throw new Error(mensagemErro); // Erro de conteúdo "Abacaxi"
+                throw new Error(mensagemErro);
             }
 
             const data = await response.json();
             setFlashcards(data.cartoes);
+
+            if (arquivo) {
+                setArquivo(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+            }
+
         } catch (error: any) {
             console.error(error);
-            if (error.name === 'AbortError' || error.message.includes("Timeout")) {
-                alert("O servidor estava dormindo. Tente novamente agora que ele acordou! ⚡");
+            // Seta a mensagem de erro para exibir na tela
+            if (error.name === 'AbortError') {
+                setErro("Tempo esgotado! Tente um texto menor.");
             } else {
-                alert("Ocorreu um erro ao gerar. Tente novamente.");
+                setErro(error.message);
             }
         } finally {
             setLoading(false);
@@ -95,30 +122,85 @@ export default function Home() {
 
             {/* --- ÁREA DE INPUT --- */}
             <div className="w-full max-w-3xl bg-white p-6 rounded-2xl shadow-xl border border-gray-100 mb-10 transition-all hover:shadow-2xl">
-                <textarea
-                    className="w-full h-40 p-4 border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none text-gray-700 transition-all text-lg"
-                    placeholder="Cole seu texto de estudo aqui..."
-                    value={texto}
-                    onChange={(e) => setTexto(e.target.value)}
-                />
 
-                <button
-                    onClick={gerarFlashcards}
-                    disabled={loading}
-                    className={`w-full mt-4 py-4 rounded-xl font-bold text-white transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 ${loading
-                        ? "bg-gray-800 cursor-wait animate-pulse"
-                        : "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/30"
-                        }`}
-                >
-                    {loading && (
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    )}
-                    {loading ? loadingText : "Gerar Flashcards ✨"}
-                </button>
+                {/* Mostra aviso se tiver arquivo selecionado */}
+                {arquivo ? (
+                    <div className="w-full h-40 flex flex-col items-center justify-center border-2 border-dashed border-blue-300 rounded-xl bg-blue-50 mb-4 animate-in fade-in">
+                        <span className="text-4xl mb-2">📄</span>
+                        <p className="font-bold text-gray-700">{arquivo.name}</p>
+                        <button
+                            onClick={() => setArquivo(null)}
+                            className="text-sm text-red-500 hover:underline mt-2"
+                        >
+                            Remover PDF e usar texto
+                        </button>
+                    </div>
+                ) : (
+                    <textarea
+                        className="w-full h-40 p-4 border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none text-gray-700 transition-all text-lg"
+                        placeholder="Cole seu texto de estudo aqui..."
+                        value={texto}
+                        onChange={(e) => setTexto(e.target.value)}
+                    />
+                )}
+
+                {/* INPUT DE ARQUIVO ESCONDIDO + BOTÃO PERSONALIZADO */}
+                <div className="flex gap-2 mt-4">
+                    <div className="relative">
+                        <input
+                            type="file"
+                            id="file-upload"
+                            accept=".pdf"
+                            className="hidden"
+                            ref={fileInputRef}
+                            onChange={(e) => {
+                                if (e.target.files?.[0]) {
+                                    setArquivo(e.target.files[0]);
+                                    setTexto(""); // Limpa texto se selecionar arquivo
+                                }
+                            }}
+                        />
+                        <label
+                            htmlFor="file-upload"
+                            className={`cursor-pointer px-4 py-4 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 flex items-center justify-center transition-colors h-full ${loading ? 'pointer-events-none opacity-50' : ''}`}
+                            title="Anexar PDF"
+                        >
+                            {/* Ícone de Clips / Anexo */}
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                        </label>
+                    </div>
+
+                    <button
+                        onClick={gerarFlashcards}
+                        disabled={loading}
+                        className={`flex-1 py-4 rounded-xl font-bold text-white transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 ${loading
+                            ? "bg-gray-800 cursor-wait animate-pulse"
+                            : "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/30"
+                            }`}
+                    >
+                        {loading && (
+                            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        )}
+                        {loading ? loadingText : (arquivo ? "Gerar do PDF ✨" : "Gerar Flashcards ✨")}
+                    </button>
+                </div>
             </div>
+
+            {/* --- MENSAGEM DE ERRO --- */}
+            {erro && (
+                <div className="w-full max-w-3xl mb-8 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r shadow-sm flex items-center gap-3 animate-in slide-in-from-top-2">
+                    <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div>
+                        <p className="font-bold">Ops!</p>
+                        <p>{erro}</p>
+                    </div>
+                </div>
+            )}
 
             {/* --- ÁREA DE RESULTADOS --- */}
             {flashcards.length > 0 && (
