@@ -4,7 +4,7 @@ import fitz  # PyMuPDF (A engine poderosa)
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
-from .models import ConjuntoFlashcards
+from .models import ConjuntoFlashcards, PlanoEstudo
 
 load_dotenv()
 
@@ -97,3 +97,60 @@ def gerar_flashcards_service(texto: str):
         raise ValueError("A IA não identificou conteúdo educativo suficiente. Tente um texto mais técnico ou acadêmico.")
 
     return resultado
+
+# === 2. SERVIÇO DE PLANOS DE ESTUDO (V0.3.0) ===
+
+modelo_plano = chat.with_structured_output(PlanoEstudo)
+
+sistema_prompt_plano = """
+Você é um TUTOR SÊNIOR e Mentor de Carreira.
+Sua missão é criar um CURRÍCULO DE ESTUDOS prático e sequencial.
+
+REGRAS:
+1. **Estrutura:** Divida o aprendizado em passos lógicos (do básico ao complexo).
+2. **Quantidade:** Crie entre 5 a 10 tópicos (Módulos).
+3. **Foco:** Os tópicos devem ser claros e acionáveis (Ex: "Sintaxe Básica" em vez de "Introdução").
+4. **Contexto:** Se o usuário pedir algo vago ("Inglês"), assuma um caminho padrão ("Inglês para Viagem" ou "Inglês Geral").
+
+Responda APENAS com o JSON estruturado.
+"""
+
+prompt_template_plano = ChatPromptTemplate.from_messages([
+    ("system", sistema_prompt_plano),
+    ("human", "Quero aprender sobre: {tema}. Meu nível atual é: {dificuldade}."),
+])
+
+chain_plano = prompt_template_plano | modelo_plano
+
+def gerar_plano_service(tema: str, dificuldade: str):
+    # Pequena validação
+    if len(tema) < 2:
+        raise ValueError("O tema é muito curto.")
+
+    print(f"🤖 Gerando plano para: {tema} [{dificuldade}]...")
+    return chain_plano.invoke({"tema": tema, "dificuldade": dificuldade})
+
+# === 3. SERVIÇO DE CONTEÚDO DE TÓPICO (V0.3.0) ===
+
+sistema_prompt_conteudo = """
+Você é um PROFESSOR ESPECIALISTA.
+Sua missão é criar flashcards didáticos sobre um Tópico específico de um Curso.
+
+REGRAS:
+1. **Contexto:** Os cards devem ser sobre o '{topico}', mas fazendo sentido dentro do curso de '{curso}'.
+2. **Quantidade:** Gere exatamente 3 flashcards de alta qualidade.
+3. **Estilo:** Perguntas objetivas e respostas explicativas.
+
+Responda APENAS com o JSON (lista de cartoes).
+"""
+
+prompt_template_conteudo = ChatPromptTemplate.from_messages([
+    ("system", sistema_prompt_conteudo),
+    ("human", "Curso: {curso}. Tópico Atual: {topico}. Gere os flashcards."),
+])
+
+chain_conteudo = prompt_template_conteudo | modelo_estruturado # Reusa o modelo de flashcards
+
+def gerar_conteudo_topico_service(curso: str, topico: str):
+    print(f"🧠 Gerando aula sobre: {topico} ({curso})...")
+    return chain_conteudo.invoke({"curso": curso, "topico": topico})

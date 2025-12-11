@@ -1,13 +1,23 @@
-# Hist�rico de Vers�es - StudiFlow
+# Histórico de Versões - StudiFlow
+
+## v0.3.0 - Feature: Tutor IA & Planos de Estudo (Entregue)
+
+- **Feature:** Implementação de "Trilhas de Aprendizado" (`StudyPlan` e `Topic`).
+- **IA (Backend):** Novos endpoints para gerar currículos completos e conteúdo por tópico (`/api/gerar-plano`, `/api/gerar-cards-topico`).
+- **Frontend:** Nova área de criação `/planos/novo` e visualização de trilha `/planos/[id]`.
+- **UI/UX:** Dashboard unificado em `/colecao` (Cards de Planos + Baralhos) e padronização visual dos botões (Outline/Clean).
+- **Estudo:** Atualização do algoritmo de revisão para suportar filtros por Plano e Tópico específico.
 
 ## v0.2.0 - Feature: Modo Estudo & Sistema SRS (Entregue)
-- **Backend:** Implementado algoritmo SM-2 (Repeti��o Espa�ada) no `actions.ts`.
-- **Frontend:** Criada p�gina `/estudar` com l�gica de revis�o di�ria e modo "Estudar Mais" (Cramming).
-- **Frontend:** Implementada sele��o m�ltipla de baralhos na Cole��o.
+
+- **Backend:** Implementado algoritmo SM-2 (Repetição Espaçada) no `actions.ts`.
+- **Frontend:** Criada página `/estudar` com lógica de revisão diária e modo "Estudar Mais" (Cramming).
+- **Frontend:** Implementada seleção múltipla de baralhos na Coleção.
 - **UI/UX:** Polimento visual nos Cards e Decks (efeitos 3D, hover, lixeira integrada).
 - **Banco de Dados:** Adicionados campos SRS (`nextReview`, `interval`, etc) e `onDelete: Cascade`.
 
-## v0.1.0 - Feature: MVP & Upload de PDF
+## v0.1.0 - Feature: MVP & Upload de PDF (Entregue)
+
 - **Backend:** Processamento de PDF com PyMuPDF e LangChain.
-- **Frontend:** Envio via FormData e gera��o de flashcards simples.
-- **Infra:** Configura��o do Prisma v7 com Supabase e Deploy Vercel/Render.
+- **Frontend:** Envio via FormData e geração de flashcards simples.
+- **Infra:** Configuração do Prisma v7 com Supabase e Deploy Vercel/Render.

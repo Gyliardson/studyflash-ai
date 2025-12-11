@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from .models import ConjuntoFlashcards
-from .services import gerar_flashcards_service, extrair_texto_do_pdf
+from .models import ConjuntoFlashcards, PlanoEstudo, PedidoPlano, PedidoConteudoTopico
+from .services import gerar_flashcards_service, extrair_texto_do_pdf, gerar_plano_service, gerar_conteudo_topico_service
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -59,6 +59,15 @@ async def gerar_flashcards(
     except Exception as e:
         print(f"Erro interno: {e}")
         raise HTTPException(status_code=500, detail="Erro interno ao processar solicitação.")
+    
+@app.post("/api/gerar-plano", response_model=PlanoEstudo)
+async def gerar_plano(pedido: PedidoPlano):
+    try:
+        resultado = gerar_plano_service(pedido.tema, pedido.dificuldade)
+        return resultado
+    except Exception as e:
+        print(f"Erro ao gerar plano: {e}")
+        raise HTTPException(status_code=500, detail="Ocorreu um erro ao criar seu plano de estudos.")
 
 @app.post("/api/debug-pdf")
 async def debug_pdf_leitura(arquivo: UploadFile = File(...)):
@@ -81,6 +90,15 @@ async def debug_pdf_leitura(arquivo: UploadFile = File(...)):
         }
     except Exception as e:
         return {"erro_interno": str(e)}
+    
+@app.post("/api/gerar-cards-topico", response_model=ConjuntoFlashcards)
+async def gerar_cards_topico(pedido: PedidoConteudoTopico):
+    try:
+        resultado = gerar_conteudo_topico_service(pedido.tema_plano, pedido.titulo_topico)
+        return resultado
+    except Exception as e:
+        print(f"Erro ao gerar conteúdo: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao gerar material didático.")
 
 @app.get("/")
 def health_check():

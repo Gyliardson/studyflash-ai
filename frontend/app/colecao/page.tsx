@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Header from "../components/Header";
-import { listarMeusBaralhos, excluirBaralho } from "../actions";
+import { listarMeusBaralhos, listarMeusPlanos, excluirBaralho, excluirPlano } from "../actions"; 
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ export default function ColecaoPage() {
     const { isLoaded, isSignedIn } = useUser();
     const router = useRouter();
     const [decks, setDecks] = useState<any[]>([]);
+    const [planos, setPlanos] = useState<any[]>([]); // Novo State
     const [loading, setLoading] = useState(true);
 
     // Estado para seleção múltipla
@@ -24,8 +25,12 @@ export default function ColecaoPage() {
                 return;
             }
             try {
-                const dados = await listarMeusBaralhos();
-                setDecks(dados);
+                const [decksData, planosData] = await Promise.all([
+                    listarMeusBaralhos(),
+                    listarMeusPlanos()
+                ]);
+                setDecks(decksData);
+                setPlanos(planosData);
             } catch (error) {
                 console.error("Erro ao carregar baralhos:", error);
             } finally {
@@ -64,21 +69,36 @@ export default function ColecaoPage() {
                         <p className="text-gray-500">Selecione as bolinhas para revisar grupos específicos.</p>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 h-12"> {/* Altura fixa para alinhar */}
+                        {/* Botão Nova Trilha */}
+                        <Link href="/planos/novo">
+                            <button className="bg-white text-indigo-600 border border-indigo-200 px-6 rounded-xl font-bold shadow-sm hover:shadow-md hover:bg-indigo-50 transition transform hover:-translate-y-1 active:scale-95 flex items-center gap-2 h-full">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                                <span className="hidden sm:inline">Nova Trilha</span>
+                            </button>
+                        </Link>
+
+                        {/* Botão Modo Estudo (Harmonizado) */}
                         <button
                             onClick={handleEstudarSelecionados}
-                            className={`px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all transform hover:-translate-y-1 active:scale-95 flex items-center gap-2
+                            className={`bg-white border px-6 rounded-xl font-bold shadow-sm hover:shadow-md transition transform hover:-translate-y-1 active:scale-95 flex items-center gap-2 h-full
                                 ${selectedDecks.length > 0
-                                    ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30 ring-2 ring-indigo-200 ring-offset-2"
-                                    : "bg-blue-600 hover:bg-blue-700 shadow-blue-500/30"
+                                    ? "text-indigo-600 border-indigo-300 bg-indigo-50 ring-2 ring-indigo-100" // Quando selecionado: Leve destaque Roxo
+                                    : "text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-indigo-600 hover:border-indigo-200" // Padrão: Cinza elegante
                                 }
                             `}
                         >
-                            <span>🚀</span>
+                            {/* Ícone Play (Alterna para Raio se tiver seleção) */}
+                            {selectedDecks.length > 0 ? (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            )}
+                            
                             <span>
                                 {selectedDecks.length > 0
                                     ? `Estudar ${selectedDecks.length} Selecionado(s)`
-                                    : "Modo Global (Tudo)"
+                                    : "Modo Global"
                                 }
                             </span>
                         </button>
@@ -109,8 +129,62 @@ export default function ColecaoPage() {
                     </div>
                 )}
 
-                {/* GRID DE BARALHOS */}
+                {/* GRID DE CONTEÚDO */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    
+                    {/* --- 1. PLANOS DE ESTUDO (Cards Roxos) --- */}
+                    {planos.map((plano) => (
+                        <Link key={plano.id} href={`/planos/${plano.id}`} className="block h-full">
+                            <div className="group relative bg-white p-6 rounded-2xl border border-purple-100 shadow-sm hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 h-full overflow-hidden">
+                                {/* Barra Gradiente Roxo */}
+                                <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-purple-500 to-indigo-500 group-hover:h-2 transition-all" />
+                                
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className="p-3 bg-purple-50 text-purple-600 rounded-xl group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                        <span className="text-2xl">🎓</span>
+                                    </div>
+                                    <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-full border border-purple-100">
+                                        {plano.difficulty}
+                                    </span>
+                                </div>
+
+                                <h3 className="text-xl font-bold text-gray-800 mb-1 truncate group-hover:text-purple-700 transition-colors">
+                                    {plano.title}
+                                </h3>
+                                <p className="text-xs text-gray-400 mb-4">
+                                    Criado em {new Date(plano.createdAt).toLocaleDateString('pt-BR')}
+                                </p>
+
+                                {/* RODAPÉ DO CARD: Módulos à esquerda, Lixeira à direita */}
+                                <div className="mt-4 flex items-center justify-between">
+                                    
+                                    {/* Contador de Módulos (Visual Clean) */}
+                                    <div className="flex items-center gap-2 text-sm font-medium text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                                        <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                                        <span>{plano.topics.length} Módulos</span>
+                                    </div>
+
+                                    {/* Botão Lixeira (Alinhado e sem sobreposição) */}
+                                    <button
+                                        onClick={async (e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            if (confirm(`Tem certeza que deseja apagar a trilha "${plano.title}"?`)) {
+                                                await excluirPlano(plano.id);
+                                                setPlanos(planos.filter(p => p.id !== plano.id));
+                                            }
+                                        }}
+                                        className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-110"
+                                        title="Excluir trilha"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </Link>
+                    ))}
+
+                    {/* --- 2. BARALHOS (Cards Azuis - Código Original) --- */}
                     {decks.map((deck) => {
                         const isSelected = selectedDecks.includes(deck.id);
                         return (
