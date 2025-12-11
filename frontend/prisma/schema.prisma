@@ -13,10 +13,18 @@ model Flashcard {
   frente    String
   verso     String
   createdAt DateTime @default(now())
+  
   deckId    String?
-  deck      Deck?    @relation(fields: [deckId], references: [id])
+  deck      Deck?    @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  // --- CAMPOS SRS (Modo Estudo) ---
+  nextReview     DateTime @default(now()) 
+  interval       Int      @default(0)     
+  repetition     Int      @default(0)     
+  easinessFactor Float    @default(2.5)   
 
   @@index([userId])
+  @@index([userId, nextReview])
 }
 
 model Deck {

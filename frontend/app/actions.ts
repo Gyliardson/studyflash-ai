@@ -9,33 +9,23 @@ type FlashcardInput = {
     verso: string;
 };
 
-// --- 1. CRIAR UM NOVO BARALHO (COM VALIDAÇÃO DE DUPLICIDADE) ---
+// --- 1. CRIAR UM NOVO BARALHO ---
 export async function criarBaralho(nome: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Logue para criar grupos." };
 
     try {
-        // 1. Verifica se já existe um deck com esse nome PARA ESSE USUÁRIO
         const existente = await prisma.deck.findFirst({
             where: {
                 userId,
-                nome: {
-                    equals: nome,
-                    mode: 'insensitive' // Ignora maiúsculas/minúsculas (Inglês == inglês)
-                }
+                nome: { equals: nome, mode: 'insensitive' }
             }
         });
 
-        if (existente) {
-            return { success: false, error: "Você já tem um grupo com este nome!" };
-        }
+        if (existente) return { success: false, error: "Já existe um grupo com este nome!" };
 
-        // 2. Se não existe, cria
         const deck = await prisma.deck.create({
-            data: {
-                userId,
-                nome,
-            },
+            data: { userId, nome },
         });
         return { success: true, deck };
     } catch (error) {
@@ -50,96 +40,184 @@ export async function listarMeusBaralhos() {
     if (!userId) return [];
 
     try {
-        const decks = await prisma.deck.findMany({
+        return await prisma.deck.findMany({
             where: { userId },
             orderBy: { createdAt: 'desc' },
             include: {
-                _count: {
-                    select: { cards: true } // Já traz a contagem de cards dentro!
-                }
+                _count: { select: { cards: true } }
             }
         });
-        return decks;
     } catch (error) {
         return [];
     }
 }
 
-// --- 3. SALVAR FLASHCARDS (Agora com suporte a Deck) ---
+// --- 3. SALVAR FLASHCARDS ---
 export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string) {
     const { userId } = await auth();
-    if (!userId) return { success: false, error: "Você precisa estar logado!" };
+    if (!userId) return { success: false, error: "Login necessário." };
 
     try {
-        // Se o usuário não escolheu deck, salvamos "solto" (deckId null)
-        // Mas o ideal é forçar a escolher. Vamos deixar opcional por enquanto.
+        if (deckId) {
+            await prisma.flashcard.createMany({
+                data: cards.map((card) => ({
+                    userId,
+                    frente: card.frente,
+                    verso: card.verso,
+                    deckId
+                })),
+            });
+        } else {
+            const nomeBaralho = `Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().getHours()}:${new Date().getMinutes()}`;
 
-        await prisma.flashcard.createMany({
-            data: cards.map((card) => ({
-                userId: userId,
-                frente: card.frente,
-                verso: card.verso,
-                deckId: deckId || null, // Liga ao baralho se tiver ID
-            })),
-        });
+            await prisma.deck.create({
+                data: {
+                    userId,
+                    nome: nomeBaralho,
+                    cards: {
+                        create: cards.map(c => ({
+                            userId,
+                            frente: c.frente,
+                            verso: c.verso
+                        }))
+                    }
+                }
+            });
+        }
 
         return { success: true };
     } catch (error) {
         console.error("Erro ao salvar:", error);
-        return { success: false, error: "Erro ao conectar com o banco." };
+        return { success: false, error: "Falha ao salvar no banco." };
     }
 }
 
-// --- 4. LISTAR CARDS DE UM BARALHO ESPECÍFICO ---
+// --- 4. LISTAR CARDS DE UM BARALHO ---
 export async function listarCardsDoBaralho(deckId: string) {
     const { userId } = await auth();
     if (!userId) return [];
 
     try {
-        const cards = await prisma.flashcard.findMany({
-            where: {
-                userId,
-                deckId // Filtra pelo ID do baralho
-            },
+        return await prisma.flashcard.findMany({
+            where: { userId, deckId },
             orderBy: { createdAt: 'desc' },
         });
-        return cards;
     } catch (error) {
         return [];
     }
 }
 
-// --- 5. EXCLUIR UM BARALHO (E seus cards opcionalmente) ---
+// --- 5. EXCLUIR BARALHO ---
 export async function excluirBaralho(id: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Não autorizado" };
 
     try {
-        // Opcional: Se quiser apagar os cards junto, descomente a linha abaixo.
-        // Se deixar comentado, os cards ficam "órfãos" (sem deckId) mas continuam no banco.
-        // await prisma.flashcard.deleteMany({ where: { deckId: id, userId } });
-
         await prisma.deck.delete({
-            where: { id, userId }, // Garante que só apaga se for dono
-        });
-        return { success: true };
-    } catch (error) {
-        console.error("Erro ao excluir deck:", error);
-        return { success: false, error: "Erro ao excluir." };
-    }
-}
-
-// --- 6. EXCLUIR UM FLASHCARD ÚNICO ---
-export async function excluirFlashcard(id: string) {
-    const { userId } = await auth();
-    if (!userId) return { success: false, error: "Não autorizado" };
-
-    try {
-        await prisma.flashcard.delete({
             where: { id, userId },
         });
         return { success: true };
     } catch (error) {
-        return { success: false, error: "Erro ao excluir card." };
+        console.error("Erro ao excluir:", error);
+        return { success: false, error: "Erro ao excluir." };
+    }
+}
+
+// --- 6. EXCLUIR FLASHCARD ---
+export async function excluirFlashcard(id: string) {
+    const { userId } = await auth();
+    if (!userId) return { success: false };
+
+    try {
+        await prisma.flashcard.delete({ where: { id, userId } });
+        return { success: true };
+    } catch (error) {
+        return { success: false };
+    }
+}
+
+// --- 7. BUSCAR PARA REVISÃO ---
+export async function buscarCartoesParaRevisar(modoExtra: boolean = false, deckIds: string[] = []) {
+    const { userId } = await auth();
+    if (!userId) return [];
+
+    try {
+        const now = new Date();
+        const whereCondition: any = { userId: userId };
+
+        // Filtro de Decks (Se tiver IDs na lista, filtra. Se vazio, pega tudo).
+        if (deckIds && deckIds.length > 0) {
+            whereCondition.deckId = { in: deckIds };
+        }
+
+        // Filtro de Data (SRS)
+        if (!modoExtra) {
+            whereCondition.nextReview = { lte: now };
+        }
+
+        return await prisma.flashcard.findMany({
+            where: whereCondition,
+            orderBy: { nextReview: 'asc' },
+            take: 20
+        });
+    } catch (error) {
+        console.error("Erro ao buscar revisões:", error);
+        return [];
+    }
+}
+
+// --- 8. REGISTRAR PROGRESSO ---
+export async function registrarRevisao(cardId: string, avaliacao: 'errei' | 'dificil' | 'facil') {
+    const { userId } = await auth();
+    if (!userId) return { success: false };
+
+    try {
+        const card = await prisma.flashcard.findUnique({
+            where: { id: cardId, userId: userId }
+        });
+
+        if (!card) return { success: false };
+
+        let { interval, repetition, easinessFactor: ef } = card;
+
+        if (avaliacao === 'errei') {
+            repetition = 0;
+            interval = 1;
+        } else {
+            if (avaliacao === 'dificil') ef = Math.max(1.3, ef - 0.15);
+            else ef = ef + 0.15;
+
+            repetition += 1;
+            if (repetition === 1) interval = 1;
+            else if (repetition === 2) interval = 6;
+            else interval = Math.round(interval * ef);
+        }
+
+        const nextDate = new Date();
+        nextDate.setDate(nextDate.getDate() + interval);
+
+        await prisma.flashcard.update({
+            where: { id: cardId },
+            data: { interval, repetition, easinessFactor: ef, nextReview: nextDate }
+        });
+
+        return { success: true };
+    } catch (error) {
+        return { success: false };
+    }
+}
+
+// --- 9. CONTAGEM TOTAL (FILTRADA) ---
+export async function contarTotalFlashcards(deckIds: string[] = []) {
+    const { userId } = await auth();
+    if (!userId) return 0;
+    try {
+        const whereCondition: any = { userId };
+        if (deckIds && deckIds.length > 0) {
+            whereCondition.deckId = { in: deckIds };
+        }
+        return await prisma.flashcard.count({ where: whereCondition });
+    } catch (error) {
+        return 0;
     }
 }
