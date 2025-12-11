@@ -53,7 +53,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
     }
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-100 p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-gray-100">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold text-gray-800">Onde vamos guardar? 🗂️</h2>
@@ -97,9 +97,9 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                 </div>
 
                                 <div className="relative flex py-5 items-center">
-                                    <div className="flex-grow border-t border-gray-200"></div>
-                                    <span className="flex-shrink-0 mx-4 text-gray-400 text-xs font-semibold uppercase tracking-wider">Ou</span>
-                                    <div className="flex-grow border-t border-gray-200"></div>
+                                    <div className="grow border-t border-gray-200"></div>
+                                    <span className="shrink-0 mx-4 text-gray-400 text-xs font-semibold uppercase tracking-wider">Ou</span>
+                                    <div className="grow border-t border-gray-200"></div>
                                 </div>
 
                                 <button
@@ -150,7 +150,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                             <button
                                 onClick={creating || decks.length === 0 ? handleCreateAndSave : handleSaveExisting}
                                 disabled={saving}
-                                className="flex-[2] py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="flex-2 py-3 bg-linear-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {saving ? (
                                     <>

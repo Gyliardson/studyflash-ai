@@ -147,7 +147,7 @@ export default function ColecaoPage() {
                                     `}>
                                         {/* Barra de Gradiente */}
                                         <div className={`absolute top-0 left-0 w-full h-1 transition-all group-hover:h-2
-                                            ${isSelected ? "bg-indigo-500" : "bg-gradient-to-r from-blue-500 to-cyan-400"}
+                                            ${isSelected ? "bg-indigo-500" : "bg-linear-to-r from-blue-500 to-cyan-400"}
                                         `} />
 
                                         <div className="flex items-start justify-between mb-4">

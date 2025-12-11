@@ -13,15 +13,15 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
 
     return (
         <div
-            className="group h-64 w-full [perspective:1000px] cursor-pointer transition-all duration-300 hover:-translate-y-2"
+            className="group h-64 w-full perspective-[1000px] cursor-pointer transition-all duration-300 hover:-translate-y-2"
             onClick={() => setIsFlipped(!isFlipped)}
         >
             <div
-                className={`relative h-full w-full transition-all duration-500 [transform-style:preserve-3d] ${isFlipped ? "[transform:rotateY(180deg)]" : ""
+                className={`relative h-full w-full transition-all duration-500 transform-3d ${isFlipped ? "transform-[rotateY(180deg)]" : ""
                     }`}
             >
                 {/* --- FRENTE DO CARTÃO --- */}
-                <div className="absolute inset-0 h-full w-full rounded-2xl bg-white p-8 shadow-xl border-2 border-blue-100 flex flex-col items-center justify-center text-center [backface-visibility:hidden] transition-all duration-300 group-hover:shadow-2xl group-hover:border-blue-400">
+                <div className="absolute inset-0 h-full w-full rounded-2xl bg-white p-8 shadow-xl border-2 border-blue-100 flex flex-col items-center justify-center text-center backface-hidden transition-all duration-300 group-hover:shadow-2xl group-hover:border-blue-400">
 
                     {/* CABEÇALHO DO CARD (Número + Lixeira) */}
                     <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
@@ -51,7 +51,7 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
                 </div>
 
                 {/* --- VERSO DO CARTÃO --- */}
-                <div className="absolute inset-0 h-full w-full rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 p-8 text-white shadow-xl [transform:rotateY(180deg)] [backface-visibility:hidden] flex flex-col items-center justify-center text-center transition-all duration-300 group-hover:shadow-2xl group-hover:brightness-110">
+                <div className="absolute inset-0 h-full w-full rounded-2xl bg-linear-to-br from-blue-600 to-blue-800 p-8 text-white shadow-xl transform-[rotateY(180deg)] backface-hidden flex flex-col items-center justify-center text-center transition-all duration-300 group-hover:shadow-2xl group-hover:brightness-110">
                     <span className="absolute top-4 left-4 text-xs font-bold text-blue-200 uppercase tracking-widest">
                         Resposta
                     </span>
