@@ -177,7 +177,7 @@ export default function Home() {
                         disabled={loading}
                         className={`flex-1 py-4 rounded-xl font-bold text-white transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 ${loading
                             ? "bg-gray-800 cursor-wait animate-pulse"
-                            : "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/30"
+                            : "bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/30"
                             }`}
                     >
                         {loading && (
@@ -194,7 +194,7 @@ export default function Home() {
             {/* --- MENSAGEM DE ERRO --- */}
             {erro && (
                 <div className="w-full max-w-3xl mb-8 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r shadow-sm flex items-center gap-3 animate-in slide-in-from-top-2">
-                    <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <div>
                         <p className="font-bold">Ops!</p>
                         <p>{erro}</p>
@@ -214,7 +214,7 @@ export default function Home() {
                                 disabled={saving}
                                 className={`
                   group relative px-8 py-4 rounded-2xl font-bold text-white shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1 active:translate-y-0
-                  ${saving ? "bg-gray-400 cursor-wait" : "bg-gradient-to-r from-green-500 to-emerald-600"}
+                  ${saving ? "bg-gray-400 cursor-wait" : "bg-linear-to-r from-green-500 to-emerald-600"}
                 `}
                             >
                                 <div className="flex items-center gap-3">
