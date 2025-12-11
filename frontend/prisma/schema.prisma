@@ -1,11 +1,13 @@
+// [MANTIDO] Configuração do Client
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
 }
+
+// === MODELS ===
 
 model Flashcard {
   id        String   @id @default(uuid())
@@ -13,18 +15,26 @@ model Flashcard {
   frente    String
   verso     String
   createdAt DateTime @default(now())
-  
-  deckId    String?
-  deck      Deck?    @relation(fields: [deckId], references: [id], onDelete: Cascade)
 
-  // --- CAMPOS SRS (Modo Estudo) ---
-  nextReview     DateTime @default(now()) 
-  interval       Int      @default(0)     
-  repetition     Int      @default(0)     
-  easinessFactor Float    @default(2.5)   
+  // --- RELAÇÕES DE ORGANIZAÇÃO ---
+
+  // 1. Modo Clássico (Decks Soltos)
+  deckId String?
+  deck   Deck?   @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  // 2. Novo Modo Estruturado (v0.3.0)
+  topicId String?
+  topic   Topic?  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  // --- CAMPOS SRS (Sistema de Repetição Espaçada) ---
+  nextReview     DateTime @default(now())
+  interval       Int      @default(0)
+  repetition     Int      @default(0)
+  easinessFactor Float    @default(2.5)
 
   @@index([userId])
   @@index([userId, nextReview])
+  @@index([topicId]) // Indexação para performance no carregamento do tópico
 }
 
 model Deck {
@@ -35,4 +45,39 @@ model Deck {
   cards     Flashcard[]
 
   @@index([userId])
+}
+
+// --- NOVOS MODELS: PLANOS DE ESTUDO ---
+
+model StudyPlan {
+  id          String  @id @default(uuid())
+  userId      String
+  title       String // Ex: "Dominar React.js"
+  description String? // Contexto ou resumo gerado pela IA
+  difficulty  String // "Iniciante", "Intermediário", "Avançado"
+  status      String  @default("active") // 'active', 'completed', 'archived'
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  topics Topic[]
+
+  @@index([userId])
+}
+
+model Topic {
+  id String @id @default(uuid())
+
+  // Relação Pai (Plano)
+  planId String
+  plan   StudyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  title       String // Ex: "Módulo 1: Hooks Básicos"
+  order       Int // Para ordenação visual (1, 2, 3...)
+  isCompleted Boolean @default(false) // Check de conclusão
+
+  // Conteúdo Gerado
+  cards Flashcard[]
+
+  @@index([planId])
 }
