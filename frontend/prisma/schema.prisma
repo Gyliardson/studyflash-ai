@@ -81,3 +81,62 @@ model Topic {
 
   @@index([planId])
 }
+
+// === GAMIFICATION SYSTEM (v0.4.0) ===
+
+model UserProfile {
+  userId   String @id @unique // ID do Clerk
+  xp       Int    @default(0)
+  level    Int    @default(1)
+  weeklyXp Int    @default(0)
+
+  // Streak System
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  lastStudyDate DateTime?
+
+  // Recompensas desbloqueadas
+  unlockedRewards UserReward[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  // Opcional: Adicionar índice para o leaderboard ser rápido
+  @@index([weeklyXp(sort: Desc)])
+}
+
+model Reward {
+  id            String @id @default(uuid())
+  slug          String @unique // Identificador fixo no código (ex: theme-dark)
+  name          String
+  description   String
+  requiredLevel Int
+  type          String // 'COSMETIC', 'FEATURE'
+
+  users UserReward[]
+}
+
+model UserReward {
+  id         String   @id @default(uuid())
+  userId     String
+  rewardId   String
+  obtainedAt DateTime @default(now())
+
+  user   UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  reward Reward      @relation(fields: [rewardId], references: [id])
+
+  @@unique([userId, rewardId]) // Um usuário só desbloqueia a recompensa uma vez
+  @@index([userId])
+}
+
+// Opcional: Log para auditoria e features futuras (Simulados)
+model XPHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  amount    Int
+  source    String // 'REVIEW', 'CREATE_CARD', 'STREAK_BONUS', 'SIMULADO'
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

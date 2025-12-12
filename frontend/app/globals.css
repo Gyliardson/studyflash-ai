@@ -24,3 +24,26 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* === ANIMAÇÕES GLOBAIS === */
+
+/* Feixe de luz correndo da esquerda para direita */
+@keyframes beam-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Listras da barra de progresso */
+@keyframes stripes-move {
+  0% { background-position: 1rem 0; }
+  100% { background-position: 0 0; }
+}
+
+/* Classes utilitárias */
+.animate-beam {
+  animation: beam-slide 3s infinite ease-in-out; /* Mais lento (3s) para ser elegante */
+}
+
+.animate-stripes {
+  animation: stripes-move 1s linear infinite;
+}

@@ -1,5 +1,14 @@
 # Histórico de Versões - StudiFlow
 
+## v0.4.0 - Feature: Gamification & Perfil de Usuário (Entregue)
+
+- **Gamification:** Implementado sistema de XP (Criação, Revisão) e Níveis.
+- **Gamification:** Implementado sistema de Streak (Ofensiva Diária) com bônus de XP.
+- **UI/UX:** Novo componente `UserHUD` no Header, exibindo Nível e Streak.
+- **Frontend:** Criada página de `Perfil (/perfil)` com estatísticas e layout revisado.
+- **Frontend:** Implementada a lógica **Anti-Abuso** para XP (só ganha se o card estiver vencido).
+- **Frontend:** Corrigido bug de concorrência que fazia botões de "Gerar Conteúdo" piscarem ao serem clicados em sequência.
+
 ## v0.3.0 - Feature: Tutor IA & Planos de Estudo (Entregue)
 
 - **Feature:** Implementação de "Trilhas de Aprendizado" (`StudyPlan` e `Topic`).

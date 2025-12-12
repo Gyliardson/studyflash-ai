@@ -2,12 +2,101 @@
 
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/db";
+import { XP_VALUES } from "@/lib/gamification";
 
 // --- TIPOS ---
 type FlashcardInput = {
     frente: string;
     verso: string;
 };
+
+// Função interna para dar XP ao usuário
+// Adicionei o parâmetro opcional 'source' para logs futuros, sem quebrar o código atual
+async function concederXp(userId: string, amount: number, source: string = "UNKNOWN") {
+    if (amount <= 0) return;
+
+    try {
+        await prisma.userProfile.upsert({
+            where: { userId },
+            create: { userId, xp: amount, weeklyXp: amount }, // Agora vai funcionar com o schema corrigido
+            update: { 
+                xp: { increment: amount },
+                weeklyXp: { increment: amount }
+            }
+        });
+    } catch (error) {
+        console.error("Erro ao conceder XP:", error);
+    }
+}
+
+// Função interna para gerenciar a Ofensiva (Streak)
+async function processarStreak(userId: string) {
+    try {
+        const profile = await prisma.userProfile.findUnique({ where: { userId } });
+        
+        // Se não tiver perfil ainda, cria na primeira interação e retorna
+        if (!profile) {
+             await prisma.userProfile.create({
+                data: { 
+                    userId, 
+                    currentStreak: 1, 
+                    longestStreak: 1, 
+                    lastStudyDate: new Date(),
+                    xp: 0,
+                    weeklyXp: 0 
+                }
+            });
+            return { streakBonus: false };
+        }
+
+        const hoje = new Date();
+        const ultimaData = profile.lastStudyDate ? new Date(profile.lastStudyDate) : null;
+        
+        // Zera as horas para comparar apenas os dias (Meia-noite)
+        const hojeZero = new Date(hoje.setHours(0,0,0,0));
+        const ultimaZero = ultimaData ? new Date(ultimaData.setHours(0,0,0,0)) : null;
+
+        // Se nunca estudou antes (caso de migração de usuário antigo sem data)
+        if (!ultimaZero) {
+            await prisma.userProfile.update({
+                where: { userId },
+                data: { currentStreak: 1, longestStreak: 1, lastStudyDate: new Date() }
+            });
+            return { streakBonus: false };
+        }
+
+        const diffTime = Math.abs(hojeZero.getTime() - ultimaZero.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+        if (diffDays === 0) {
+            // Já estudou hoje, não faz nada
+            return { streakBonus: false };
+        } else if (diffDays === 1) {
+            // Estudou ontem -> Aumenta a Streak!
+            await prisma.userProfile.update({
+                where: { userId },
+                data: { 
+                    currentStreak: { increment: 1 },
+                    lastStudyDate: new Date(),
+                    longestStreak: Math.max(profile.currentStreak + 1, profile.longestStreak)
+                }
+            });
+            // Dá o bônus de XP
+            await concederXp(userId, XP_VALUES.DAILY_STREAK_BONUS, "STREAK");
+            return { streakBonus: true };
+        } else {
+            // Passou mais de 1 dia -> Zerou a Streak :(
+            await prisma.userProfile.update({
+                where: { userId },
+                data: { currentStreak: 1, lastStudyDate: new Date() }
+            });
+            return { streakBonus: false };
+        }
+    } catch (error) {
+        console.error("Erro no streak:", error);
+        return { streakBonus: false };
+    }
+}
 
 // --- 1. CRIAR UM NOVO BARALHO ---
 export async function criarBaralho(nome: string) {
@@ -52,7 +141,7 @@ export async function listarMeusBaralhos() {
     }
 }
 
-// --- 3. SALVAR FLASHCARDS ---
+// --- 3. SALVAR FLASHCARDS (ATUALIZADA COM XP) ---
 export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Login necessário." };
@@ -84,6 +173,11 @@ export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string)
                 }
             });
         }
+
+        // === CORREÇÃO: DAR XP PELA CRIAÇÃO ===
+        // Limitamos a 50 XP por lote
+        const xpGanho = Math.min(cards.length * XP_VALUES.CREATE_CARD, 50);
+        await concederXp(userId, xpGanho);
 
         return { success: true };
     } catch (error) {
@@ -183,7 +277,7 @@ export async function buscarCartoesParaRevisar(
     }
 }
 
-// --- 8. REGISTRAR PROGRESSO ---
+// --- 8. REGISTRAR PROGRESSO (COM XP + ANTI-FARM) ---
 export async function registrarRevisao(cardId: string, avaliacao: 'errei' | 'dificil' | 'facil') {
     const { userId } = await auth();
     if (!userId) return { success: false };
@@ -195,6 +289,20 @@ export async function registrarRevisao(cardId: string, avaliacao: 'errei' | 'dif
 
         if (!card) return { success: false };
 
+        // 1. Regra Anti-Farm: Só ganha XP se a revisão for agendada (vencida)
+        const isScheduledReview = card.nextReview <= new Date();
+        
+        let xpGained = 0;
+
+        if (isScheduledReview) {
+            if (avaliacao === 'facil') xpGained = XP_VALUES.REVIEW_EASY;
+            else if (avaliacao === 'dificil') xpGained = XP_VALUES.REVIEW_HARD;
+            else xpGained = XP_VALUES.REVIEW_FAIL;
+        } else {
+            xpGained = XP_VALUES.REVIEW_EXTRA; // 0 XP
+        }
+
+        // 2. Lógica SRS
         let { interval, repetition, easinessFactor: ef } = card;
 
         if (avaliacao === 'errei') {
@@ -213,13 +321,32 @@ export async function registrarRevisao(cardId: string, avaliacao: 'errei' | 'dif
         const nextDate = new Date();
         nextDate.setDate(nextDate.getDate() + interval);
 
-        await prisma.flashcard.update({
-            where: { id: cardId },
-            data: { interval, repetition, easinessFactor: ef, nextReview: nextDate }
-        });
+        // 3. Transação Atômica (Card + XP)
+        await prisma.$transaction(async (tx) => {
+            await tx.flashcard.update({
+                where: { id: cardId },
+                data: { interval, repetition, easinessFactor: ef, nextReview: nextDate }
+            });
 
-        return { success: true };
+            if (xpGained > 0) {
+                // === ATENÇÃO: Se der erro de 'weeklyXp' aqui, verifique seu schema.prisma ===
+                await tx.userProfile.upsert({
+                    where: { userId },
+                    create: { userId, xp: xpGained, weeklyXp: xpGained },
+                    update: { 
+                        xp: { increment: xpGained },
+                        weeklyXp: { increment: xpGained }
+                    }
+                });
+            }
+        });
+        
+        // 4. Processa Streak
+        await processarStreak(userId);
+
+        return { success: true, xpGained, isScheduledReview };
     } catch (error) {
+        console.error("Erro ao registrar revisão:", error);
         return { success: false };
     }
 }
@@ -374,5 +501,69 @@ export async function excluirPlano(id: string) {
     } catch (error) {
         console.error("Erro ao excluir plano:", error);
         return { success: false, error: "Erro ao excluir plano." };
+    }
+}
+
+// --- 15. OBTER PERFIL DO USUÁRIO (HUD) ---
+export async function obterPerfilUsuario() {
+    const { userId } = await auth();
+    if (!userId) return null;
+
+    try {
+        const profile = await prisma.userProfile.findUnique({
+            where: { userId },
+            // include: { unlockedRewards: true } // Futuro
+        });
+        
+        // Se não tiver perfil ainda, retorna um padrão zerado para não quebrar a UI
+        if (!profile) return { xp: 0, level: 1, currentStreak: 0, weeklyXp: 0 };
+        
+        return profile;
+    } catch (error) {
+        console.error("Erro ao buscar perfil:", error);
+        return null;
+    }
+}
+
+// --- 16. CONCLUIR TÓPICO DA TRILHA (GAMIFICATION) ---
+export async function concluirTopico(topicId: string) {
+    const { userId } = await auth();
+    if (!userId) return { success: false };
+
+    try {
+        // 1. Verifica se o tópico existe e pertence a um plano do usuário
+        const topic = await prisma.topic.findFirst({
+            where: { 
+                id: topicId,
+                plan: { userId } // Garante segurança (só dono altera)
+            }
+        });
+
+        if (!topic) return { success: false, error: "Tópico não encontrado" };
+        if (topic.isCompleted) return { success: false, error: "Já concluído!" }; // Evita farmar XP clicando 2x
+
+        // 2. Transação: Marca concluído + Dá XP
+        await prisma.$transaction(async (tx) => {
+            // Marca Check
+            await tx.topic.update({
+                where: { id: topicId },
+                data: { isCompleted: true }
+            });
+
+            // Dá o XP
+            await tx.userProfile.upsert({
+                where: { userId },
+                create: { userId, xp: XP_VALUES.COMPLETE_TOPIC, weeklyXp: XP_VALUES.COMPLETE_TOPIC },
+                update: { 
+                    xp: { increment: XP_VALUES.COMPLETE_TOPIC },
+                    weeklyXp: { increment: XP_VALUES.COMPLETE_TOPIC }
+                }
+            });
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error("Erro ao concluir tópico:", error);
+        return { success: false };
     }
 }

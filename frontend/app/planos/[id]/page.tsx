@@ -12,10 +12,13 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
     const { isLoaded, isSignedIn } = useUser();
     const [plano, setPlano] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [loadingTopicId, setLoadingTopicId] = useState<string | null>(null);
+    
+    // CORREÇÃO 1: Usar Array para suportar múltiplos loadings simultâneos
+    const [generatingTopicIds, setGeneratingTopicIds] = useState<string[]>([]);
+    
     const [id, setId] = useState<string>("");
 
-    // Desenbrulha params
+    // Desembrulha params
     useEffect(() => {
         params.then((p) => setId(p.id));
     }, [params]);
@@ -33,7 +36,8 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
     }
 
     async function handleGerarConteudo(topicId: string, topicTitle: string) {
-        setLoadingTopicId(topicId);
+        // CORREÇÃO 2: Adiciona o ID na lista de "carregando"
+        setGeneratingTopicIds((prev) => [...prev, topicId]);
         
         const res = await gerarCardsParaTopico(plano.title, topicId, topicTitle);
         
@@ -43,7 +47,8 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
             alert("Erro ao gerar conteúdo. Tente novamente.");
         }
         
-        setLoadingTopicId(null);
+        // CORREÇÃO 3: Remove o ID da lista, liberando o botão
+        setGeneratingTopicIds((prev) => prev.filter((id) => id !== topicId));
     }
 
     if (loading) {
@@ -75,6 +80,8 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
                     
                     {plano.topics.map((topic: any, index: number) => {
                         const temCards = topic._count.cards > 0;
+                        // CORREÇÃO 4: Verifica se ESTE tópico está na lista de geração
+                        const isGenerating = generatingTopicIds.includes(topic.id);
 
                         return (
                             <div key={topic.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
@@ -104,11 +111,19 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
                                         {!temCards ? (
                                             <button 
                                                 onClick={() => handleGerarConteudo(topic.id, topic.title)}
-                                                disabled={loadingTopicId === topic.id}
-                                                className="w-full py-2 bg-indigo-50 text-indigo-600 font-bold rounded-lg hover:bg-indigo-100 transition flex justify-center items-center gap-2 text-sm"
+                                                disabled={isGenerating}
+                                                className={`w-full py-2 font-bold rounded-lg transition flex justify-center items-center gap-2 text-sm
+                                                    ${isGenerating 
+                                                        ? "bg-indigo-50 text-indigo-400 cursor-wait" 
+                                                        : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                                                    }
+                                                `}
                                             >
-                                                {loadingTopicId === topic.id ? (
-                                                    <span className="animate-pulse">Criando...</span>
+                                                {isGenerating ? (
+                                                    <>
+                                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent"></div>
+                                                        <span>Criando...</span>
+                                                    </>
                                                 ) : (
                                                     <>✨ Gerar Conteúdo</>
                                                 )}
