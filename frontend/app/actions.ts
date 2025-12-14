@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/db";
-import { XP_VALUES } from "@/lib/gamification";
+import { XP_VALUES, DAILY_LIMITS } from "@/lib/gamification";
 
 // --- TIPOS ---
 type FlashcardInput = {
@@ -11,19 +11,31 @@ type FlashcardInput = {
 };
 
 // Função interna para dar XP ao usuário
-// Adicionei o parâmetro opcional 'source' para logs futuros, sem quebrar o código atual
+// Função interna atualizada: Grava histórico para controle de limites
 async function concederXp(userId: string, amount: number, source: string = "UNKNOWN") {
     if (amount <= 0) return;
 
     try {
-        await prisma.userProfile.upsert({
-            where: { userId },
-            create: { userId, xp: amount, weeklyXp: amount }, // Agora vai funcionar com o schema corrigido
-            update: { 
-                xp: { increment: amount },
-                weeklyXp: { increment: amount }
-            }
-        });
+        // Transação: Atualiza Perfil E cria o Log de Histórico
+        await prisma.$transaction([
+            // 1. Atualiza totais
+            prisma.userProfile.upsert({
+                where: { userId },
+                create: { userId, xp: amount, weeklyXp: amount },
+                update: { 
+                    xp: { increment: amount },
+                    weeklyXp: { increment: amount }
+                }
+            }),
+            // 2. Grava auditoria (Fundamental para o limite diário funcionar)
+            prisma.xPHistory.create({
+                data: {
+                    userId,
+                    amount,
+                    source
+                }
+            })
+        ]);
     } catch (error) {
         console.error("Erro ao conceder XP:", error);
     }
@@ -141,12 +153,13 @@ export async function listarMeusBaralhos() {
     }
 }
 
-// --- 3. SALVAR FLASHCARDS (ATUALIZADA COM XP) ---
+// --- 3. SALVAR FLASHCARDS (COM LIMITE DIÁRIO DE XP) ---
 export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Login necessário." };
 
     try {
+        // 1. Salva os cards no Banco (Lógica original mantida)
         if (deckId) {
             await prisma.flashcard.createMany({
                 data: cards.map((card) => ({
@@ -158,7 +171,6 @@ export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string)
             });
         } else {
             const nomeBaralho = `Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().getHours()}:${new Date().getMinutes()}`;
-
             await prisma.deck.create({
                 data: {
                     userId,
@@ -174,10 +186,40 @@ export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string)
             });
         }
 
-        // === CORREÇÃO: DAR XP PELA CRIAÇÃO ===
-        // Limitamos a 50 XP por lote
-        const xpGanho = Math.min(cards.length * XP_VALUES.CREATE_CARD, 50);
-        await concederXp(userId, xpGanho);
+        // 2. Lógica de Gamification: Verifica Limite Diário
+        
+        // Define o início do dia (00:00 de hoje)
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        // Soma quanto XP de "CREATE_CARD" o usuário já ganhou hoje
+        const history = await prisma.xPHistory.aggregate({
+            _sum: { amount: true },
+            where: {
+                userId,
+                source: "CREATE_CARD",
+                createdAt: { gte: startOfDay }
+            }
+        });
+
+        const xpJaGanhoHoje = history._sum.amount || 0;
+        const limiteDiario = DAILY_LIMITS.MAX_XP_FROM_CREATION; // 50 XP
+        
+        // Calcula quanto ele PODE ganhar nesta ação
+        let xpPotencial = Math.min(cards.length * XP_VALUES.CREATE_CARD, 50); // Cap por lote
+        let xpReal = 0;
+
+        if (xpJaGanhoHoje >= limiteDiario) {
+            xpReal = 0; // Já atingiu o limite, ganha 0
+        } else {
+            // Ganha o menor valor entre: O que o lote vale OU O que falta para atingir o limite
+            xpReal = Math.min(xpPotencial, limiteDiario - xpJaGanhoHoje);
+        }
+
+        // Só concede se tiver saldo > 0
+        if (xpReal > 0) {
+            await concederXp(userId, xpReal, "CREATE_CARD");
+        }
 
         return { success: true };
     } catch (error) {
@@ -564,6 +606,208 @@ export async function concluirTopico(topicId: string) {
         return { success: true };
     } catch (error) {
         console.error("Erro ao concluir tópico:", error);
+        return { success: false };
+    }
+}
+
+// === 17. MODO SIMULADO (v0.5.1 - Múltipla Escolha) ===
+
+// A. Iniciar Simulado (COM FALLBACK HÍBRIDO)
+export async function iniciarSimulado(
+    mode: 'DECK' | 'TOPIC' | 'PLAN' | 'GLOBAL',
+    sourceId: string | undefined,
+    quantity: number
+) {
+    const { userId } = await auth();
+    if (!userId) return { success: false, error: "Login necessário." };
+
+    try {
+        const whereCondition: any = { userId };
+        
+        // --- FILTROS ---
+        if (mode === 'DECK' && sourceId) whereCondition.deckId = sourceId;
+        if (mode === 'TOPIC' && sourceId) whereCondition.topicId = sourceId;
+        if (mode === 'PLAN' && sourceId) whereCondition.topic = { planId: sourceId };
+        
+        // 1. Busca IDs (Pool de Questões)
+        const allCards = await prisma.flashcard.findMany({
+            where: whereCondition,
+            select: { id: true, frente: true, verso: true }
+        });
+
+        if (allCards.length < 4) {
+            return { success: false, error: "Você precisa de pelo menos 4 flashcards para criar alternativas." };
+        }
+
+        // 2. Sorteia as Questões (Limitado a 15 para IA)
+        const maxQuestions = Math.min(quantity, 15);
+        const shuffled = allCards.sort(() => 0.5 - Math.random());
+        const selectedCards = shuffled.slice(0, maxQuestions);
+
+        // 3. Tenta chamar a IA (com timeout curto para não travar)
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        let questoesIA: any[] = [];
+        
+        try {
+            const aiResponse = await fetch(`${baseUrl}/api/gerar-prova`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    cartoes: selectedCards.map(c => ({
+                        id: c.id,
+                        frente: c.frente,
+                        verso: c.verso
+                    }))
+                }),
+                cache: "no-store",
+                signal: AbortSignal.timeout(8000) // 8s timeout para não deixar o user esperando
+            });
+
+            if (aiResponse.ok) {
+                questoesIA = await aiResponse.json();
+            }
+        } catch (ignored) {
+            console.log("IA indisponível ou lenta, usando gerador local.");
+        }
+
+        // 4. Mesclagem Inteligente (O segredo do fix)
+        const finalExam = selectedCards.map(card => {
+            const dadosIA = questoesIA.find((q: any) => q.card_id === card.id);
+            
+            // Verifica se a IA retornou dados VÁLIDOS (pelo menos 2 alternativas)
+            // Se retornou só 1 (a correta), descartamos e usamos o gerador local.
+            let options = (dadosIA && dadosIA.alternativas && dadosIA.alternativas.length >= 2)
+                ? dadosIA.alternativas
+                : null;
+
+            // FALLBACK LOCAL: Se não tem opções da IA, pega de outros cards
+            if (!options) {
+                const distractorPool = allCards.filter(c => c.id !== card.id);
+                const wrongAnswers = distractorPool
+                    .sort(() => 0.5 - Math.random())
+                    .slice(0, 3)
+                    .map(c => c.verso);
+                
+                // Garante que temos a correta + 3 erradas
+                options = [card.verso, ...wrongAnswers];
+            }
+
+            // Embaralha final
+            options = options.sort(() => 0.5 - Math.random());
+
+            return { ...card, options };
+        });
+
+        return { success: true, cards: finalExam };
+
+    } catch (error) {
+        console.error("Erro crítico ao iniciar simulado:", error);
+        return { success: false, error: "Falha ao gerar a prova." };
+    }
+}
+
+// B. Finalizar Simulado
+export async function finalizarSimulado(
+    resultado: {
+        totalQuestions: number;
+        correctAnswers: number;
+        timeSpentSeconds: number;
+        difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'IMPOSSIBLE';
+        sourceType: string;
+        sourceId?: string;
+        answers: { flashcardId: string; isCorrect: boolean; timeTaken: number }[]
+    }
+) {
+    const { userId } = await auth();
+    if (!userId) return { success: false };
+
+    try {
+        // 1. Verificação Anti-Farm: Quantos simulados já fez hoje?
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        const simuladosHoje = await prisma.examSession.count({
+            where: {
+                userId,
+                createdAt: { gte: hoje }
+            }
+        });
+
+        // LIMITE DIÁRIO: 3 Simulados Valendo XP
+        const LIMITE_DIARIO = 3;
+        const jaAtingiuLimite = simuladosHoje >= LIMITE_DIARIO;
+
+        // 2. Cálculo do XP (Se atingiu limite, XP é zero)
+        const score = resultado.totalQuestions > 0 ? resultado.correctAnswers / resultado.totalQuestions : 0;
+        let xpGained = 0;
+
+        if (!jaAtingiuLimite) {
+            xpGained = XP_VALUES.EXAM_COMPLETION;
+
+            let multiplier = XP_VALUES.EXAM_PER_CORRECT_EASY;
+            if (resultado.difficulty === 'MEDIUM') multiplier = XP_VALUES.EXAM_PER_CORRECT_MEDIUM;
+            if (resultado.difficulty === 'HARD') multiplier = XP_VALUES.EXAM_PER_CORRECT_HARD;
+            if (resultado.difficulty === 'IMPOSSIBLE') multiplier = XP_VALUES.EXAM_PER_CORRECT_IMPOSSIBLE;
+
+            xpGained += (resultado.correctAnswers * multiplier);
+            if (score >= 0.9) xpGained += XP_VALUES.EXAM_PERFECT_BONUS;
+        }
+
+        // 3. Salva no Banco
+        const session = await prisma.$transaction(async (tx) => {
+            const newSession = await tx.examSession.create({
+                data: {
+                    userId,
+                    sourceType: resultado.sourceType,
+                    sourceDeckId: resultado.sourceType === 'DECK' ? resultado.sourceId : undefined,
+                    sourceTopicId: resultado.sourceType === 'TOPIC' ? resultado.sourceId : undefined,
+                    sourcePlanId: resultado.sourceType === 'PLAN' ? resultado.sourceId : undefined,
+                    
+                    totalQuestions: resultado.totalQuestions,
+                    correctAnswers: resultado.correctAnswers,
+                    score: score,
+                    timeSpentSeconds: resultado.timeSpentSeconds,
+                    difficulty: resultado.difficulty,
+                    xpAwarded: xpGained, // Pode ser 0 se atingiu limite
+                    questions: {
+                        create: resultado.answers.map(a => ({
+                            flashcardId: a.flashcardId,
+                            isCorrect: a.isCorrect,
+                            timeTakenSeconds: a.timeTaken
+                        }))
+                    }
+                }
+            });
+
+            // Só atualiza o perfil se ganhou XP
+            if (xpGained > 0) {
+                await tx.userProfile.update({
+                    where: { userId },
+                    data: { 
+                        xp: { increment: xpGained },
+                        weeklyXp: { increment: xpGained }
+                    }
+                });
+            }
+
+            return newSession;
+        });
+
+        // 4. Se processar streak for necessário, chamamos aqui
+        if (!jaAtingiuLimite) {
+             await processarStreak(userId);
+        }
+
+        return { 
+            success: true, 
+            sessionId: session.id, 
+            xpGained, 
+            score,
+            limitReached: jaAtingiuLimite // Avisa o frontend
+        };
+
+    } catch (error) {
+        console.error("Erro ao salvar simulado:", error);
         return { success: false };
     }
 }

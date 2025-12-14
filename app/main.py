@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from .models import ConjuntoFlashcards, PlanoEstudo, PedidoPlano, PedidoConteudoTopico
-from .services import gerar_flashcards_service, extrair_texto_do_pdf, gerar_plano_service, gerar_conteudo_topico_service
+from .models import ConjuntoFlashcards, PlanoEstudo, PedidoPlano, PedidoConteudoTopico, PedidoGerarProva, QuestaoProva
+from .services import gerar_flashcards_service, extrair_texto_do_pdf, gerar_plano_service, gerar_conteudo_topico_service, gerar_distratores_batch
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -99,6 +99,23 @@ async def gerar_cards_topico(pedido: PedidoConteudoTopico):
     except Exception as e:
         print(f"Erro ao gerar conteúdo: {e}")
         raise HTTPException(status_code=500, detail="Erro ao gerar material didático.")
+    
+@app.post("/api/gerar-prova", response_model=list[QuestaoProva])
+async def gerar_prova(pedido: PedidoGerarProva):
+    try:
+        # Limitamos a 20 questões por requisição para evitar timeout do Vercel/Render
+        # Se o usuário pedir 50, o frontend pode quebrar em requisições menores futuramente
+        if len(pedido.cartoes) > 20:
+             # Pega apenas os 20 primeiros para garantir performance no MVP
+             cartoes_processar = pedido.cartoes[:20]
+        else:
+             cartoes_processar = pedido.cartoes
+
+        resultado = await gerar_distratores_batch(cartoes_processar)
+        return resultado
+    except Exception as e:
+        print(f"Erro ao gerar prova: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao gerar prova com IA.")
 
 @app.get("/")
 def health_check():

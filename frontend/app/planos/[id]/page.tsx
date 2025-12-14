@@ -6,6 +6,7 @@ import Flashcard from "../../components/Flashcard";
 import { buscarPlanoPorId, gerarCardsParaTopico } from "../../actions";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { triggerHudRefresh } from "../../components/UserHUD";
 
 // Next.js 15+ Params
 export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -42,6 +43,7 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
         const res = await gerarCardsParaTopico(plano.title, topicId, topicTitle);
         
         if (res.success) {
+            triggerHudRefresh();
             await carregarPlano(); // Recarrega para mostrar os novos cards
         } else {
             alert("Erro ao gerar conteúdo. Tente novamente.");

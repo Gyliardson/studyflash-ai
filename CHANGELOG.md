@@ -1,5 +1,46 @@
 # Histórico de Versões - StudiFlow
 
+## [v0.5.0] - 14/12/2025 (Modo Simulado & Resiliência de IA)
+
+### ✨ Novas Funcionalidades (Modo Simulado)
+
+- **Engine de Provas:** Novo sistema de Simulado que gera questões de múltipla escolha baseadas nos seus Flashcards.
+- **Alternativas via IA:** A IA (Llama-70b) agora cria 3 alternativas falsas ("distratores") plausíveis para cada questão, tornando o teste mais desafiador.
+- **Níveis de Dificuldade:**
+  - **Prática:** Sem tempo limite.
+  - **Exame:** 1m 30s por questão.
+  - **Difícil:** 45s por questão.
+  - **Impossível:** 20s por questão (Multiplicador de XP 5x).
+- **Filtros de Fonte:** Agora é possível criar simulados por **Baralho**, **Tópico**, **Trilha Completa** (Plano) ou **Global** (Tudo).
+- **Gamification Balanceado:** XP turbinado para simulados, com **Limite Diário** (apenas os 3 primeiros do dia valem XP) para evitar "farming".
+
+### 🛡️ Backend & Resiliência (AI Safety)
+
+- **Circuit Breaker (Fallback Híbrido):** Implementado sistema robusto que alterna automaticamente entre modelos de IA se o limite for atingido:
+  1.  **Principal:** `llama-3.3-70b-versatile` (Alta Inteligência).
+  2.  **Backup:** `llama-3.1-8b-instant` (Alta Velocidade/Cota, modo JSON forçado).
+  3.  **Local:** Gerador aleatório interno (caso a internet/API falhe totalmente).
+- **Rate Limit Throttling:** Adicionada pausa estratégica (`sleep`) entre gerações de questões para evitar erros de "Burst" (429) na API da Groq.
+- **Validação de Output:** O sistema agora ignora respostas da IA que não sigam o formato JSON estrito.
+
+### 🎨 Interface & UX (Design System)
+
+- **Redesign da Coleção:** Substituição de emojis por ícones SVG (Heroicons) para um visual mais profissional.
+- **Abas de Navegação:** Separação entre "Meus Baralhos" e "Trilhas de Estudo" na tela de coleção.
+- **Componentes Customizados:**
+  - Novos seletores (Dropdowns) estilizados que substituem o select nativo do navegador.
+  - Sliders de quantidade e dificuldade com design moderno.
+- **Micro-interações:**
+  - Botão de "Lixeira" agora fica invisível e só aparece ao passar o mouse (Hover).
+  - Feedback visual de acerto/erro instantâneo após o timer da prova.
+
+### 🐛 Correções & Ajustes
+
+- **Database:** Adicionado campo `sourcePlanId` na tabela `ExamSession` para rastrear simulados de trilhas.
+- **Layout:** Correção do alinhamento do Header na página de coleção (`mx-auto`).
+- **Input:** Correção da cor da fonte no input de criar baralho (estava branco no fundo branco).
+- **Navegação:** Ajuste na leitura de parâmetros de URL (`deckId` vs `decks`) na página de estudo.
+
 ## v0.4.0 - Feature: Gamification & Perfil de Usuário (Entregue)
 
 - **Gamification:** Implementado sistema de XP (Criação, Revisão) e Níveis.

@@ -22,8 +22,13 @@ function StudyContent() {
 
     // --- LEITURA DOS PARÂMETROS DA URL (v0.3.0) ---
     // 1. Decks (Modo Clássico)
-    const deckIdsParam = searchParams.get('decks');
-    const deckIds = deckIdsParam ? deckIdsParam.split(',') : [];
+    const deckIdsParam = searchParams.get('decks');     // Suporte a múltiplos (?decks=1,2,3)
+    const singleDeckId = searchParams.get('deckId');    // Suporte a único (?deckId=1) [CORREÇÃO AQUI]
+    
+    // Normaliza para sempre ser um array de strings
+    const deckIds = deckIdsParam 
+        ? deckIdsParam.split(',') 
+        : (singleDeckId ? [singleDeckId] : []);
 
     // 2. Planos e Tópicos (Modo Tutor)
     const planId = searchParams.get('planId') || undefined;
@@ -52,7 +57,7 @@ function StudyContent() {
             }
         }
         carregar();
-    }, [isLoaded, isSignedIn, deckIdsParam, planId, topicId]);
+    }, [isLoaded, isSignedIn, deckIdsParam, singleDeckId, planId, topicId]); // Adicionado singleDeckId nas dependências
 
     const handleAvaliacao = async (avaliacao: 'errei' | 'dificil' | 'facil') => {
         const cardAtual = queue[cardAtualIndex];
@@ -88,14 +93,14 @@ function StudyContent() {
     const getSessionTitle = () => {
         if (topicId) return "Revisão de Tópico";
         if (planId) return "Estudo do Plano Completo";
-        if (deckIds.length > 0) return `${deckIds.length} Baralho(s) Selecionado(s)`;
+        if (deckIds.length > 0) return `${deckIds.length} Baralho(s) Selecionado(s)`; // Agora vai cair aqui corretamente
         return "Modo Global (Tudo)";
     };
 
     if (loading) {
         return (
             <div className="flex justify-center items-center py-20">
-                <div className="animate-spin h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                <div className="animate-spin h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
             </div>
         );
     }
@@ -104,7 +109,7 @@ function StudyContent() {
         <div className="w-full max-w-2xl text-center">
             {/* Título da Sessão */}
             <div className="mb-6">
-                <span className="text-xs font-bold text-blue-500 tracking-widest uppercase mb-1 block">
+                <span className="text-xs font-bold text-indigo-500 tracking-widest uppercase mb-1 block">
                     {getSessionTitle()}
                 </span>
             </div>
@@ -113,7 +118,7 @@ function StudyContent() {
                 <>
                     <div className="mb-6 flex justify-between items-end px-2">
                         <h1 className="text-2xl font-bold text-gray-800">Modo Estudo 🧠</h1>
-                        <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                        <span className="text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
                             {cardAtualIndex + 1} / {queue.length}
                         </span>
                     </div>
@@ -153,7 +158,7 @@ function StudyContent() {
                             
                             {/* Botão de Voltar Inteligente */}
                             <Link href={planId ? `/planos/${planId}` : "/colecao"}>
-                                <button className="w-full bg-blue-600 text-white px-6 py-3.5 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg active:scale-95">
+                                <button className="w-full bg-indigo-600 text-white px-6 py-3.5 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg active:scale-95">
                                     {planId ? "Voltar ao Plano" : "Voltar para Coleção"}
                                 </button>
                             </Link>
@@ -198,7 +203,7 @@ function StudyContent() {
 // Componente Principal
 export default function EstudarPage() {
     return (
-        <div className="min-h-screen bg-gray-100 flex flex-col items-center p-6 md:p-12">
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center p-6 md:p-12">
             <Header />
             <Suspense fallback={<div className="text-center p-10">Carregando ambiente de estudo...</div>}>
                 <StudyContent />

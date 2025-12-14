@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { criarBaralho, listarMeusBaralhos, salvarFlashcards } from "../actions";
+import { triggerHudRefresh } from "./UserHUD";
 
 interface SaveModalProps {
     cards: { frente: string; verso: string }[];
@@ -41,6 +42,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
 
         await salvarFlashcards(cards, resDeck.deck.id);
         setSaving(false);
+        triggerHudRefresh();
         onSuccess();
     }
 
@@ -49,6 +51,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
         setSaving(true);
         await salvarFlashcards(cards, selectedDeck);
         setSaving(false);
+        triggerHudRefresh();
         onSuccess();
     }
 

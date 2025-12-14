@@ -32,6 +32,9 @@ model Flashcard {
   repetition     Int      @default(0)
   easinessFactor Float    @default(2.5)
 
+  // --- RELAÇÃO AO SIMULADO ---
+  examResults ExamQuestion[]
+
   @@index([userId])
   @@index([userId, nextReview])
   @@index([topicId]) // Indexação para performance no carregamento do tópico
@@ -80,6 +83,44 @@ model Topic {
   cards Flashcard[]
 
   @@index([planId])
+}
+
+// --- NOVOS MODELS: MODO SIMULADO (v0.5.0) ---
+
+model ExamSession {
+  id               String   @id @default(uuid())
+  userId           String
+  sourceDeckId     String? // Se for um Deck
+  sourceTopicId    String? // Se for um Tópico
+  sourcePlanId     String? // [NOVO] Se for uma Trilha Completa
+  sourceType       String // 'DECK', 'TOPIC', 'PLAN', 'GLOBAL'
+  totalQuestions   Int
+  correctAnswers   Int
+  score            Float // Porcentagem de acerto (0.0 a 1.0)
+  timeSpentSeconds Int
+  difficulty       String // 'EASY', 'MEDIUM', 'HARD', 'IMPOSSIBLE'
+  xpAwarded        Int
+  createdAt        DateTime @default(now())
+
+  questions ExamQuestion[]
+
+  @@index([userId])
+}
+
+model ExamQuestion {
+  id        String      @id @default(uuid())
+  sessionId String
+  session   ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // Link para o cartão original (SEM DUPLICAÇÃO)
+  flashcardId String
+  flashcard   Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+
+  isCorrect        Boolean
+  timeTakenSeconds Float?
+
+  @@index([sessionId])
+  @@index([flashcardId])
 }
 
 // === GAMIFICATION SYSTEM (v0.4.0) ===

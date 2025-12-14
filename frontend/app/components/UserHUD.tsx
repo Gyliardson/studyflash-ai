@@ -3,21 +3,40 @@
 import { useEffect, useState } from "react";
 import { obterPerfilUsuario } from "../actions";
 import { calcularNivel } from "@/lib/gamification";
-import Link from "next/link"; // <--- Importado
+import Link from "next/link";
+
+// --- UTILITÁRIO GLOBAL PARA ATUALIZAR O HUD ---
+// Importe e chame esta função em qualquer lugar que o usuário ganhe XP
+export const triggerHudRefresh = () => {
+    if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("user-hud-refresh"));
+    }
+};
 
 export default function UserHUD() {
     const [stats, setStats] = useState({ xp: 0, currentStreak: 0 });
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function load() {
-            const dados = await obterPerfilUsuario();
-            if (dados) {
-                setStats({ xp: dados.xp, currentStreak: dados.currentStreak });
-            }
-            setLoading(false);
+    // Função de carregamento isolada para ser reutilizada
+    async function fetchStats() {
+        const dados = await obterPerfilUsuario();
+        if (dados) {
+            setStats({ xp: dados.xp, currentStreak: dados.currentStreak });
         }
-        load();
+        setLoading(false);
+    }
+
+    useEffect(() => {
+        // 1. Carrega na montagem inicial
+        fetchStats();
+
+        // 2. Adiciona o ouvinte do evento global
+        window.addEventListener("user-hud-refresh", fetchStats);
+
+        // 3. Limpeza ao desmontar
+        return () => {
+            window.removeEventListener("user-hud-refresh", fetchStats);
+        };
     }, []);
 
     if (loading) return (
@@ -30,13 +49,11 @@ export default function UserHUD() {
     const { level, progress, xpToNext } = calcularNivel(stats.xp);
 
     return (
-        // Envolvemos tudo num Link para a página de Perfil
         <Link href="/perfil">
             <div 
                 className="group relative flex items-center gap-5 bg-linear-to-b from-indigo-50 to-white backdrop-blur-xl border border-indigo-100/50 px-5 py-2.5 rounded-2xl shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all duration-500 hover:-translate-y-0.5 cursor-pointer overflow-hidden"
                 title={`Faltam ${xpToNext} XP para o nível ${level + 1}. Clique para ver perfil.`}
             >
-                {/* Feixe de Luz */}
                 <div 
                     className="absolute inset-0 z-10 pointer-events-none animate-beam"
                     style={{
@@ -49,7 +66,6 @@ export default function UserHUD() {
                     }}
                 />
 
-                {/* Conteúdo (Igual ao anterior) */}
                 <div className="relative z-20 flex items-center gap-2">
                     <div className={`text-2xl filter drop-shadow-sm transition-transform duration-700 ${stats.currentStreak > 0 ? "animate-pulse scale-110" : "grayscale opacity-50"}`}>
                         🔥

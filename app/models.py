@@ -32,3 +32,22 @@ class PedidoPlano(BaseModel):
 class PedidoConteudoTopico(BaseModel):
     tema_plano: str
     titulo_topico: str
+
+# === 3. MODO SIMULADO / PROVA ===
+
+class ItemSimuladoInput(BaseModel):
+    id: str
+    frente: str
+    verso: str
+
+class PedidoGerarProva(BaseModel):
+    cartoes: List[ItemSimuladoInput]
+
+# [NOVO] Modelo Exclusivo para a IA (Sem ID, apenas criatividade)
+class QuestaoProvaGeracao(BaseModel):
+    alternativas: List[str] = Field(description="Lista contendo a resposta CORRETA e 3 DISTRATORES (respostas erradas plausíveis).")
+
+# Modelo final para o Frontend (Com ID)
+class QuestaoProva(BaseModel):
+    card_id: str
+    alternativas: List[str]
