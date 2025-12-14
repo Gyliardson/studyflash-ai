@@ -44,20 +44,20 @@ function CustomDropdown({
                 onClick={() => setIsOpen(!isOpen)}
                 className={`w-full h-full p-1 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-3 text-center
                     ${isActive 
-                    ? 'border-indigo-600 bg-indigo-50/50 shadow-sm' 
-                    : 'border-gray-100 hover:border-indigo-200 hover:bg-gray-50'}`}
+                    ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/30 shadow-sm'
+                    : 'border-gray-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-800 hover:bg-gray-50 dark:hover:bg-slate-800'}`}
             >
-                <div className={`p-3 rounded-full transition-colors ${isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
+                <div className={`p-3 rounded-full transition-colors ${isActive ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400'}`}>
                     {icon}
                 </div>
-                <div className={`font-bold text-sm truncate max-w-[140px] px-2 ${isActive ? 'text-indigo-900' : 'text-gray-500'}`}>
+                <div className={`font-bold text-sm truncate max-w-[140px] px-2 ${isActive ? 'text-indigo-900 dark:text-indigo-300' : 'text-gray-500 dark:text-gray-400'}`}>
                     {selectedLabel || placeholder}
                 </div>
-                <div className="absolute top-3 right-3 text-[10px] opacity-30">▼</div>
+                <div className="absolute top-3 right-3 text-[10px] opacity-30 dark:text-gray-400">▼</div>
             </button>
 
             {isOpen && (
-                <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2">
+                <div className="absolute top-full left-0 w-full mt-2 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 z-50 max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2">
                     {options.length > 0 ? (
                         <div className="p-1 space-y-1">
                             {options.map((option) => (
@@ -69,8 +69,8 @@ function CustomDropdown({
                                     }}
                                     className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors
                                         ${value === option.id 
-                                            ? "bg-indigo-50 text-indigo-700" 
-                                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                                            ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400"
+                                            : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-gray-100"
                                         }
                                     `}
                                 >
@@ -97,7 +97,7 @@ const DIFFICULTIES = {
         description: "Sem tempo.", 
         timePerQuestion: 0, 
         multiplier: 1, 
-        color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", ring: "ring-emerald-500",
+        color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20", border: "border-emerald-200 dark:border-emerald-800", ring: "ring-emerald-500",
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
     },
     MEDIUM: { 
@@ -106,7 +106,7 @@ const DIFFICULTIES = {
         description: "1m 30s / questão", 
         timePerQuestion: 90, 
         multiplier: 2, 
-        color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200", ring: "ring-amber-500",
+        color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20", border: "border-amber-200 dark:border-amber-800", ring: "ring-amber-500",
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
     },
     HARD: { 
@@ -115,7 +115,7 @@ const DIFFICULTIES = {
         description: "45s / questão", 
         timePerQuestion: 45, 
         multiplier: 3, 
-        color: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200", ring: "ring-rose-500",
+        color: "text-rose-700 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-900/20", border: "border-rose-200 dark:border-rose-800", ring: "ring-rose-500",
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
     },
     IMPOSSIBLE: { 
@@ -124,7 +124,7 @@ const DIFFICULTIES = {
         description: "20s / questão 🔥", 
         timePerQuestion: 20, 
         multiplier: 5, 
-        color: "text-purple-700", bg: "bg-purple-50", border: "border-purple-200", ring: "ring-purple-500",
+        color: "text-purple-700 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-900/20", border: "border-purple-200 dark:border-purple-800", ring: "ring-purple-500",
         icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
     }
 };
@@ -290,7 +290,7 @@ function SimuladoContent() {
     // --- RENDER ---
 
     return (
-        <div className="w-full max-w-5xl px-6 py-8">
+        <div className="w-full max-w-5xl px-4 md:px-6 py-8">
             <style jsx global>{`
                 input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
                 input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 8px; cursor: pointer; background: #e5e7eb; border-radius: 9999px; }
@@ -300,7 +300,7 @@ function SimuladoContent() {
 
             {/* === CONFIGURAÇÃO === */}
             {step === 'CONFIG' && (
-                <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-300">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl overflow-hidden border border-gray-100 dark:border-slate-800 animate-in fade-in zoom-in duration-300">
                     <div className="bg-linear-to-r from-indigo-600 to-indigo-800 p-8 text-white relative overflow-hidden">
                         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                             <div>
@@ -318,7 +318,7 @@ function SimuladoContent() {
                         </div>
                     </div>
 
-                    <div className="p-8 space-y-8">
+                    <div className="p-4 md:p-8 space-y-8">
                         {/* 1. Origem */}
                         <div className="space-y-4">
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -331,10 +331,10 @@ function SimuladoContent() {
                                     onClick={() => { setSourceType('GLOBAL'); setSourceId(""); }}
                                     className={`group relative h-full rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center p-2
                                         ${sourceType === 'GLOBAL' 
-                                        ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700 shadow-sm' 
-                                        : 'border-gray-100 text-gray-500 hover:border-indigo-200 hover:bg-gray-50'}`}
+                                        ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 shadow-sm'
+                                        : 'border-gray-100 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:border-indigo-200 dark:hover:border-indigo-800 hover:bg-gray-50 dark:hover:bg-slate-800'}`}
                                 >
-                                    <div className={`p-2 rounded-full transition-colors ${sourceType === 'GLOBAL' ? 'bg-indigo-100' : 'bg-gray-100 group-hover:bg-indigo-50'}`}>
+                                    <div className={`p-2 rounded-full transition-colors ${sourceType === 'GLOBAL' ? 'bg-indigo-100 dark:bg-indigo-900/50' : 'bg-gray-100 dark:bg-slate-800 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-900/30'}`}>
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </div>
                                     <div className="font-bold text-xs">Global</div>
@@ -384,7 +384,7 @@ function SimuladoContent() {
                                         className={`p-3 rounded-2xl border-2 text-left transition-all relative group flex flex-col justify-between h-full min-h-[120px] ${
                                             difficulty === diff.id 
                                             ? `${diff.border} ${diff.bg} ${diff.ring} ring-1 shadow-md` 
-                                            : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
+                                            : "border-gray-100 dark:border-slate-700 hover:border-gray-200 dark:hover:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-800"
                                         }`}
                                     >
                                         <div>
@@ -392,9 +392,9 @@ function SimuladoContent() {
                                                 {diff.icon}
                                                 {diff.label}
                                             </div>
-                                            <div className="text-[10px] text-gray-500 font-medium leading-relaxed">{diff.description}</div>
+                                            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-medium leading-relaxed">{diff.description}</div>
                                         </div>
-                                        <div className={`mt-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border w-max ${diff.border} bg-white/80 text-gray-600`}>
+                                        <div className={`mt-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border w-max ${diff.border} bg-white/80 dark:bg-slate-800 text-gray-600 dark:text-gray-300`}>
                                             XP x{diff.multiplier}
                                         </div>
                                     </button>
@@ -409,7 +409,7 @@ function SimuladoContent() {
                                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                                     3. Volume
                                 </label>
-                                <span className="text-2xl font-black text-indigo-600 tabular-nums">{quantity} <span className="text-sm font-medium text-gray-400">questões</span></span>
+                                <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400 tabular-nums">{quantity} <span className="text-sm font-medium text-gray-400">questões</span></span>
                             </div>
                             <div className="relative h-12 flex items-center">
                                 <input 
@@ -427,7 +427,7 @@ function SimuladoContent() {
 
                         <button 
                             onClick={handleStartExam}
-                            className="w-full py-5 bg-gray-900 text-white font-bold rounded-2xl text-lg shadow-xl shadow-gray-200 hover:bg-black transition transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 mt-8"
+                            className="w-full py-5 bg-gray-900 dark:bg-indigo-600 text-white font-bold rounded-2xl text-lg shadow-xl shadow-gray-200 dark:shadow-none hover:bg-black dark:hover:bg-indigo-500 transition transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 mt-8"
                         >
                             <span>Iniciar Simulado</span>
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
@@ -440,12 +440,12 @@ function SimuladoContent() {
             {step === 'LOADING' && (
                 <div className="flex flex-col items-center justify-center py-32 animate-in fade-in">
                     <div className="relative mb-8">
-                        <div className="w-20 h-20 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-                        <div className="absolute inset-0 flex items-center justify-center text-indigo-600">
+                        <div className="w-20 h-20 border-4 border-indigo-100 dark:border-indigo-900 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin"></div>
+                        <div className="absolute inset-0 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                             <svg className="w-8 h-8 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
                         </div>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-800">{loadingText}</h2>
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">{loadingText}</h2>
                     <p className="text-gray-400 mt-2 text-sm max-w-xs text-center">Estamos consultando seus flashcards e criando alternativas inteligentes.</p>
                 </div>
             )}
@@ -453,29 +453,29 @@ function SimuladoContent() {
             {/* === PROVA (EXAM) === */}
             {step === 'EXAM' && examCards.length > 0 && (
                 <div className="max-w-3xl mx-auto animate-in slide-in-from-right-8 duration-500 select-none">
-                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center mb-6 sticky top-4 z-40">
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex justify-between items-center mb-6 sticky top-4 z-40">
                         <div className="flex items-center gap-4">
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Progresso</span>
-                                <div className="text-xl font-black text-gray-800 leading-none">
-                                    {currentIndex + 1} <span className="text-gray-300 text-base">/ {examCards.length}</span>
+                                <div className="text-xl font-black text-gray-800 dark:text-gray-100 leading-none">
+                                    {currentIndex + 1} <span className="text-gray-300 dark:text-gray-600 text-base">/ {examCards.length}</span>
                                 </div>
                             </div>
-                            <div className="hidden sm:block h-2 w-32 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="hidden sm:block h-2 w-32 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                 <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${((currentIndex) / examCards.length) * 100}%` }} />
                             </div>
                         </div>
                         {DIFFICULTIES[difficulty].timePerQuestion > 0 && (
-                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-colors duration-300 ${timeLeft <= 10 ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+                            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-colors duration-300 ${timeLeft <= 10 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 animate-pulse' : 'bg-gray-50 dark:bg-slate-800 border-gray-100 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 <span className="font-mono font-bold text-lg tabular-nums">00:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}</span>
                             </div>
                         )}
                     </div>
 
-                    <div className="bg-white p-10 rounded-3xl shadow-lg border border-gray-100 mb-6 min-h-[180px] flex items-center justify-center text-center relative overflow-hidden group">
-                        <div className="absolute inset-0 bg-linear-to-b from-transparent to-gray-50/50 pointer-events-none"></div>
-                        <h2 className="text-2xl font-bold text-gray-800 leading-relaxed relative z-10">
+                    <div className="bg-white dark:bg-slate-900 p-6 md:p-10 rounded-3xl shadow-lg border border-gray-100 dark:border-slate-800 mb-6 min-h-[180px] flex items-center justify-center text-center relative overflow-hidden group">
+                        <div className="absolute inset-0 bg-linear-to-b from-transparent to-gray-50/50 dark:to-slate-800/50 pointer-events-none"></div>
+                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 leading-relaxed relative z-10">
                             {examCards[currentIndex].frente}
                         </h2>
                     </div>
@@ -490,13 +490,13 @@ function SimuladoContent() {
                                     onClick={() => confirmAnswer(option)}
                                     className={`group relative p-5 rounded-2xl border-2 text-left transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center gap-5
                                         ${isSelected 
-                                            ? "border-indigo-600 bg-indigo-50 text-indigo-900 shadow-md" 
-                                            : "border-gray-100 bg-white hover:border-indigo-200 hover:bg-gray-50 text-gray-600"
+                                            ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-200 shadow-md"
+                                            : "border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-indigo-200 dark:hover:border-indigo-800 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-300"
                                         }
                                     `}
                                 >
                                     <div className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-bold transition-colors shrink-0 shadow-sm
-                                        ${isSelected ? "bg-indigo-600 text-white" : "bg-gray-50 text-gray-400 group-hover:bg-indigo-100 group-hover:text-indigo-600"}
+                                        ${isSelected ? "bg-indigo-600 text-white" : "bg-gray-50 dark:bg-slate-800 text-gray-400 dark:text-gray-500 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400"}
                                     `}>
                                         {letters[idx]}
                                     </div>
@@ -510,7 +510,7 @@ function SimuladoContent() {
 
             {/* === RESULTADO === */}
             {step === 'RESULT' && finalResult && (
-                <div className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100 animate-in zoom-in duration-300 max-w-lg mx-auto">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-slate-800 animate-in zoom-in duration-300 max-w-lg mx-auto">
                     <div className={`p-10 text-center text-white relative overflow-hidden ${finalResult.score >= 0.7 ? "bg-emerald-600" : "bg-indigo-600"}`}>
                             <div className="absolute top-0 left-0 w-full h-full opacity-20">
                             <svg className="w-full h-full" fill="currentColor" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 100 C 20 0 50 0 100 100 Z"></path></svg>
@@ -527,17 +527,17 @@ function SimuladoContent() {
 
                     <div className="p-8">
                         <div className="grid grid-cols-2 gap-4 mb-8">
-                            <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 text-center">
+                            <div className="bg-gray-50 dark:bg-slate-800 p-5 rounded-2xl border border-gray-100 dark:border-slate-700 text-center">
                                 <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Acertos</div>
-                                <div className="text-3xl font-black text-gray-800">{finalResult.correctAnswers}<span className="text-gray-300 text-xl">/{finalResult.totalQuestions}</span></div>
+                                <div className="text-3xl font-black text-gray-800 dark:text-gray-100">{finalResult.correctAnswers}<span className="text-gray-300 dark:text-gray-600 text-xl">/{finalResult.totalQuestions}</span></div>
                             </div>
                             
                             {/* LÓGICA DE EXIBIÇÃO DE XP LIMITADO */}
-                            <div className={`p-5 rounded-2xl border text-center ${finalResult.limitReached ? 'bg-gray-100 border-gray-200 opacity-70' : 'bg-indigo-50 border-indigo-100'}`}>
-                                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${finalResult.limitReached ? 'text-gray-500' : 'text-indigo-600'}`}>
+                            <div className={`p-5 rounded-2xl border text-center ${finalResult.limitReached ? 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700 opacity-70' : 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800'}`}>
+                                <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${finalResult.limitReached ? 'text-gray-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
                                     {finalResult.limitReached ? "Limite Diário" : "XP Total"}
                                 </div>
-                                <div className={`text-3xl font-black ${finalResult.limitReached ? 'text-gray-400' : 'text-indigo-600'}`}>
+                                <div className={`text-3xl font-black ${finalResult.limitReached ? 'text-gray-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
                                     {finalResult.limitReached ? "MAX" : `+${finalResult.xpGained}`}
                                 </div>
                             </div>
@@ -545,24 +545,24 @@ function SimuladoContent() {
                         
                         {/* Mensagem explicativa se atingiu o limite */}
                         {finalResult.limitReached && (
-                            <div className="mb-6 p-3 bg-yellow-50 border border-yellow-100 rounded-xl text-xs text-yellow-700 text-center">
+                            <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800 rounded-xl text-xs text-yellow-700 dark:text-yellow-400 text-center">
                                 Você atingiu o limite de 3 simulados valendo XP por dia. Continue praticando para fixar o conteúdo! 🧠
                             </div>
                         )}
 
                         <div className="space-y-3 mb-8">
-                            <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                <span className="text-sm font-medium text-gray-500">Tempo Total</span>
-                                <span className="font-bold text-gray-900">{Math.round(finalResult.totalTime)}s</span>
+                            <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700">
+                                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Tempo Total</span>
+                                <span className="font-bold text-gray-900 dark:text-gray-100">{Math.round(finalResult.totalTime)}s</span>
                             </div>
-                            <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-                                <span className="text-sm font-medium text-gray-500">Precisão</span>
-                                <span className={`font-bold ${finalResult.score >= 0.7 ? "text-emerald-600" : "text-gray-900"}`}>{Math.round(finalResult.score * 100)}%</span>
+                            <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700">
+                                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Precisão</span>
+                                <span className={`font-bold ${finalResult.score >= 0.7 ? "text-emerald-600 dark:text-emerald-400" : "text-gray-900 dark:text-gray-100"}`}>{Math.round(finalResult.score * 100)}%</span>
                             </div>
                         </div>
 
                         <Link href="/colecao">
-                            <button className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition shadow-lg flex justify-center items-center gap-2">
+                            <button className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-bold rounded-xl hover:bg-black dark:hover:bg-gray-100 transition shadow-lg flex justify-center items-center gap-2">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                                 Voltar para Coleção
                             </button>
@@ -577,12 +577,12 @@ function SimuladoContent() {
 // [FIX] Componente Principal que envolve tudo em Suspense
 export default function SimuladoPage() {
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center select-none" onContextMenu={(e) => e.preventDefault()}>
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col items-center select-none transition-colors duration-300" onContextMenu={(e) => e.preventDefault()}>
             <Header />
             <Suspense fallback={
                 <div className="flex flex-col items-center justify-center py-32 animate-in fade-in">
-                    <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-6"></div>
-                    <h2 className="text-xl font-bold text-gray-700">Carregando ambiente...</h2>
+                    <div className="w-16 h-16 border-4 border-indigo-200 dark:border-indigo-800 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin mb-6"></div>
+                    <h2 className="text-xl font-bold text-gray-700 dark:text-gray-200">Carregando ambiente...</h2>
                 </div>
             }>
                 <SimuladoContent />
