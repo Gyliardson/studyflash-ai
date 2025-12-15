@@ -1,5 +1,29 @@
 # Histórico de Versões - StudiFlow
 
+## [v0.6.0] - 15/12/2025 (Design System, Responsividade & Theming)
+
+### 🎨 Interface & UX (Design System)
+
+- **Dark & Light Mode Unificados:** Refatoração completa do sistema de temas usando tokens de tema (Tailwind v4), garantindo alternância consistente entre os modos.
+- **Remoção de Cores Hardcoded:** Eliminação de cores fixas (`bg-*`, `text-*`, `dark:*`) em componentes de UI que quebravam o toggle de tema.
+- **Harmonia Visual por Tema:** Ajuste fino das paletas para que cada modo (Light/Dark) tenha cores próprias, equilibradas e coerentes.
+- **Correção de Cores Neon no Light Mode:** Botões e elementos de destaque (verde, amarelo, vermelho, roxo) agora utilizam tons adequados ao modo claro.
+- **Padronização de Superfícies:** Containers de página, cards, banners e modais agora seguem corretamente `bg-background` e `bg-card`.
+
+### 📱 Responsividade & Layout
+
+- **Mobile-First Improvements:** Ajustes de layout e espaçamentos para melhor adaptação em telas pequenas.
+- **Header Responsivo:** Correções de alinhamento, comportamento sticky e navegação mobile.
+- **Consistência entre Páginas:** Garantia de comportamento visual uniforme em `/colecao`, `/estudar`, `/simulado`, `/planos` e `/perfil`.
+
+### 🧹 Manutenção & Qualidade de Código
+
+- **Auditoria Completa do Frontend:** Revisão geral dos arquivos de UI para remover inconsistências visuais e técnicas.
+- **Refatoração Semântica de Componentes:** Melhor uso de tokens como `bg-background`, `bg-card`, `text-foreground`, `border-border`.
+- **Base Preparada para Evoluções:** Frontend mais estável e previsível para futuras features (ex: PWA, mobile app, novos modos de estudo).
+
+> Esta versão foca em estabilidade visual, coerência de design e preparação da base para as próximas funcionalidades.
+
 ## [v0.5.0] - 14/12/2025 (Modo Simulado & Resiliência de IA)
 
 ### ✨ Novas Funcionalidades (Modo Simulado)
