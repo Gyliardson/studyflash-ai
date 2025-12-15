@@ -21,11 +21,11 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
                     }`}
             >
                 {/* --- FRENTE DO CARTÃO --- */}
-                <div className="absolute inset-0 h-full w-full rounded-2xl bg-white p-8 shadow-xl border-2 border-blue-100 flex flex-col items-center justify-center text-center backface-hidden transition-all duration-300 group-hover:shadow-2xl group-hover:border-blue-400">
+                <div className="absolute inset-0 h-full w-full rounded-2xl bg-card p-8 shadow-xl border-2 border-border flex flex-col items-center justify-center text-center backface-hidden transition-all duration-300 group-hover:shadow-2xl group-hover:border-primary/50">
 
                     {/* CABEÇALHO DO CARD (Número + Lixeira) */}
                     <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
-                        <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">
+                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                             Cartão {index + 1}
                         </span>
 
@@ -36,7 +36,7 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
                                     e.stopPropagation();
                                     onDelete();
                                 }}
-                                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-125 shadow-sm"
+                                className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-125 shadow-sm"
                                 title="Excluir Flashcard"
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -44,14 +44,14 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
                         )}
                     </div>
 
-                    <p className="text-xl font-bold text-gray-800 mt-2">{frente}</p>
-                    <p className="absolute bottom-4 text-xs text-gray-400 group-hover:text-blue-500 transition-colors">
+                    <p className="text-xl font-bold text-card-foreground mt-2">{frente}</p>
+                    <p className="absolute bottom-4 text-xs text-muted-foreground group-hover:text-primary transition-colors">
                         Clique para ver a resposta
                     </p>
                 </div>
 
                 {/* --- VERSO DO CARTÃO --- */}
-                <div className="absolute inset-0 h-full w-full rounded-2xl bg-linear-to-br from-blue-600 to-blue-800 p-8 text-white shadow-xl transform-[rotateY(180deg)] backface-hidden flex flex-col items-center justify-center text-center transition-all duration-300 group-hover:shadow-2xl group-hover:brightness-110">
+                <div className="absolute inset-0 h-full w-full rounded-2xl bg-linear-to-br from-blue-600 to-blue-800 dark:from-blue-700 dark:to-blue-900 p-8 text-white shadow-xl transform-[rotateY(180deg)] backface-hidden flex flex-col items-center justify-center text-center transition-all duration-300 group-hover:shadow-2xl group-hover:brightness-110">
                     <span className="absolute top-4 left-4 text-xs font-bold text-blue-200 uppercase tracking-widest">
                         Resposta
                     </span>
