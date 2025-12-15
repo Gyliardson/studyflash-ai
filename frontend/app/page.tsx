@@ -117,27 +117,27 @@ export default function Home() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex flex-col items-center p-4 md:p-12 relative transition-colors duration-300">
+        <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-12 relative transition-colors duration-300">
             <Header />
 
             {/* --- ÁREA DE INPUT --- */}
-            <div className="w-full max-w-3xl bg-white dark:bg-slate-900 p-4 md:p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 mb-10 transition-all hover:shadow-2xl">
+            <div className="w-full max-w-3xl bg-card p-4 md:p-6 rounded-2xl shadow-xl border border-border mb-10 transition-all hover:shadow-2xl">
 
                 {/* Mostra aviso se tiver arquivo selecionado */}
                 {arquivo ? (
-                    <div className="w-full h-40 flex flex-col items-center justify-center border-2 border-dashed border-blue-300 dark:border-blue-700 rounded-xl bg-blue-50 dark:bg-blue-900/20 mb-4 animate-in fade-in">
+                    <div className="w-full h-40 flex flex-col items-center justify-center border-2 border-dashed border-primary/40 rounded-xl bg-primary/10 mb-4 animate-in fade-in">
                         <span className="text-4xl mb-2">📄</span>
-                        <p className="font-bold text-gray-700 dark:text-gray-300">{arquivo.name}</p>
+                        <p className="font-bold text-card-foreground">{arquivo.name}</p>
                         <button
                             onClick={() => setArquivo(null)}
-                            className="text-sm text-red-500 hover:underline mt-2"
+                            className="text-sm text-destructive hover:underline mt-2"
                         >
                             Remover PDF e usar texto
                         </button>
                     </div>
                 ) : (
                     <textarea
-                        className="w-full h-40 p-4 border border-gray-200 dark:border-slate-700 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none resize-none text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-900 transition-all text-lg"
+                        className="w-full h-40 p-4 border border-input rounded-xl focus:border-ring focus:ring-2 focus:ring-ring/20 outline-none resize-none text-foreground bg-background transition-all text-lg"
                         placeholder="Cole seu texto de estudo aqui..."
                         value={texto}
                         onChange={(e) => setTexto(e.target.value)}
@@ -162,7 +162,7 @@ export default function Home() {
                         />
                         <label
                             htmlFor="file-upload"
-                            className={`cursor-pointer w-full sm:w-auto px-4 py-4 rounded-xl border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-400 flex items-center justify-center transition-colors h-full ${loading ? 'pointer-events-none opacity-50' : ''}`}
+                            className={`cursor-pointer w-full sm:w-auto px-4 py-4 rounded-xl border border-input hover:bg-accent text-muted-foreground flex items-center justify-center transition-colors h-full ${loading ? 'pointer-events-none opacity-50' : ''}`}
                             title="Anexar PDF"
                         >
                             {/* Ícone de Clips / Anexo */}
@@ -175,8 +175,8 @@ export default function Home() {
                     <button
                         onClick={gerarFlashcards}
                         disabled={loading}
-                        className={`w-full sm:flex-1 py-4 rounded-xl font-bold text-white transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 ${loading
-                            ? "bg-gray-800 dark:bg-slate-700 cursor-wait animate-pulse"
+                        className={`w-full sm:flex-1 py-4 rounded-xl font-bold text-primary-foreground transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 ${loading
+                            ? "bg-muted cursor-wait animate-pulse"
                             : "bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-500/30"
                             }`}
                     >
@@ -193,7 +193,7 @@ export default function Home() {
 
             {/* --- MENSAGEM DE ERRO --- */}
             {erro && (
-                <div className="w-full max-w-3xl mb-8 p-4 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-700 dark:text-red-300 rounded-r shadow-sm flex items-center gap-3 animate-in slide-in-from-top-2">
+                <div className="w-full max-w-3xl mb-8 p-4 bg-destructive/10 border-l-4 border-destructive text-destructive rounded-r shadow-sm flex items-center gap-3 animate-in slide-in-from-top-2">
                     <svg className="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     <div>
                         <p className="font-bold">Ops!</p>
@@ -214,7 +214,7 @@ export default function Home() {
                                 disabled={saving}
                                 className={`
                   group relative w-full sm:w-auto px-8 py-4 rounded-2xl font-bold text-white shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-1 active:translate-y-0
-                  ${saving ? "bg-gray-400 cursor-wait" : "bg-linear-to-r from-green-500 to-emerald-600"}
+                  ${saving ? "bg-muted cursor-wait" : "bg-linear-to-r from-green-500 to-emerald-600"}
                 `}
                             >
                                 <div className="flex items-center justify-center gap-3">
@@ -224,18 +224,18 @@ export default function Home() {
                             </button>
                         ) : (
                             // CTA PARA DESLOGADO
-                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-lg border border-gray-100 dark:border-slate-800 flex flex-col md:flex-row items-center gap-6 max-w-2xl w-full hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
-                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-full">
-                                    <svg className="w-8 h-8 text-blue-500 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                            <div className="bg-card p-6 rounded-2xl shadow-lg border border-border flex flex-col md:flex-row items-center gap-6 max-w-2xl w-full hover:border-primary/50 transition-colors">
+                                <div className="p-4 bg-primary/10 rounded-full">
+                                    <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                                 </div>
                                 <div className="flex-1 text-center md:text-left">
-                                    <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">Não perca seu estudo!</h3>
-                                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                                    <h3 className="text-lg font-bold text-card-foreground">Não perca seu estudo!</h3>
+                                    <p className="text-muted-foreground text-sm mt-1">
                                         Crie uma conta gratuita para salvar estes flashcards e acessá-los de qualquer dispositivo.
                                     </p>
                                 </div>
                                 <SignInButton mode="modal">
-                                    <button className="whitespace-nowrap w-full md:w-auto px-6 py-3 rounded-xl bg-gray-900 dark:bg-indigo-600 text-white font-bold text-sm hover:bg-gray-800 dark:hover:bg-indigo-500 transition-all shadow-md active:scale-95">
+                                    <button className="whitespace-nowrap w-full md:w-auto px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-all shadow-md active:scale-95">
                                         Criar conta grátis
                                     </button>
                                 </SignInButton>

@@ -21,12 +21,11 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
                     }`}
             >
                 {/* --- FRENTE DO CARTÃO --- */}
-                {/* Changed bg-white to bg-card, text-gray-800 to text-card-foreground/text-foreground */}
-                <div className="absolute inset-0 h-full w-full rounded-2xl bg-card p-8 shadow-xl border-2 border-blue-100 dark:border-slate-700 flex flex-col items-center justify-center text-center backface-hidden transition-all duration-300 group-hover:shadow-2xl group-hover:border-blue-400 dark:group-hover:border-blue-500">
+                <div className="absolute inset-0 h-full w-full rounded-2xl bg-card p-8 shadow-xl border-2 border-border flex flex-col items-center justify-center text-center backface-hidden transition-all duration-300 group-hover:shadow-2xl group-hover:border-primary/50">
 
                     {/* CABEÇALHO DO CARD (Número + Lixeira) */}
                     <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
-                        <span className="text-xs font-bold text-blue-400 dark:text-blue-300 uppercase tracking-widest">
+                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                             Cartão {index + 1}
                         </span>
 
@@ -37,7 +36,7 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
                                     e.stopPropagation();
                                     onDelete();
                                 }}
-                                className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-125 shadow-sm"
+                                className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full transition-all duration-300 opacity-0 group-hover:opacity-100 hover:scale-125 shadow-sm"
                                 title="Excluir Flashcard"
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -45,8 +44,8 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
                         )}
                     </div>
 
-                    <p className="text-xl font-bold text-foreground mt-2">{frente}</p>
-                    <p className="absolute bottom-4 text-xs text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors">
+                    <p className="text-xl font-bold text-card-foreground mt-2">{frente}</p>
+                    <p className="absolute bottom-4 text-xs text-muted-foreground group-hover:text-primary transition-colors">
                         Clique para ver a resposta
                     </p>
                 </div>

@@ -57,19 +57,18 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-100 p-4">
-            {/* Changed bg-white to bg-card, text colors to semantic vars */}
-            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-gray-100 dark:border-slate-800">
+            <div className="bg-popover rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-border">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-foreground">Onde vamos guardar? 🗂️</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
+                    <h2 className="text-xl font-bold text-popover-foreground">Onde vamos guardar? 🗂️</h2>
+                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
 
                 {/* LOADING */}
                 {loading && (
-                    <div className="flex flex-col items-center py-8 text-gray-500 dark:text-gray-400">
-                        <div className="animate-spin h-6 w-6 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full mb-2"></div>
+                    <div className="flex flex-col items-center py-8 text-muted-foreground">
+                        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mb-2"></div>
                         <p className="text-sm">Buscando seus grupos...</p>
                     </div>
                 )}
@@ -81,10 +80,10 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                         {/* MODO: SELECIONAR EXISTENTE */}
                         {decks.length > 0 && !creating && (
                             <div className="animate-in slide-in-from-left-2 duration-200">
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Escolha um grupo existente:</label>
+                                <label className="block text-sm font-bold text-muted-foreground mb-2">Escolha um grupo existente:</label>
                                 <div className="relative">
                                     <select
-                                        className="w-full p-3 pl-4 pr-10 border border-gray-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-foreground font-medium focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/30 outline-none appearance-none transition-all cursor-pointer hover:border-blue-300 dark:hover:border-blue-700"
+                                        className="w-full p-3 pl-4 pr-10 border border-border rounded-xl bg-card text-card-foreground font-medium focus:border-ring focus:ring-4 focus:ring-ring/20 outline-none appearance-none transition-all cursor-pointer hover:border-primary/50"
                                         value={selectedDeck}
                                         onChange={(e) => setSelectedDeck(e.target.value)}
                                     >
@@ -95,20 +94,20 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                         ))}
                                     </select>
                                     {/* Ícone customizado do Select */}
-                                    <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-500 dark:text-gray-400">
+                                    <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-muted-foreground">
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                 </div>
 
                                 <div className="relative flex py-5 items-center">
-                                    <div className="grow border-t border-gray-200 dark:border-slate-800"></div>
-                                    <span className="shrink-0 mx-4 text-gray-400 dark:text-gray-500 text-xs font-semibold uppercase tracking-wider">Ou</span>
-                                    <div className="grow border-t border-gray-200 dark:border-slate-800"></div>
+                                    <div className="grow border-t border-border"></div>
+                                    <span className="shrink-0 mx-4 text-muted-foreground text-xs font-semibold uppercase tracking-wider">Ou</span>
+                                    <div className="grow border-t border-border"></div>
                                 </div>
 
                                 <button
                                     onClick={() => setCreating(true)}
-                                    className="w-full py-3 border-2 border-dashed border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 font-bold rounded-xl hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-400 dark:hover:border-blue-600 transition-all flex items-center justify-center gap-2"
+                                    className="w-full py-3 border-2 border-dashed border-primary/30 text-primary font-bold rounded-xl hover:bg-primary/10 hover:border-primary transition-all flex items-center justify-center gap-2"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                                     Criar Novo Grupo
@@ -119,11 +118,11 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                         {/* MODO: CRIAR NOVO */}
                         {(creating || decks.length === 0) && (
                             <div className="animate-in slide-in-from-right-2 duration-200">
-                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Nome do novo grupo:</label>
+                                <label className="block text-sm font-bold text-muted-foreground mb-2">Nome do novo grupo:</label>
                                 <input
                                     type="text"
                                     placeholder="Ex: Biologia Celular, Verbos Irregulares..."
-                                    className="w-full p-3 border-2 border-blue-100 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-foreground placeholder-gray-400 dark:placeholder-gray-500 font-medium focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/30 outline-none transition-all"
+                                    className="w-full p-3 border-2 border-border rounded-xl bg-card text-card-foreground placeholder-muted-foreground font-medium focus:border-ring focus:ring-4 focus:ring-ring/20 outline-none transition-all"
                                     value={newDeckName}
                                     onChange={(e) => setNewDeckName(e.target.value)}
                                     autoFocus
@@ -133,7 +132,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                 {decks.length > 0 && (
                                     <button
                                         onClick={() => setCreating(false)}
-                                        className="w-full mt-3 py-3 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300 font-semibold rounded-xl border border-gray-200 dark:border-slate-700 transition-all flex items-center justify-center gap-2 active:scale-95"
+                                        className="w-full mt-3 py-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-semibold rounded-xl border border-border transition-all flex items-center justify-center gap-2 active:scale-95"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                                         Voltar para lista
@@ -143,10 +142,10 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                         )}
 
                         {/* AÇÕES PRINCIPAIS */}
-                        <div className="flex gap-3 mt-6 pt-5 border-t border-gray-100 dark:border-slate-800">
+                        <div className="flex gap-3 mt-6 pt-5 border-t border-border">
                             <button
                                 onClick={onClose}
-                                className="flex-1 py-3 text-gray-500 dark:text-gray-400 font-bold hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-700 dark:hover:text-gray-200 rounded-xl transition"
+                                className="flex-1 py-3 text-muted-foreground font-bold hover:bg-muted hover:text-foreground rounded-xl transition"
                             >
                                 Cancelar
                             </button>
@@ -154,7 +153,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                             <button
                                 onClick={creating || decks.length === 0 ? handleCreateAndSave : handleSaveExisting}
                                 disabled={saving}
-                                className="flex-2 py-3 bg-linear-to-r from-green-600 to-emerald-600 dark:from-green-500 dark:to-emerald-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="flex-2 py-3 bg-linear-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {saving ? (
                                     <>
