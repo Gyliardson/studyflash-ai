@@ -49,34 +49,34 @@ export default function DetalhesBaralhoPage({ params }: { params: Promise<{ deck
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex flex-col items-center p-4 md:p-12 transition-colors duration-300">
+        <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-12 transition-colors duration-300">
             <Header />
 
             <div className="w-full max-w-5xl">
                 {/* Cabeçalho com Voltar */}
                 <div className="flex items-center gap-4 mb-8">
                     <Link href="/colecao">
-                        <button className="p-2 bg-white dark:bg-slate-900 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-gray-400 transition shadow-sm border border-gray-200 dark:border-slate-800">
+                        <button className="p-2 bg-card rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition shadow-sm border border-border">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                         </button>
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Detalhes do Baralho</h1>
-                        <p className="text-gray-500 dark:text-gray-400">{cards.length} cartões encontrados</p>
+                        <h1 className="text-3xl font-bold text-foreground">Detalhes do Baralho</h1>
+                        <p className="text-muted-foreground">{cards.length} cartões encontrados</p>
                     </div>
                 </div>
 
                 {loading && (
                     <div className="flex justify-center py-20">
-                        <div className="animate-spin h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                        <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full"></div>
                     </div>
                 )}
 
                 {!loading && cards.length === 0 && (
-                    <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-sm">
+                    <div className="text-center py-20 bg-card rounded-3xl border border-border shadow-sm">
                         <div className="text-6xl mb-4">📭</div>
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">Baralho Vazio</h3>
-                        <p className="text-gray-500 dark:text-gray-400 mb-6">Não há cartões aqui.</p>
+                        <h3 className="text-xl font-bold text-foreground">Baralho Vazio</h3>
+                        <p className="text-muted-foreground mb-6">Não há cartões aqui.</p>
                     </div>
                 )}
 
