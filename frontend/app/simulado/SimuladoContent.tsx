@@ -323,7 +323,8 @@ export default function SimuladoContent() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                                 1. Origem das Questões
                             </label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:h-32">
+                            {/* Changed grid-cols-2 to grid-cols-1 sm:grid-cols-2 for better mobile stacking */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:h-32">
 
                                 <button
                                     onClick={() => { setSourceType('GLOBAL'); setSourceId(""); }}
@@ -374,7 +375,8 @@ export default function SimuladoContent() {
                                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                                 2. Intensidade
                             </label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {/* Changed grid-cols-2 to grid-cols-1 sm:grid-cols-2 for better mobile stacking */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                                 {Object.values(DIFFICULTIES).map((diff) => (
                                     <button
                                         key={diff.id}
@@ -443,9 +445,11 @@ export default function SimuladoContent() {
                             <svg className="w-8 h-8 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
                         </div>
                     </div>
-                    {/* Fixed Text Alignment for Mobile */}
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 text-center px-4">{loadingText}</h2>
-                    <p className="text-gray-400 mt-2 text-sm max-w-xs text-center">Estamos consultando seus flashcards e criando alternativas inteligentes.</p>
+                    {/* Fixed Text Alignment for Mobile - Centered as requested */}
+                    <div className="w-full text-center px-4">
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">{loadingText}</h2>
+                        <p className="text-gray-400 text-sm max-w-xs mx-auto">Estamos consultando seus flashcards e criando alternativas inteligentes.</p>
+                    </div>
                 </div>
             )}
 

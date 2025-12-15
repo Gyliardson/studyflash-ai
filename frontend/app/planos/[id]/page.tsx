@@ -55,7 +55,7 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex justify-center items-center">
+            <div className="min-h-screen bg-background flex justify-center items-center">
                 <div className="animate-spin h-10 w-10 border-4 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full"></div>
             </div>
         );
@@ -64,7 +64,7 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
     if (!plano) return <div className="text-center p-10 dark:text-gray-200">Plano não encontrado.</div>;
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col items-center p-4 md:p-12 transition-colors duration-300">
+        <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-12 transition-colors duration-300">
             <Header />
 
             <div className="w-full max-w-4xl">
@@ -73,7 +73,7 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
                     <span className="inline-block px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-full text-xs font-bold uppercase tracking-wider mb-3">
                         {plano.difficulty}
                     </span>
-                    <h1 className="text-4xl font-extrabold text-gray-900 dark:text-gray-100 mb-4">{plano.title}</h1>
+                    <h1 className="text-4xl font-extrabold text-foreground mb-4">{plano.title}</h1>
                     <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto text-lg">{plano.description}</p>
                 </div>
 
@@ -94,9 +94,9 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
                                 </div>
                                 
                                 {/* Card do Tópico */}
-                                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 hover:shadow-lg transition-all">
+                                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-card p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 hover:shadow-lg transition-all">
                                     <div className="flex justify-between items-start mb-2">
-                                        <h3 className="font-bold text-gray-800 dark:text-gray-100 text-lg">{topic.title}</h3>
+                                        <h3 className="font-bold text-foreground text-lg">{topic.title}</h3>
                                         {temCards ? (
                                             <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-1 rounded-md font-bold">
                                                 {topic._count.cards} cards

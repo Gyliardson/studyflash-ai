@@ -43,12 +43,8 @@ export default function Header() {
 
                     <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                         <span className="text-2xl">⚡</span>
-                        {/* Mobile Logo Fix: Ensure text is visible or layout is clean */}
-                        <span className="text-xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight hidden sm:inline">
-                            Study<span className="text-blue-600 dark:text-blue-400">Flash</span>
-                        </span>
-                        {/* Mobile Text (Visible only on XS screens if we want, or keep hidden and rely on Icon) */}
-                        <span className="sm:hidden text-lg font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
+                        {/* Mobile Logo Fix: Ensure text is visible and consistent */}
+                        <span className="text-xl font-extrabold text-gray-800 dark:text-gray-100 tracking-tight">
                             Study<span className="text-blue-600 dark:text-blue-400">Flash</span>
                         </span>
                     </Link>

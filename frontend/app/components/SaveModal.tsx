@@ -57,9 +57,10 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-100 p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-gray-100 dark:border-slate-800">
+            {/* Changed bg-white to bg-card, text colors to semantic vars */}
+            <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-gray-100 dark:border-slate-800">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Onde vamos guardar? 🗂️</h2>
+                    <h2 className="text-xl font-bold text-foreground">Onde vamos guardar? 🗂️</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
@@ -83,7 +84,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Escolha um grupo existente:</label>
                                 <div className="relative">
                                     <select
-                                        className="w-full p-3 pl-4 pr-10 border border-gray-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 font-medium focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/30 outline-none appearance-none transition-all cursor-pointer hover:border-blue-300 dark:hover:border-blue-700"
+                                        className="w-full p-3 pl-4 pr-10 border border-gray-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-foreground font-medium focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/30 outline-none appearance-none transition-all cursor-pointer hover:border-blue-300 dark:hover:border-blue-700"
                                         value={selectedDeck}
                                         onChange={(e) => setSelectedDeck(e.target.value)}
                                     >
@@ -122,7 +123,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                 <input
                                     type="text"
                                     placeholder="Ex: Biologia Celular, Verbos Irregulares..."
-                                    className="w-full p-3 border-2 border-blue-100 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 font-medium focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/30 outline-none transition-all"
+                                    className="w-full p-3 border-2 border-blue-100 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 text-foreground placeholder-gray-400 dark:placeholder-gray-500 font-medium focus:border-blue-500 dark:focus:border-blue-500 focus:ring-4 focus:ring-blue-50 dark:focus:ring-blue-900/30 outline-none transition-all"
                                     value={newDeckName}
                                     onChange={(e) => setNewDeckName(e.target.value)}
                                     autoFocus

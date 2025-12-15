@@ -21,7 +21,8 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
                     }`}
             >
                 {/* --- FRENTE DO CARTÃO --- */}
-                <div className="absolute inset-0 h-full w-full rounded-2xl bg-white dark:bg-slate-800 p-8 shadow-xl border-2 border-blue-100 dark:border-slate-700 flex flex-col items-center justify-center text-center backface-hidden transition-all duration-300 group-hover:shadow-2xl group-hover:border-blue-400 dark:group-hover:border-blue-500">
+                {/* Changed bg-white to bg-card, text-gray-800 to text-card-foreground/text-foreground */}
+                <div className="absolute inset-0 h-full w-full rounded-2xl bg-card p-8 shadow-xl border-2 border-blue-100 dark:border-slate-700 flex flex-col items-center justify-center text-center backface-hidden transition-all duration-300 group-hover:shadow-2xl group-hover:border-blue-400 dark:group-hover:border-blue-500">
 
                     {/* CABEÇALHO DO CARD (Número + Lixeira) */}
                     <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-10">
@@ -44,7 +45,7 @@ export default function Flashcard({ frente, verso, index, onDelete }: FlashcardP
                         )}
                     </div>
 
-                    <p className="text-xl font-bold text-gray-800 dark:text-gray-100 mt-2">{frente}</p>
+                    <p className="text-xl font-bold text-foreground mt-2">{frente}</p>
                     <p className="absolute bottom-4 text-xs text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors">
                         Clique para ver a resposta
                     </p>
