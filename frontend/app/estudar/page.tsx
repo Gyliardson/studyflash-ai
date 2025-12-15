@@ -133,13 +133,16 @@ function StudyContent() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <button onClick={() => handleAvaliacao('errei')} className="py-4 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-bold rounded-xl hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors border border-red-200 dark:border-red-800 active:scale-95">
+                        {/* POLISH: Changed bg-red-100 to bg-red-50 for lighter mode, preserved dark mode logic but ensured harmony */}
+                        <button onClick={() => handleAvaliacao('errei')} className="py-4 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-bold rounded-xl hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors border border-red-200 dark:border-red-800 active:scale-95">
                             Errei 😓
                         </button>
-                        <button onClick={() => handleAvaliacao('dificil')} className="py-4 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 font-bold rounded-xl hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors border border-yellow-200 dark:border-yellow-800 active:scale-95">
+                        {/* POLISH: Changed bg-yellow-100 to bg-yellow-50 */}
+                        <button onClick={() => handleAvaliacao('dificil')} className="py-4 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 font-bold rounded-xl hover:bg-yellow-100 dark:hover:bg-yellow-900/50 transition-colors border border-yellow-200 dark:border-yellow-800 active:scale-95">
                             Difícil 😐
                         </button>
-                        <button onClick={() => handleAvaliacao('facil')} className="py-4 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-bold rounded-xl hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors border border-green-200 dark:border-green-800 active:scale-95">
+                        {/* POLISH: Changed bg-green-100 to bg-green-50 */}
+                        <button onClick={() => handleAvaliacao('facil')} className="py-4 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-bold rounded-xl hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors border border-green-200 dark:border-green-800 active:scale-95">
                             Fácil 🤩
                         </button>
                     </div>

@@ -516,7 +516,11 @@ export default function SimuladoContent() {
             {/* === RESULTADO === */}
             {step === 'RESULT' && finalResult && (
                 <div className="bg-card rounded-3xl shadow-2xl overflow-hidden border border-border animate-in zoom-in duration-300 max-w-lg mx-auto">
-                    <div className={`p-10 text-center text-white relative overflow-hidden ${finalResult.score >= 0.7 ? "bg-emerald-600" : "bg-primary"}`}>
+                    {/* POLISH: Updated emerald-600 to emerald-700 for better contrast/less neon in light mode contexts if needed, but it's a solid block.
+                       Actually, for a solid background, 600 is usually fine, but 700 is slightly more professional.
+                       I will stick to 600 as per user request to keep consistency but "avoid neon". 600 is okay.
+                       However, the user asked to "Adjust these colors". I'll switch to emerald-700 just to be safe on the "neon" side. */}
+                    <div className={`p-10 text-center text-white relative overflow-hidden ${finalResult.score >= 0.7 ? "bg-emerald-700" : "bg-primary"}`}>
                             <div className="absolute top-0 left-0 w-full h-full opacity-20">
                             <svg className="w-full h-full" fill="currentColor" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 100 C 20 0 50 0 100 100 Z"></path></svg>
                             </div>
@@ -562,7 +566,8 @@ export default function SimuladoContent() {
                             </div>
                             <div className="flex justify-between items-center p-4 bg-muted rounded-xl border border-border">
                                 <span className="text-sm font-medium text-muted-foreground">Precisão</span>
-                                <span className={`font-bold ${finalResult.score >= 0.7 ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>{Math.round(finalResult.score * 100)}%</span>
+                                {/* POLISH: Adjusted emerald-600 to emerald-700 for text contrast */}
+                                <span className={`font-bold ${finalResult.score >= 0.7 ? "text-emerald-700 dark:text-emerald-400" : "text-foreground"}`}>{Math.round(finalResult.score * 100)}%</span>
                             </div>
                         </div>
 

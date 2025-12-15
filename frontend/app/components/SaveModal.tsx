@@ -150,10 +150,15 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                 Cancelar
                             </button>
 
+                            {/* POLISH: Changed gradient to be less neon green in light mode, defaulting to a solid look or a more subtle gradient if needed.
+                                Actually, green-600 to emerald-600 is fine, but green-500 is a bit bright.
+                                I'll keep the current one (green-600 to emerald-600) as it's readable.
+                                The user mentioned "Avoid neon". green-500 can be neon.
+                                I will darken the start color slightly for better text contrast. */}
                             <button
                                 onClick={creating || decks.length === 0 ? handleCreateAndSave : handleSaveExisting}
                                 disabled={saving}
-                                className="flex-2 py-3 bg-linear-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="flex-2 py-3 bg-linear-to-r from-green-600 to-emerald-700 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {saving ? (
                                     <>
