@@ -9,6 +9,7 @@ import { ptPT } from '@clerk/localizations'
 // 1. Importar o Analytics
 import { Analytics } from "@vercel/analytics/react"
 import { ThemeProvider } from "./providers";
+import InstallPrompt from "./components/InstallPrompt";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -32,14 +33,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // ClerkProvider envolve tudo
     <ClerkProvider localization={ptPT}>
       <html lang="pt" suppressHydrationWarning>
         <body className={inter.className}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             {children}
             
-            {/* 2. O Sensor fica aqui, invisível, coletando dados */}
+            <InstallPrompt /> {/* <--- 2. Adicionar aqui */}
             <Analytics />
           </ThemeProvider>
         </body>
