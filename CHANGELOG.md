@@ -1,5 +1,20 @@
 # Histórico de Versões - StudiFlow
 
+## [v0.6.1] - 18/12/2025 (PWA & Offline Mode)
+
+### 📱 Progressive Web App (PWA)
+
+- **Instalação Nativa:** Agora é possível instalar o StudyFlash como aplicativo no Desktop e Mobile (Adicionado à Home Screen).
+- **Suporte Offline:** Implementação de Service Worker (via `@ducanh2912/next-pwa`) para cache inteligente de assets. O app carrega instantaneamente mesmo em redes instáveis.
+- **Identidade Mobile:** Configuração completa de `manifest.ts` e ícones adaptativos.
+
+### 🏗️ Infraestrutura & DX
+
+- **Next.js Config:** Ajuste na configuração de build para gerar Service Workers apenas em produção.
+- **Compatibilidade:** Adicionada flag `--webpack` no script de dev para garantir compatibilidade de plugins com o Next.js 16.
+
+> Esta versão habilita a distribuição da aplicação como software instalável, aumentando a retenção e performance percebida.
+
 ## [v0.6.0] - 15/12/2025 (Design System, Responsividade & Theming)
 
 ### 🎨 Interface & UX (Design System)

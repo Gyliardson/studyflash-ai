@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -13,8 +13,17 @@ import { ThemeProvider } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "StudyFlash AI",
+  title: "StudyFlash",
   description: "Gera flashcards com IA",
+  manifest: "/manifest.webmanifest", // Link automático gerado pelo Next.js
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4f46e5",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // Sensação de app nativo (impede zoom acidental)
 };
 
 export default function RootLayout({
