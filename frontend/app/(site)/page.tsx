@@ -132,7 +132,7 @@ export default async function LandingPage() {
                <div className="flex items-center space-x-4">
                  <div className="h-10 w-10 rounded-full bg-secondary"></div>
                  <div>
-                   <p className="text-sm font-semibold text-card-foreground">Maria Silva</p>
+                   <p className="text-sm font-semibold text-card-foreground">Ana Paula Costa</p>
                    <p className="text-xs text-muted-foreground">Estudante de Medicina</p>
                  </div>
                </div>
@@ -144,7 +144,7 @@ export default async function LandingPage() {
                <div className="flex items-center space-x-4">
                  <div className="h-10 w-10 rounded-full bg-secondary"></div>
                  <div>
-                   <p className="text-sm font-semibold text-card-foreground">João Souza</p>
+                   <p className="text-sm font-semibold text-card-foreground">Lucas Rodrigues</p>
                    <p className="text-xs text-muted-foreground">Concurseiro</p>
                  </div>
                </div>
