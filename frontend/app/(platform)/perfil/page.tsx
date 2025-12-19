@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Header from "../components/Header";
-import { obterPerfilUsuario } from "../actions";
+import { obterPerfilUsuario } from "@/app/actions";
 import { calcularNivel } from "@/lib/gamification";
 import { useUser } from "@clerk/nextjs";
 
@@ -28,7 +27,6 @@ export default function PerfilPage() {
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-6 transition-colors duration-300">
-            <Header />
 
             <div className="w-full max-w-4xl animate-in slide-in-from-bottom-4 duration-500">
                 

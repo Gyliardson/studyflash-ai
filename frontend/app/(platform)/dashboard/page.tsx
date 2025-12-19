@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Flashcard from "./components/Flashcard";
-import Header from "./components/Header";
+import Flashcard from "@/app/components/Flashcard";
 import { useUser } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs"; 
-import SaveModal from "./components/SaveModal";
+import SaveModal from "@/app/components/SaveModal";
 
 export default function Home() {
     const { isSignedIn } = useUser();
@@ -118,7 +117,6 @@ export default function Home() {
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-12 relative transition-colors duration-300">
-            <Header />
 
             {/* --- ÁREA DE INPUT --- */}
             <div className="w-full max-w-3xl bg-card p-4 md:p-6 rounded-2xl shadow-xl border border-border mb-10 transition-all hover:shadow-2xl">

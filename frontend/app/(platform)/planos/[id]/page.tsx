@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
-import Header from "../../components/Header";
-import Flashcard from "../../components/Flashcard";
-import { buscarPlanoPorId, gerarCardsParaTopico } from "../../actions";
+import Flashcard from "@/app/components/Flashcard";
+import { buscarPlanoPorId, gerarCardsParaTopico } from "@/app/actions";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { triggerHudRefresh } from "../../components/UserHUD";
+import { triggerHudRefresh } from "@/app/components/UserHUD";
 
 // Next.js 15+ Params
 export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -65,7 +64,6 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-12 transition-colors duration-300">
-            <Header />
 
             <div className="w-full max-w-4xl">
                 {/* Cabeçalho do Plano */}

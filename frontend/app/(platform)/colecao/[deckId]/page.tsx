@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
-import Header from "../../components/Header";
-import Flashcard from "../../components/Flashcard";
-import { listarCardsDoBaralho, excluirFlashcard } from "../../actions";
+import Flashcard from "@/app/components/Flashcard";
+import { listarCardsDoBaralho, excluirFlashcard } from "@/app/actions";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 
@@ -50,7 +49,6 @@ export default function DetalhesBaralhoPage({ params }: { params: Promise<{ deck
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-12 transition-colors duration-300">
-            <Header />
 
             <div className="w-full max-w-5xl">
                 {/* Cabeçalho com Voltar */}

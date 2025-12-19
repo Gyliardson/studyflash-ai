@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Header from "../../components/Header";
-import { gerarSalvarPlano } from "../../actions";
+import { gerarSalvarPlano } from "@/app/actions";
 import { useRouter } from "next/navigation";
 
 export default function NovoPlanoPage() {
@@ -27,7 +26,6 @@ export default function NovoPlanoPage() {
 
     return (
         <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-6 transition-colors duration-300">
-            <Header />
 
             <div className="w-full max-w-2xl mt-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="bg-card p-6 md:p-10 rounded-3xl shadow-xl border border-border text-left">

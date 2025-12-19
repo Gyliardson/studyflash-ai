@@ -9,14 +9,13 @@ import { ptPT } from '@clerk/localizations'
 // 1. Importar o Analytics
 import { Analytics } from "@vercel/analytics/react"
 import { ThemeProvider } from "./providers";
-import InstallPrompt from "./components/InstallPrompt";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "StudyFlash",
   description: "Gera flashcards com IA",
-  manifest: "/manifest.webmanifest", // Link automático gerado pelo Next.js
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
@@ -24,7 +23,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Sensação de app nativo (impede zoom acidental)
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -38,8 +37,6 @@ export default function RootLayout({
         <body className={inter.className}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             {children}
-            
-            <InstallPrompt /> {/* <--- 2. Adicionar aqui */}
             <Analytics />
           </ThemeProvider>
         </body>

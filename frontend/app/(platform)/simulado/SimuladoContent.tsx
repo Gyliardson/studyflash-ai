@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { iniciarSimulado, finalizarSimulado, listarMeusBaralhos, listarMeusPlanos } from "../actions";
+import { iniciarSimulado, finalizarSimulado, listarMeusBaralhos, listarMeusPlanos } from "@/app/actions";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 

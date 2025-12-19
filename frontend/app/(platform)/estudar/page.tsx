@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import Header from "../components/Header";
-import Flashcard from "../components/Flashcard";
-import { buscarCartoesParaRevisar, registrarRevisao, contarTotalFlashcards } from "../actions";
+import Flashcard from "@/app/components/Flashcard";
+import { buscarCartoesParaRevisar, registrarRevisao, contarTotalFlashcards } from "@/app/actions";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -207,7 +206,6 @@ function StudyContent() {
 export default function EstudarPage() {
     return (
         <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-12 transition-colors duration-300">
-            <Header />
             <Suspense fallback={<div className="text-center p-10 text-muted-foreground">Carregando ambiente de estudo...</div>}>
                 <StudyContent />
             </Suspense>

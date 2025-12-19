@@ -1,5 +1,35 @@
 # Histórico de Versões - StudiFlow
 
+## [v0.7.0] - 18/12/2025 (Marketing, Legal & Reestruturação de Rotas)
+
+### 🚀 Arquitetura & Rotas (Next.js Route Groups)
+
+- **Separação Lógica:** Implementação de Route Groups para isolar o site institucional da aplicação:
+  - `(site)`: Landing Page e páginas públicas.
+  - `(platform)`: Dashboard, Coleção e modos de estudo.
+- **Rota Protegida:** O antigo `page.tsx` (Dashboard) foi movido para `/dashboard`. A raiz `/` agora é a Landing Page.
+- **Refatoração de Imports:** Migração massiva de imports relativos (`../../`) para imports absolutos (`@/app/...`) para evitar quebras em movimentações futuras.
+
+### 🌐 Landing Page & Marketing
+
+- **Nova Home Page:** Página inicial otimizada para conversão com seções de Hero, Features e Prova Social.
+- **Botões Inteligentes (Smart Auth):** A interface detecta se o usuário já está logado e altera os botões de "Entrar" para "Ir para o App", evitando erros de sessão do Clerk.
+- **Layout Exclusivo:** Criação de um Layout limpo para o site (sem Sidebar/UserHUD) e um Layout focado para a Plataforma.
+
+### ⚖️ Compliance & Legal (LGPD)
+
+- **Páginas Obrigatórias:** Implementação das rotas `/termos` e `/privacidade` com textos adaptados à legislação brasileira.
+- **Disclaimer de IA:** Adicionado aviso legal explícito sobre a responsabilidade do usuário na verificação de alucinações da IA.
+- **Gestão de Cookies:** Componente `CookieBanner` funcional que persiste o consentimento do usuário via `localStorage`.
+- **Canal de Contato:** Link `mailto` integrado ao rodapé para solicitações de suporte e dados.
+
+### 🔧 Fixes & Melhorias
+
+- **Correção Clerk:** Tratamento do erro `cannot_render_single_session_enabled` prevenindo renderização de modais de login quando a sessão já existe.
+- **UI Consistency:** Ajuste de alinhamentos na Landing Page para Desktop sem quebrar o Mobile-first.
+
+> Esta versão marca a transição do projeto de "ferramenta" para "produto", introduzindo a camada de vendas e conformidade jurídica necessária para operação pública.
+
 ## [v0.6.1] - 18/12/2025 (PWA & Offline Mode)
 
 ### 📱 Progressive Web App (PWA)

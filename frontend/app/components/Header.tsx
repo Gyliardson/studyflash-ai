@@ -41,7 +41,7 @@ export default function Header() {
                         {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
                     </button>
 
-                    <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                    <Link href="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                         <span className="text-2xl">⚡</span>
                         {/* Mobile Logo Fix: Ensure text is visible and consistent */}
                         <span className="text-xl font-extrabold text-foreground tracking-tight">
@@ -51,7 +51,7 @@ export default function Header() {
 
                     <SignedIn>
                         <nav className="hidden md:flex gap-6 text-sm font-medium text-muted-foreground">
-                            <Link href="/" className="hover:text-primary transition-colors">
+                            <Link href="/dashboard" className="hover:text-primary transition-colors">
                                 Criar Novo
                             </Link>
                             <Link href="/colecao" className="hover:text-primary transition-colors">
@@ -112,7 +112,7 @@ export default function Header() {
                     <SignedIn>
                         <div className="flex flex-col gap-2">
                             <Link 
-                                href="/" 
+                                href="/dashboard" 
                                 onClick={() => setIsMenuOpen(false)}
                                 className="p-3 rounded-xl hover:bg-accent text-foreground font-medium"
                             >

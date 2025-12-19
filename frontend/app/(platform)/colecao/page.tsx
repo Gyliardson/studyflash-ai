@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Header from "../components/Header";
 import Link from "next/link";
 // FIX: Importação corrigida para 'excluirBaralho'
-import { listarMeusBaralhos, listarMeusPlanos, criarBaralho, excluirBaralho, excluirPlano } from "../actions";
+import { listarMeusBaralhos, listarMeusPlanos, criarBaralho, excluirBaralho, excluirPlano } from "@/app/actions";
 
 export default function ColecaoPage() {
     const [decks, setDecks] = useState<any[]>([]);
@@ -58,7 +57,6 @@ export default function ColecaoPage() {
 
     return (
         <div className="min-h-screen bg-background pb-20 transition-colors duration-300">
-            <Header />
 
             <div className="max-w-5xl mx-auto px-4 md:px-6 mt-8">
                 
