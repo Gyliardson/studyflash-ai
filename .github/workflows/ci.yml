@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   frontend-quality:
-    name: Frontend targeted lint and typecheck
+    name: Frontend lint, typecheck and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -82,6 +82,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Production build
+        run: npm run build
+
   dependency-security:
     name: Frontend dependency security
     runs-on: ubuntu-latest
@@ -121,18 +124,57 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Enforce production critical/high policy
+      - name: Enforce reviewed production critical/high policy
         shell: bash
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const report = JSON.parse(fs.readFileSync('npm-audit-production.json', 'utf8'));
+          const policy = JSON.parse(fs.readFileSync('../security/npm-audit-accepted.json', 'utf8'));
+          const accepted = new Map(
+            policy.accepted.map((entry) => [`${entry.package}|${entry.advisory}`, entry])
+          );
+          const blocking = [];
+          const reviewed = [];
+
+          for (const [packageName, vulnerability] of Object.entries(report.vulnerabilities ?? {})) {
+            if (!['critical', 'high'].includes(vulnerability.severity)) continue;
+
+            if (vulnerability.isDirect) {
+              blocking.push(`${packageName}: direct ${vulnerability.severity} vulnerability`);
+              continue;
+            }
+
+            const highAdvisories = (vulnerability.via ?? []).filter(
+              (item) => typeof item === 'object' && ['critical', 'high'].includes(item.severity)
+            );
+
+            if (highAdvisories.length === 0) {
+              blocking.push(`${packageName}: ${vulnerability.severity} transitive vulnerability has no reviewable advisory metadata`);
+              continue;
+            }
+
+            const unaccepted = highAdvisories.filter(
+              (item) => !accepted.has(`${packageName}|${item.url}`)
+            );
+
+            if (unaccepted.length > 0) {
+              for (const item of unaccepted) {
+                blocking.push(`${packageName}: ${item.severity} ${item.url ?? item.title ?? 'unknown advisory'}`);
+              }
+              continue;
+            }
+
+            reviewed.push(`${packageName}: ${highAdvisories.length} explicitly reviewed high/critical advisories`);
+          }
+
           const counts = report.metadata?.vulnerabilities ?? {};
-          const critical = Number(counts.critical ?? 0);
-          const high = Number(counts.high ?? 0);
-          console.log(`Production dependency audit: critical=${critical}, high=${high}, moderate=${counts.moderate ?? 0}, low=${counts.low ?? 0}`);
-          if (critical > 0 || high > 0) {
-            console.error('Unresolved production critical/high dependency advisories require triage/remediation. See the uploaded audit artifact.');
+          console.log(`Production dependency audit raw counts: critical=${counts.critical ?? 0}, high=${counts.high ?? 0}, moderate=${counts.moderate ?? 0}, low=${counts.low ?? 0}`);
+          for (const item of reviewed) console.log(`Accepted by exact advisory policy: ${item}`);
+
+          if (blocking.length > 0) {
+            console.error('Unresolved policy-relevant production dependency advisories:');
+            for (const item of blocking) console.error(`- ${item}`);
             process.exit(1);
           }
           NODE
