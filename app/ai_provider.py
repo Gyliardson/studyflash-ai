@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import lru_cache
 from typing import Protocol, TypeVar
 
@@ -15,7 +16,7 @@ class AIProviderError(RuntimeError):
 
 
 class AIProviderRateLimitError(AIProviderError):
-    """Provider rejected the request because of a rate/quota limit."""
+    """Both configured model attempts were rate limited."""
 
 
 class AIProvider(Protocol):
@@ -29,11 +30,32 @@ class AIProvider(Protocol):
 
 
 TModel = TypeVar("TModel", bound=BaseModel)
+TResult = TypeVar("TResult")
 
 
 def _is_rate_limit_error(exc: Exception) -> bool:
     message = str(exc).lower()
     return any(token in message for token in ("429", "rate limit", "quota", "too many requests"))
+
+
+def invoke_with_bounded_fallback(
+    primary: Callable[[], TResult],
+    backup: Callable[[], TResult],
+) -> TResult:
+    """Try the backup once only when the primary failure is rate-limit related."""
+
+    try:
+        return primary()
+    except Exception as exc:
+        if not _is_rate_limit_error(exc):
+            raise AIProviderError(f"AI provider request failed: {type(exc).__name__}") from exc
+
+    try:
+        return backup()
+    except Exception as exc:
+        if _is_rate_limit_error(exc):
+            raise AIProviderRateLimitError("AI provider rate limit exhausted") from exc
+        raise AIProviderError(f"AI backup provider request failed: {type(exc).__name__}") from exc
 
 
 class GroqAIProvider:
@@ -83,21 +105,10 @@ Não use 'todas as anteriores' e não invente IDs.
         )
         primary_chain = prompt | self._primary.with_structured_output(schema)
         backup_chain = prompt | self._backup.with_structured_output(schema)
-
-        try:
-            return primary_chain.invoke(values)
-        except Exception as exc:
-            if not _is_rate_limit_error(exc):
-                raise AIProviderError(f"AI provider request failed: {type(exc).__name__}") from exc
-
-            try:
-                return backup_chain.invoke(values)
-            except Exception as backup_exc:
-                if _is_rate_limit_error(backup_exc):
-                    raise AIProviderRateLimitError("AI provider rate limit exhausted") from backup_exc
-                raise AIProviderError(
-                    f"AI backup provider request failed: {type(backup_exc).__name__}"
-                ) from backup_exc
+        return invoke_with_bounded_fallback(
+            lambda: primary_chain.invoke(values),
+            lambda: backup_chain.invoke(values),
+        )
 
     def generate_flashcards(self, text: str) -> ConjuntoFlashcards:
         return self._invoke_structured(
@@ -134,6 +145,6 @@ Não use 'todas as anteriores' e não invente IDs.
 
 @lru_cache(maxsize=1)
 def get_ai_provider() -> AIProvider:
-    """Resolve the production provider lazily so imports/tests never require a remote key."""
+    """Resolve production remote clients lazily, never during module import."""
 
     return GroqAIProvider()
