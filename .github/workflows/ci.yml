@@ -95,8 +95,8 @@ jobs:
       - name: Run ownership integration tests
         run: node --test --experimental-strip-types tests/ownership.test.mjs
 
-  backend-syntax:
-    name: Backend Python syntax
+  backend-quality:
+    name: Backend syntax and security tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -113,4 +113,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Compile backend
-        run: python -m compileall -q app
+        run: python -m compileall -q app tests
+
+      - name: Run backend security tests
+        run: python -m unittest -v tests.test_request_security
