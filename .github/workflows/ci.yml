@@ -43,7 +43,7 @@ jobs:
         run: npx prisma generate
 
       - name: Lint security boundaries
-        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts
+        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts lib/gamification-transactions.mjs
 
       - name: Gate server-only AI boundary
         shell: bash
@@ -63,11 +63,25 @@ jobs:
           grep -q 'STUDYFLASH_INTERNAL_API_KEY' lib/ai-api.ts
           grep -q 'X-StudyFlash-Internal-Key' lib/ai-api.ts
 
+      - name: Gate production gamification wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          actions_path='app/actions.ts'
+          grep -q 'saveFlashcardsForUser' "$actions_path"
+          grep -q 'recordReviewForUser' "$actions_path"
+          grep -q 'completeTopicForUser' "$actions_path"
+          grep -q 'finalizeExamForUser' "$actions_path"
+          if grep -E 'concederXp|processarStreak|xpJaGanhoHoje|simuladosHoje' "$actions_path"; then
+            echo "Legacy TOCTOU gamification path reintroduced in production actions" >&2
+            exit 1
+          fi
+
       - name: Typecheck
         run: npx tsc --noEmit
 
   ownership-integration:
-    name: Cross-user ownership (PostgreSQL)
+    name: Ownership and gamification (PostgreSQL)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -112,6 +126,9 @@ jobs:
 
       - name: Run ownership integration tests
         run: node --test --experimental-strip-types tests/ownership.test.mjs
+
+      - name: Run gamification concurrency tests
+        run: node --test --experimental-strip-types tests/gamification-concurrency.test.mjs
 
   backend-quality:
     name: Backend syntax and security tests
