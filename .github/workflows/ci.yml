@@ -42,8 +42,25 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Lint security boundary
-        run: npx eslint lib/db.ts
+      - name: Lint security boundaries
+        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts app/actions.ts
+
+      - name: Gate server-only AI boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R "NEXT_PUBLIC_API_URL" app/actions.ts app/dashboard/page.tsx app/api/ai/gerar/route.ts lib/ai-api.ts; then
+            echo "Public AI backend URL leaked into a protected caller" >&2
+            exit 1
+          fi
+          grep -q 'getAiApiUrl()}/api/gerar-plano' app/actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-cards-topico' app/actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-prova' app/actions.ts
+          test "$(grep -o 'getAiApiHeaders(' app/actions.ts | wc -l)" -ge 3
+          grep -q 'fetch("/api/ai/gerar"' app/dashboard/page.tsx
+          grep -q 'import "server-only"' lib/ai-api.ts
+          grep -q 'STUDYFLASH_INTERNAL_API_KEY' lib/ai-api.ts
+          grep -q 'X-StudyFlash-Internal-Key' lib/ai-api.ts
 
       - name: Typecheck
         run: npx tsc --noEmit
