@@ -5,6 +5,7 @@ import prisma from "../lib/db.ts";
 import { DAILY_LIMITS, XP_VALUES } from "../lib/gamification.ts";
 import {
   completeTopicForUser,
+  finalizeExamForUser,
   grantCreationXpForUser,
   processStudyStreakForUser,
   recordReviewForUser,
@@ -43,6 +44,15 @@ async function createDueCard(userId = userA) {
       nextReview: new Date(now.getTime() - 60_000),
     },
   });
+}
+
+function examResult(cardId) {
+  return {
+    difficulty: "EASY",
+    sourceType: "GLOBAL",
+    timeSpentSeconds: 30,
+    answers: [{ flashcardId: cardId, isCorrect: true, timeTaken: 30 }],
+  };
 }
 
 test("concurrent review submissions award one scheduled-review XP grant", async () => {
@@ -178,4 +188,52 @@ test("concurrent next-day streak processing increments and rewards once", async 
     await prisma.xPHistory.count({ where: { userId: userA, source: "STREAK" } }),
     1,
   );
+});
+
+test("concurrent exam completions cannot exceed the daily XP-eligible session limit", async () => {
+  const card = await createDueCard();
+  await prisma.userProfile.create({ data: { userId: userA, xp: 0, weeklyXp: 0, lastStudyDate: now } });
+
+  for (let index = 0; index < 2; index += 1) {
+    await prisma.examSession.create({
+      data: {
+        userId: userA,
+        sourceType: "GLOBAL",
+        totalQuestions: 1,
+        correctAnswers: 1,
+        score: 1,
+        timeSpentSeconds: 10,
+        difficulty: "EASY",
+        xpAwarded: 0,
+        createdAt: now,
+      },
+    });
+  }
+
+  const results = await Promise.all([
+    finalizeExamForUser(userA, examResult(card.id), now),
+    finalizeExamForUser(userA, examResult(card.id), now),
+  ]);
+
+  assert.equal(results.filter((result) => result.success).length, 2);
+  assert.equal(results.filter((result) => result.xpGained > 0).length, 1);
+  assert.equal(results.filter((result) => result.limitReached).length, 1);
+  assert.equal(await prisma.examSession.count({ where: { userId: userA } }), 4);
+  assert.equal(await prisma.xPHistory.count({ where: { userId: userA, source: "EXAM" } }), 1);
+
+  const profile = await prisma.userProfile.findUniqueOrThrow({ where: { userId: userA } });
+  const expectedXp = XP_VALUES.EXAM_COMPLETION
+    + XP_VALUES.EXAM_PER_CORRECT_EASY
+    + XP_VALUES.EXAM_PERFECT_BONUS;
+  assert.equal(profile.xp, expectedXp);
+});
+
+test("exam finalization rejects another user's flashcard without partial writes", async () => {
+  const foreignCard = await createDueCard(userB);
+
+  const result = await finalizeExamForUser(userA, examResult(foreignCard.id), now);
+
+  assert.equal(result.success, false);
+  assert.equal(await prisma.examSession.count({ where: { userId: userA } }), 0);
+  assert.equal(await prisma.xPHistory.count({ where: { userId: userA } }), 0);
 });
