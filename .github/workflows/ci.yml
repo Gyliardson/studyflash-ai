@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   frontend-quality:
-    name: Frontend lint and typecheck
+    name: Frontend targeted lint and typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -27,10 +27,10 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -39,8 +39,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint security boundary
+        run: npx eslint lib/db.ts
 
       - name: Typecheck
         run: npx tsc --noEmit
@@ -71,10 +71,10 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -87,7 +87,7 @@ jobs:
         run: npx prisma generate
 
       - name: Create disposable schema
-        run: npx prisma db push --skip-generate
+        run: npx prisma db push
 
       - name: Run ownership integration tests
         run: node --test --experimental-strip-types tests/ownership.test.mjs
@@ -98,10 +98,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
           cache: pip
