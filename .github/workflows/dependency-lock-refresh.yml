@@ -25,7 +25,7 @@ jobs:
           node-version: 22
 
       - name: Resolve patched dependency graph without lifecycle scripts
-        run: npm install --package-lock-only --ignore-scripts
+        run: npm install --package-lock-only --ignore-scripts --legacy-peer-deps
 
       - name: Capture candidate audits
         shell: bash
