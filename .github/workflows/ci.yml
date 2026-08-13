@@ -82,6 +82,61 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+  dependency-security:
+    name: Frontend dependency security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Capture complete npm audit evidence
+        shell: bash
+        run: |
+          set -uo pipefail
+          npm audit --json > npm-audit-all.json || true
+          npm audit --omit=dev --json > npm-audit-production.json || true
+
+      - name: Upload dependency audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-${{ github.sha }}
+          path: |
+            frontend/npm-audit-all.json
+            frontend/npm-audit-production.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce production critical/high policy
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit-production.json', 'utf8'));
+          const counts = report.metadata?.vulnerabilities ?? {};
+          const critical = Number(counts.critical ?? 0);
+          const high = Number(counts.high ?? 0);
+          console.log(`Production dependency audit: critical=${critical}, high=${high}, moderate=${counts.moderate ?? 0}, low=${counts.low ?? 0}`);
+          if (critical > 0 || high > 0) {
+            console.error('Unresolved production critical/high dependency advisories require triage/remediation. See the uploaded audit artifact.');
+            process.exit(1);
+          }
+          NODE
+
   ownership-integration:
     name: Ownership and gamification (PostgreSQL)
     runs-on: ubuntu-latest
