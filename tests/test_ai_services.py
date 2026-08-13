@@ -1,6 +1,10 @@
 import unittest
 
-from app.ai_provider import AIProviderError
+from app.ai_provider import (
+    AIProviderError,
+    AIProviderRateLimitError,
+    invoke_with_bounded_fallback,
+)
 from app.models import (
     ConjuntoFlashcards,
     Flashcard,
@@ -58,6 +62,62 @@ class ScriptedProvider:
     def generate_exam_options(self, question, correct_answer):
         self._maybe_fail()
         return self.exam
+
+
+class AIProviderPolicyTests(unittest.TestCase):
+    def test_rate_limit_uses_backup_once(self):
+        calls = []
+
+        def primary():
+            calls.append("primary")
+            raise RuntimeError("429 too many requests")
+
+        def backup():
+            calls.append("backup")
+            return "ok"
+
+        self.assertEqual(invoke_with_bounded_fallback(primary, backup), "ok")
+        self.assertEqual(calls, ["primary", "backup"])
+
+    def test_non_rate_limit_failure_does_not_use_backup(self):
+        calls = []
+
+        def primary():
+            calls.append("primary")
+            raise TimeoutError("provider timed out")
+
+        def backup():
+            calls.append("backup")
+            return "unexpected"
+
+        with self.assertRaises(AIProviderError):
+            invoke_with_bounded_fallback(primary, backup)
+        self.assertEqual(calls, ["primary"])
+
+    def test_both_rate_limited_raise_explicit_rate_limit_error(self):
+        def primary():
+            raise RuntimeError("rate limit")
+
+        def backup():
+            raise RuntimeError("quota exceeded")
+
+        with self.assertRaises(AIProviderRateLimitError):
+            invoke_with_bounded_fallback(primary, backup)
+
+    def test_backup_non_rate_failure_is_wrapped_without_retry_loop(self):
+        calls = []
+
+        def primary():
+            calls.append("primary")
+            raise RuntimeError("429")
+
+        def backup():
+            calls.append("backup")
+            raise ConnectionError("provider unavailable")
+
+        with self.assertRaises(AIProviderError):
+            invoke_with_bounded_fallback(primary, backup)
+        self.assertEqual(calls, ["primary", "backup"])
 
 
 class AIServiceTests(unittest.IsolatedAsyncioTestCase):
