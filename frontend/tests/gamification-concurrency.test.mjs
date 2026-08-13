@@ -175,6 +175,24 @@ test("concurrent next-day streak processing increments and rewards once", async 
   assert.equal(await prisma.xPHistory.count({ where: { userId: userA, source: "STREAK" } }), 1);
 });
 
+test("streak after a missed day resets to one and records the new study date without bonus", async () => {
+  const previousStudy = new Date(now);
+  previousStudy.setDate(previousStudy.getDate() - 2);
+  await prisma.userProfile.create({
+    data: { userId: userA, xp: 20, weeklyXp: 20, currentStreak: 7, longestStreak: 9, lastStudyDate: previousStudy },
+  });
+
+  const result = await processStudyStreakForUser(userA, now);
+  assert.equal(result.streakBonus, false);
+
+  const profile = await prisma.userProfile.findUniqueOrThrow({ where: { userId: userA } });
+  assert.equal(profile.currentStreak, 1);
+  assert.equal(profile.longestStreak, 9);
+  assert.equal(profile.lastStudyDate?.getTime(), now.getTime());
+  assert.equal(profile.xp, 20);
+  assert.equal(await prisma.xPHistory.count({ where: { userId: userA, source: "STREAK" } }), 0);
+});
+
 test("concurrent exam completions cannot exceed the daily XP-eligible session limit", async () => {
   const card = await createDueCard();
   await prisma.userProfile.create({ data: { userId: userA, xp: 0, weeklyXp: 0, lastStudyDate: now } });
