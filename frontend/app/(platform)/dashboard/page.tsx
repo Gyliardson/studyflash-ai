@@ -22,12 +22,6 @@ export default function Home() {
     // ESTADO DO MODAL
     const [showModal, setShowModal] = useState(false);
 
-    // --- WAKE UP PING ---
-    useEffect(() => {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-        fetch(`${baseUrl}/`).catch(() => { });
-    }, []);
-
     // --- LOADING TEXT ---
     useEffect(() => {
         if (!loading) return;
@@ -59,7 +53,6 @@ export default function Home() {
         setLoading(true);
 
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 90000);
 
@@ -70,7 +63,7 @@ export default function Home() {
                 formData.append("texto", texto);
             }
 
-            const response = await fetch(`${baseUrl}/api/gerar`, {
+            const response = await fetch("/api/ai/gerar", {
                 method: "POST",
                 body: formData,
                 signal: controller.signal

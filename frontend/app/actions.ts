@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/db";
 import { XP_VALUES, DAILY_LIMITS } from "@/lib/gamification";
+import { getAiApiHeaders, getAiApiUrl } from "@/lib/ai-api";
 
 // --- TIPOS ---
 type FlashcardInput = {
@@ -420,12 +421,10 @@ export async function gerarSalvarPlano(tema: string, dificuldade: string) {
     if (!userId) return { success: false, error: "Login necessário para criar planos." };
 
     try {
-        // 1. Chama a IA no Backend Python
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-        
-        const response = await fetch(`${baseUrl}/api/gerar-plano`, {
+        // 1. Chama a IA no Backend Python pela boundary server-only
+        const response = await fetch(`${getAiApiUrl()}/api/gerar-plano`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getAiApiHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ tema, dificuldade }),
             cache: "no-store" // Garante que não cacheie a resposta
         });
@@ -501,11 +500,10 @@ export async function gerarCardsParaTopico(planTitle: string, topicId: string, t
     if (!userId) return { success: false, error: "Não autorizado" };
 
     try {
-        // 1. Chama a IA
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-        const res = await fetch(`${baseUrl}/api/gerar-cards-topico`, {
+        // 1. Chama a IA pela boundary server-only
+        const res = await fetch(`${getAiApiUrl()}/api/gerar-cards-topico`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: getAiApiHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ tema_plano: planTitle, titulo_topico: topicTitle }),
             cache: "no-store"
         });
@@ -645,13 +643,12 @@ export async function iniciarSimulado(
         const selectedCards = shuffled.slice(0, maxQuestions);
 
         // 3. Tenta chamar a IA (com timeout curto para não travar)
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
         let questoesIA: any[] = [];
         
         try {
-            const aiResponse = await fetch(`${baseUrl}/api/gerar-prova`, {
+            const aiResponse = await fetch(`${getAiApiUrl()}/api/gerar-prova`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAiApiHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({
                     cartoes: selectedCards.map(c => ({
                         id: c.id,

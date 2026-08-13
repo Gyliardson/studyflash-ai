@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# StudyFlash Frontend
 
-## Getting Started
+Next.js frontend for StudyFlash.
 
-First, run the development server:
+## Local development
+
+Install dependencies and start the development server:
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The application is available at `http://localhost:3000` by default.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## AI backend boundary
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Browser code must not call the FastAPI AI service directly and must never receive the internal backend credential. AI requests are routed through authenticated Next.js server code, which forwards them to FastAPI.
 
-## Learn More
+Configure these variables only in the server environment:
 
-To learn more about Next.js, take a look at the following resources:
+```env
+AI_API_URL=http://127.0.0.1:8000
+STUDYFLASH_INTERNAL_API_KEY=replace-with-a-random-secret-at-least-32-characters
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`AI_API_URL` identifies the FastAPI service from the Next.js server. `STUDYFLASH_INTERNAL_API_KEY` is a shared server-to-server credential and must use the same value in the FastAPI environment. Do not prefix either variable with `NEXT_PUBLIC_`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The backend currently requires `X-StudyFlash-Internal-Key` on protected AI endpoints; the frontend server helper injects that header. Client components should call same-origin Next.js routes or Server Actions instead of constructing FastAPI URLs.
 
-## Deploy on Vercel
+## Quality gates
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Run the frontend checks used by CI before merging changes:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+Database-backed integration checks require the repository test environment and PostgreSQL configuration described by the root project documentation/CI workflow.

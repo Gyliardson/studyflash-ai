@@ -42,8 +42,26 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Lint security boundary
-        run: npx eslint lib/db.ts
+      - name: Lint security boundaries
+        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts
+
+      - name: Gate server-only AI boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          dashboard_path='app/(platform)/dashboard/page.tsx'
+          if grep -R "NEXT_PUBLIC_API_URL" app/actions.ts "$dashboard_path" app/api/ai/gerar/route.ts lib/ai-api.ts; then
+            echo "Public AI backend URL leaked into a protected caller" >&2
+            exit 1
+          fi
+          grep -q 'getAiApiUrl()}/api/gerar-plano' app/actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-cards-topico' app/actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-prova' app/actions.ts
+          test "$(grep -o 'getAiApiHeaders(' app/actions.ts | wc -l)" -ge 3
+          grep -q 'fetch("/api/ai/gerar"' "$dashboard_path"
+          grep -q 'import "server-only"' lib/ai-api.ts
+          grep -q 'STUDYFLASH_INTERNAL_API_KEY' lib/ai-api.ts
+          grep -q 'X-StudyFlash-Internal-Key' lib/ai-api.ts
 
       - name: Typecheck
         run: npx tsc --noEmit
@@ -95,8 +113,8 @@ jobs:
       - name: Run ownership integration tests
         run: node --test --experimental-strip-types tests/ownership.test.mjs
 
-  backend-syntax:
-    name: Backend Python syntax
+  backend-quality:
+    name: Backend syntax and security tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -113,4 +131,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Compile backend
-        run: python -m compileall -q app
+        run: python -m compileall -q app tests
+
+      - name: Run backend security tests
+        run: python -m unittest -v tests.test_request_security
