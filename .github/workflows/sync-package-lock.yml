@@ -1,0 +1,40 @@
+name: Synchronize package lock
+
+on:
+  push:
+    branches:
+      - work/10-dependency-security
+
+permissions:
+  contents: write
+
+jobs:
+  sync-lock:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: work/10-dependency-security
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Synchronize lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Verify clean install
+        run: npm ci --ignore-scripts
+      - name: Commit lockfile and remove helper
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/sync-package-lock.yml
+          git add frontend/package-lock.json
+          git commit -m "chore: synchronize package lock after dependency updates"
+          git push origin HEAD:work/10-dependency-security
