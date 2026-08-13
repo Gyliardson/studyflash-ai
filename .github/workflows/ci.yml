@@ -43,7 +43,7 @@ jobs:
         run: npx prisma generate
 
       - name: Lint security boundaries
-        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts
+        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts lib/gamification-transactions.mjs
 
       - name: Gate server-only AI boundary
         shell: bash
@@ -67,7 +67,7 @@ jobs:
         run: npx tsc --noEmit
 
   ownership-integration:
-    name: Cross-user ownership (PostgreSQL)
+    name: Ownership and gamification (PostgreSQL)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -112,6 +112,9 @@ jobs:
 
       - name: Run ownership integration tests
         run: node --test --experimental-strip-types tests/ownership.test.mjs
+
+      - name: Run gamification concurrency tests
+        run: node --test --experimental-strip-types tests/gamification-concurrency.test.mjs
 
   backend-quality:
     name: Backend syntax and security tests
