@@ -6,7 +6,10 @@
     "dev": "next dev --webpack",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:status": "prisma migrate status",
+    "db:schema:verify": "prisma migrate diff --exit-code --from-config-datasource --to-schema=prisma/schema.prisma"
   },
   "dependencies": {
     "@clerk/localizations": "^3.30.0",
