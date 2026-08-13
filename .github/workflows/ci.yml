@@ -238,7 +238,7 @@ jobs:
         run: node --test --experimental-strip-types tests/gamification-concurrency.test.mjs
 
   backend-quality:
-    name: Backend syntax and security tests
+    name: Backend syntax and deterministic tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -257,5 +257,5 @@ jobs:
       - name: Compile backend
         run: python -m compileall -q app tests
 
-      - name: Run backend security tests
-        run: python -m unittest -v tests.test_request_security
+      - name: Run backend deterministic tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
