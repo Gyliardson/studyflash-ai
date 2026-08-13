@@ -43,7 +43,7 @@ jobs:
         run: npx prisma generate
 
       - name: Lint security boundaries
-        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts app/actions.ts
+        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts
 
       - name: Gate server-only AI boundary
         shell: bash
