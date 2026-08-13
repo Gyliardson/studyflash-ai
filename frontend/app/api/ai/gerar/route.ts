@@ -9,7 +9,7 @@ const MAX_PROXY_BODY_BYTES = 11 * 1024 * 1024;
 
 class RequestBodyTooLargeError extends Error {}
 
-async function readRequestBodyLimited(request: Request): Promise<Uint8Array> {
+async function readRequestBodyLimited(request: Request): Promise<ArrayBuffer> {
   const declaredLength = request.headers.get("content-length");
   if (declaredLength) {
     const parsedLength = Number(declaredLength);
@@ -19,7 +19,7 @@ async function readRequestBodyLimited(request: Request): Promise<Uint8Array> {
   }
 
   if (!request.body) {
-    return new Uint8Array();
+    return new ArrayBuffer(0);
   }
 
   const reader = request.body.getReader();
@@ -42,13 +42,14 @@ async function readRequestBodyLimited(request: Request): Promise<Uint8Array> {
     reader.releaseLock();
   }
 
-  const payload = new Uint8Array(total);
+  const buffer = new ArrayBuffer(total);
+  const payload = new Uint8Array(buffer);
   let offset = 0;
   for (const chunk of chunks) {
     payload.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return payload;
+  return buffer;
 }
 
 export async function POST(request: Request) {
