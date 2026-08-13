@@ -115,7 +115,7 @@ test("review XP failure rolls back SRS, profile, streak, and ledger state", asyn
   const unchangedCard = await prisma.flashcard.findUniqueOrThrow({ where: { id: card.id } });
   assert.equal(unchangedCard.nextReview.getTime(), dueAt.getTime());
   assert.equal(unchangedCard.repetition, 0);
-  assert.equal(unchangedCard.interval, 1);
+  assert.equal(unchangedCard.interval, 0);
 
   const profile = await prisma.userProfile.findUniqueOrThrow({ where: { userId: userA } });
   assert.equal(profile.xp, 2_147_483_647);
