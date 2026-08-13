@@ -1,0 +1,71 @@
+name: Browser E2E
+
+on:
+  push:
+    branches:
+      - portfolio/revamp-2026
+      - 'work/**'
+  pull_request:
+    branches:
+      - portfolio/revamp-2026
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public-browser:
+    name: Public browser smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_e2e
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5hY2NvdW50cy5kZXYk
+      CI: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/e2e/package-lock.json
+
+      - name: Install application dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install browser test dependencies
+        working-directory: frontend/e2e
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: frontend/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Build StudyFlash
+        working-directory: frontend
+        run: npm run build
+
+      - name: Run deterministic browser smoke
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Upload browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-${{ github.sha }}
+          path: |
+            frontend/e2e/test-results
+            frontend/e2e/playwright-report
+          if-no-files-found: ignore
+          retention-days: 14
