@@ -80,7 +80,12 @@ const prismaClientSingleton = () => {
         if (!questions) return;
 
         const rows = Array.isArray(questions) ? questions : [questions];
-        const flashcardIds = rows.map((row) => row.flashcardId);
+        const flashcardIds = rows.map((row) => {
+            if (!('flashcardId' in row) || typeof row.flashcardId !== 'string') {
+                throw new Error(AUTHORIZATION_ERROR);
+            }
+            return row.flashcardId;
+        });
         const uniqueIds = [...new Set(flashcardIds)];
 
         if (uniqueIds.length !== flashcardIds.length) throw new Error(AUTHORIZATION_ERROR);
