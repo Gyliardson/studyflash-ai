@@ -3,7 +3,10 @@ import { Prisma } from "@prisma/client";
 import prisma from "./db.ts";
 import { DAILY_LIMITS, XP_VALUES } from "./gamification.ts";
 
-const MAX_SERIALIZABLE_ATTEMPTS = 3;
+const MAX_SERIALIZABLE_ATTEMPTS = 5;
+const DAILY_EXAM_XP_LIMIT = 3;
+const EXAM_DIFFICULTIES = new Set(["EASY", "MEDIUM", "HARD", "IMPOSSIBLE"]);
+const EXAM_SOURCE_TYPES = new Set(["DECK", "TOPIC", "PLAN", "GLOBAL"]);
 
 function isRetryableTransactionConflict(error) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
@@ -193,5 +196,114 @@ export async function completeTopicForUser(userId, topicId) {
     await grantXp(tx, userId, XP_VALUES.COMPLETE_TOPIC, "COMPLETE_TOPIC");
 
     return { success: true };
+  });
+}
+
+async function assertOwnedExamSource(tx, userId, sourceType, sourceId) {
+  if (!EXAM_SOURCE_TYPES.has(sourceType)) return false;
+  if (sourceType === "GLOBAL") return !sourceId;
+  if (!sourceId) return false;
+
+  if (sourceType === "DECK") {
+    return Boolean(await tx.deck.findFirst({
+      where: { id: sourceId, userId },
+      select: { id: true },
+    }));
+  }
+  if (sourceType === "TOPIC") {
+    return Boolean(await tx.topic.findFirst({
+      where: { id: sourceId, plan: { userId } },
+      select: { id: true },
+    }));
+  }
+
+  return Boolean(await tx.studyPlan.findFirst({
+    where: { id: sourceId, userId },
+    select: { id: true },
+  }));
+}
+
+async function assertOwnedExamAnswers(tx, userId, answers) {
+  if (!Array.isArray(answers) || answers.length === 0) return false;
+  const ids = answers.map((answer) => answer.flashcardId);
+  if (ids.some((id) => typeof id !== "string")) return false;
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length !== ids.length) return false;
+
+  const count = await tx.flashcard.count({
+    where: { userId, id: { in: uniqueIds } },
+  });
+  return count === uniqueIds.length;
+}
+
+function calculateExamXp(difficulty, correctAnswers, score) {
+  let multiplier = XP_VALUES.EXAM_PER_CORRECT_EASY;
+  if (difficulty === "MEDIUM") multiplier = XP_VALUES.EXAM_PER_CORRECT_MEDIUM;
+  if (difficulty === "HARD") multiplier = XP_VALUES.EXAM_PER_CORRECT_HARD;
+  if (difficulty === "IMPOSSIBLE") multiplier = XP_VALUES.EXAM_PER_CORRECT_IMPOSSIBLE;
+
+  let amount = XP_VALUES.EXAM_COMPLETION + (correctAnswers * multiplier);
+  if (score >= 0.9) amount += XP_VALUES.EXAM_PERFECT_BONUS;
+  return amount;
+}
+
+export async function finalizeExamForUser(userId, result, now = new Date()) {
+  return runSerializable(async (tx) => {
+    if (!EXAM_DIFFICULTIES.has(result.difficulty)) {
+      return { success: false, error: "Invalid exam difficulty." };
+    }
+    if (!await assertOwnedExamSource(tx, userId, result.sourceType, result.sourceId)) {
+      return { success: false, error: "Invalid exam source." };
+    }
+    if (!await assertOwnedExamAnswers(tx, userId, result.answers)) {
+      return { success: false, error: "Invalid exam answers." };
+    }
+
+    const totalQuestions = result.answers.length;
+    const correctAnswers = result.answers.filter((answer) => answer.isCorrect === true).length;
+    const score = correctAnswers / totalQuestions;
+
+    const sessionsToday = await tx.examSession.count({
+      where: { userId, createdAt: { gte: startOfLocalDay(now) } },
+    });
+    const limitReached = sessionsToday >= DAILY_EXAM_XP_LIMIT;
+    const xpGained = limitReached
+      ? 0
+      : calculateExamXp(result.difficulty, correctAnswers, score);
+
+    const session = await tx.examSession.create({
+      data: {
+        userId,
+        sourceType: result.sourceType,
+        sourceDeckId: result.sourceType === "DECK" ? result.sourceId : undefined,
+        sourceTopicId: result.sourceType === "TOPIC" ? result.sourceId : undefined,
+        sourcePlanId: result.sourceType === "PLAN" ? result.sourceId : undefined,
+        totalQuestions,
+        correctAnswers,
+        score,
+        timeSpentSeconds: Math.max(0, Math.floor(Number(result.timeSpentSeconds) || 0)),
+        difficulty: result.difficulty,
+        xpAwarded: xpGained,
+        createdAt: now,
+        questions: {
+          create: result.answers.map((answer) => ({
+            flashcardId: answer.flashcardId,
+            isCorrect: answer.isCorrect === true,
+            timeTakenSeconds: Math.max(0, Number(answer.timeTaken) || 0),
+          })),
+        },
+      },
+    });
+
+    await grantXp(tx, userId, xpGained, "EXAM");
+    if (!limitReached) await processStreak(tx, userId, now);
+
+    return {
+      success: true,
+      sessionId: session.id,
+      xpGained,
+      score,
+      limitReached,
+    };
   });
 }
