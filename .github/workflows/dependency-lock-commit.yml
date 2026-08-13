@@ -1,0 +1,41 @@
+name: Commit dependency lock candidate
+
+on:
+  push:
+    branches:
+      - work/10-dependency-security
+
+permissions:
+  contents: write
+
+jobs:
+  commit-lockfile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Refresh lockfile without lifecycle scripts
+        run: npm install --package-lock-only --ignore-scripts --legacy-peer-deps
+      - name: Commit lockfile only
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo 'Lockfile already current.'
+          else
+            git commit -m 'fix(security): refresh lockfile for patched Clerk'
+            git push origin HEAD:work/10-dependency-security
+          fi
