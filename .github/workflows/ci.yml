@@ -45,6 +45,53 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+  ownership-integration:
+    name: Cross-user ownership (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: studyflash_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d studyflash_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_test
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/studyflash_test
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Create disposable schema
+        run: npx prisma db push --skip-generate
+
+      - name: Run ownership integration tests
+        run: node --test --experimental-strip-types tests/ownership.test.mjs
+
   backend-syntax:
     name: Backend Python syntax
     runs-on: ubuntu-latest
