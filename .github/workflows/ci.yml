@@ -63,6 +63,20 @@ jobs:
           grep -q 'STUDYFLASH_INTERNAL_API_KEY' lib/ai-api.ts
           grep -q 'X-StudyFlash-Internal-Key' lib/ai-api.ts
 
+      - name: Gate production gamification wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          actions_path='app/actions.ts'
+          grep -q 'saveFlashcardsForUser' "$actions_path"
+          grep -q 'recordReviewForUser' "$actions_path"
+          grep -q 'completeTopicForUser' "$actions_path"
+          grep -q 'finalizeExamForUser' "$actions_path"
+          if grep -E 'concederXp|processarStreak|xpJaGanhoHoje|simuladosHoje' "$actions_path"; then
+            echo "Legacy TOCTOU gamification path reintroduced in production actions" >&2
+            exit 1
+          fi
+
       - name: Typecheck
         run: npx tsc --noEmit
 
