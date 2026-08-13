@@ -2,13 +2,17 @@ import os
 import unittest
 from unittest.mock import patch
 
+from fastapi import HTTPException
+
 from app.request_security import (
     DEFAULT_MAX_PDF_BYTES,
     get_cors_origins,
+    get_internal_api_key,
     get_max_pdf_bytes,
     read_upload_limited,
     validate_pdf_metadata,
     validate_pdf_signature,
+    verify_internal_api_key,
 )
 
 
@@ -55,6 +59,27 @@ class RequestSecurityTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {"MAX_PDF_BYTES": "invalid"}, clear=True):
             with self.assertRaises(RuntimeError):
                 get_max_pdf_bytes()
+
+    def test_internal_api_key_must_be_configured_and_strong_enough(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "must be configured"):
+                get_internal_api_key()
+        with patch.dict(os.environ, {"STUDYFLASH_INTERNAL_API_KEY": "too-short"}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, "at least 32"):
+                get_internal_api_key()
+        key = "a" * 32
+        with patch.dict(os.environ, {"STUDYFLASH_INTERNAL_API_KEY": key}, clear=True):
+            self.assertEqual(get_internal_api_key(), key)
+
+    def test_internal_api_key_rejects_missing_or_wrong_values(self):
+        expected = "a" * 32
+        for provided in (None, "", "b" * 32):
+            with self.subTest(provided=provided):
+                with self.assertRaises(HTTPException) as raised:
+                    verify_internal_api_key(provided, expected)
+                self.assertEqual(raised.exception.status_code, 401)
+                self.assertEqual(raised.exception.detail, "Não autorizado.")
+        verify_internal_api_key(expected, expected)
 
     def test_pdf_metadata_rejects_wrong_extension_and_mime(self):
         with self.assertRaises(ValueError):
