@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from .models import ConjuntoFlashcards, PlanoEstudo, PedidoPlano, PedidoConteudoTopico, PedidoGerarProva, QuestaoProva
-from .request_security import get_cors_origins, read_upload_limited, validate_pdf_metadata
+from .request_security import get_cors_origins, read_upload_limited, require_internal_api_key, validate_pdf_metadata
 from .services import gerar_flashcards_service, extrair_texto_do_pdf, gerar_plano_service, gerar_conteudo_topico_service, gerar_distratores_batch
 from dotenv import load_dotenv
 
@@ -18,7 +18,7 @@ app.add_middleware(
 )
 
 
-@app.post("/api/gerar", response_model=ConjuntoFlashcards)
+@app.post("/api/gerar", response_model=ConjuntoFlashcards, dependencies=[Depends(require_internal_api_key)])
 async def gerar_flashcards(
     texto: str = Form(None),
     arquivo: UploadFile = File(None),
@@ -55,7 +55,7 @@ async def gerar_flashcards(
         raise HTTPException(status_code=500, detail="Erro interno ao processar solicitação.") from exc
 
 
-@app.post("/api/gerar-plano", response_model=PlanoEstudo)
+@app.post("/api/gerar-plano", response_model=PlanoEstudo, dependencies=[Depends(require_internal_api_key)])
 async def gerar_plano(pedido: PedidoPlano):
     try:
         return gerar_plano_service(pedido.tema, pedido.dificuldade)
@@ -64,7 +64,7 @@ async def gerar_plano(pedido: PedidoPlano):
         raise HTTPException(status_code=500, detail="Ocorreu um erro ao criar seu plano de estudos.") from exc
 
 
-@app.post("/api/gerar-cards-topico", response_model=ConjuntoFlashcards)
+@app.post("/api/gerar-cards-topico", response_model=ConjuntoFlashcards, dependencies=[Depends(require_internal_api_key)])
 async def gerar_cards_topico(pedido: PedidoConteudoTopico):
     try:
         return gerar_conteudo_topico_service(pedido.tema_plano, pedido.titulo_topico)
@@ -73,7 +73,7 @@ async def gerar_cards_topico(pedido: PedidoConteudoTopico):
         raise HTTPException(status_code=500, detail="Erro ao gerar material didático.") from exc
 
 
-@app.post("/api/gerar-prova", response_model=list[QuestaoProva])
+@app.post("/api/gerar-prova", response_model=list[QuestaoProva], dependencies=[Depends(require_internal_api_key)])
 async def gerar_prova(pedido: PedidoGerarProva):
     try:
         cartoes_processar = pedido.cartoes[:20]
