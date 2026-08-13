@@ -49,7 +49,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -R "NEXT_PUBLIC_API_URL" app/actions.ts app/dashboard/page.tsx app/api/ai/gerar/route.ts lib/ai-api.ts; then
+          dashboard_path='app/(platform)/dashboard/page.tsx'
+          if grep -R "NEXT_PUBLIC_API_URL" app/actions.ts "$dashboard_path" app/api/ai/gerar/route.ts lib/ai-api.ts; then
             echo "Public AI backend URL leaked into a protected caller" >&2
             exit 1
           fi
@@ -57,7 +58,7 @@ jobs:
           grep -q 'getAiApiUrl()}/api/gerar-cards-topico' app/actions.ts
           grep -q 'getAiApiUrl()}/api/gerar-prova' app/actions.ts
           test "$(grep -o 'getAiApiHeaders(' app/actions.ts | wc -l)" -ge 3
-          grep -q 'fetch("/api/ai/gerar"' app/dashboard/page.tsx
+          grep -q 'fetch("/api/ai/gerar"' "$dashboard_path"
           grep -q 'import "server-only"' lib/ai-api.ts
           grep -q 'STUDYFLASH_INTERNAL_API_KEY' lib/ai-api.ts
           grep -q 'X-StudyFlash-Internal-Key' lib/ai-api.ts
