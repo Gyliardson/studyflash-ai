@@ -11,11 +11,11 @@ function isRetryableTransactionConflict(error) {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
   if (error.code === "P2034") return true;
   if (error.code !== "P2002") return false;
-  const target = error.meta?.target;
-  return error.meta?.modelName === "UserProfile"
-    && Array.isArray(target)
-    && target.length === 1
-    && target[0] === "userId";
+
+  // Two concurrent first-use requests may both attempt to bootstrap the same
+  // UserProfile. userId is the model's only unique business key, so this
+  // conflict is safe to retry from the start of the serializable transaction.
+  return error.meta?.modelName === "UserProfile";
 }
 
 async function runSerializable(operation) {
@@ -81,7 +81,7 @@ async function processStreak(tx, userId, now) {
     await grantXp(tx, userId, XP_VALUES.DAILY_STREAK_BONUS, "STREAK");
     return { streakBonus: true };
   }
-  await tx.userProfile.update({ where: { userId }, data: { currentStreak: 1, lastSudyDate: now } });
+  await tx.userProfile.update({ where: { userId }, data: { currentStreak: 1, lastStudyDate: now } });
   return { streakBonus: false };
 }
 
