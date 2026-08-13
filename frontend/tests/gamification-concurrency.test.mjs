@@ -92,6 +92,40 @@ test("review ownership is enforced inside the serializable transaction", async (
   assert.ok(card.nextReview < now);
 });
 
+test("review XP failure rolls back SRS, profile, streak, and ledger state", async () => {
+  const dueAt = new Date(now.getTime() - 60_000);
+  const card = await prisma.flashcard.create({
+    data: { userId: userA, frente: "Question", verso: "Answer", nextReview: dueAt },
+  });
+  const lastStudyDate = new Date(now);
+  lastStudyDate.setDate(lastStudyDate.getDate() - 1);
+  await prisma.userProfile.create({
+    data: {
+      userId: userA,
+      xp: 2_147_483_647,
+      weeklyXp: 2_147_483_647,
+      currentStreak: 4,
+      longestStreak: 4,
+      lastStudyDate,
+    },
+  });
+
+  await assert.rejects(() => recordReviewForUser(userA, card.id, "facil", now));
+
+  const unchangedCard = await prisma.flashcard.findUniqueOrThrow({ where: { id: card.id } });
+  assert.equal(unchangedCard.nextReview.getTime(), dueAt.getTime());
+  assert.equal(unchangedCard.repetition, 0);
+  assert.equal(unchangedCard.interval, 1);
+
+  const profile = await prisma.userProfile.findUniqueOrThrow({ where: { userId: userA } });
+  assert.equal(profile.xp, 2_147_483_647);
+  assert.equal(profile.weeklyXp, 2_147_483_647);
+  assert.equal(profile.currentStreak, 4);
+  assert.equal(profile.longestStreak, 4);
+  assert.equal(profile.lastStudyDate?.getTime(), lastStudyDate.getTime());
+  assert.equal(await prisma.xPHistory.count({ where: { userId: userA } }), 0);
+});
+
 test("concurrent card saves cannot exceed creation XP cap and persist cards atomically", async () => {
   const deck = await prisma.deck.create({ data: { userId: userA, nome: "Deck" } });
   await prisma.userProfile.create({ data: { userId: userA, xp: 45, weeklyXp: 45 } });
