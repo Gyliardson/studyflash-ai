@@ -22,6 +22,8 @@ jobs:
     name: Frontend targeted lint and typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_generate
     defaults:
       run:
         working-directory: frontend
@@ -123,8 +125,11 @@ jobs:
       - name: Apply migrations to empty disposable PostgreSQL
         run: npm run db:migrate:deploy
 
-      - name: Verify migration state
+      - name: Verify migration history
         run: npm run db:migrate:status
+
+      - name: Verify database matches Prisma schema
+        run: npm run db:schema:verify
 
       - name: Run ownership integration tests
         run: node --test --experimental-strip-types tests/ownership.test.mjs
