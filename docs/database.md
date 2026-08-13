@@ -37,9 +37,12 @@ npm ci
 npx prisma generate
 npm run db:migrate:deploy
 npm run db:migrate:status
+npm run db:schema:verify
 ```
 
-After migrations, run the normal integration tests against the same disposable database.
+`db:migrate:status` verifies migration history/accounting. `db:schema:verify` separately compares the configured PostgreSQL database with `prisma/schema.prisma` and fails when schema drift remains. CI runs both checks because successful migration deployment alone does not prove that the resulting database exactly matches the Prisma schema.
+
+After these checks, run the normal integration tests against the same disposable database.
 
 `prisma db push` is not the authoritative schema bootstrap once migration history is present.
 
@@ -47,7 +50,7 @@ After migrations, run the normal integration tests against the same disposable d
 
 The migration `20260813142000_baseline` represents the Prisma schema that existed when checked-in migration history was introduced.
 
-For a brand-new empty PostgreSQL database, apply it normally with `prisma migrate deploy`.
+For a brand-new empty PostgreSQL database, apply it normally with `prisma migrate deploy`, then run `npm run db:schema:verify` before treating the database as current.
 
 For an already-populated production database that predates checked-in migration history, **do not run the baseline migration blindly**. First verify the live schema matches the baseline. Only after verification should the migration be marked as already applied, for example:
 
@@ -69,7 +72,8 @@ Minimum production setup:
 4. verify a backup/recovery point before the first migration of existing production data;
 5. run `prisma migrate status` against the intended database;
 6. baseline an existing matching schema when necessary, otherwise run `prisma migrate deploy`;
-7. deploy the application only after migration verification succeeds.
+7. run `npm run db:schema:verify` and resolve any unexpected drift before application deployment;
+8. deploy the application only after migration verification succeeds.
 
 Never put a production connection string in GitHub Actions test jobs or committed files.
 
