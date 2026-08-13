@@ -24,6 +24,9 @@ jobs:
     timeout-minutes: 15
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_generate
+      # Public, synthetic Clerk development key from Clerk's documented key-format example.
+      # It allows static build validation without using a real project credential.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5hY2NvdW50cy5kZXYk
     defaults:
       run:
         working-directory: frontend
