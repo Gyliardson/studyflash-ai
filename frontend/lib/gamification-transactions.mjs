@@ -111,28 +111,78 @@ export async function processStudyStreakForUser(userId, now = new Date()) {
   return runSerializable((tx) => processStreak(tx, userId, now));
 }
 
+async function grantCreationXp(tx, userId, requestedXp, now) {
+  await ensureProfile(tx, userId);
+
+  const history = await tx.xPHistory.aggregate({
+    _sum: { amount: true },
+    where: {
+      userId,
+      source: "CREATE_CARD",
+      createdAt: { gte: startOfLocalDay(now) },
+    },
+  });
+
+  const alreadyAwarded = history._sum.amount ?? 0;
+  const remaining = Math.max(
+    0,
+    DAILY_LIMITS.MAX_XP_FROM_CREATION - alreadyAwarded,
+  );
+  const awarded = Math.min(Math.max(0, requestedXp), remaining);
+
+  await grantXp(tx, userId, awarded, "CREATE_CARD");
+  return awarded;
+}
+
 export async function grantCreationXpForUser(userId, requestedXp, now = new Date()) {
+  return runSerializable((tx) => grantCreationXp(tx, userId, requestedXp, now));
+}
+
+export async function saveFlashcardsForUser(userId, cards, deckId, now = new Date()) {
+  if (!Array.isArray(cards) || cards.length === 0) {
+    return { success: false, error: "Nenhum flashcard para salvar." };
+  }
+
   return runSerializable(async (tx) => {
-    await ensureProfile(tx, userId);
+    if (deckId) {
+      const ownedDeck = await tx.deck.findFirst({
+        where: { id: deckId, userId },
+        select: { id: true },
+      });
+      if (!ownedDeck) return { success: false, error: "Grupo não encontrado." };
 
-    const history = await tx.xPHistory.aggregate({
-      _sum: { amount: true },
-      where: {
-        userId,
-        source: "CREATE_CARD",
-        createdAt: { gte: startOfLocalDay(now) },
-      },
-    });
+      await tx.flashcard.createMany({
+        data: cards.map((card) => ({
+          userId,
+          frente: card.frente,
+          verso: card.verso,
+          deckId,
+        })),
+      });
+    } else {
+      const deckName = `Gerado em ${now.toLocaleDateString("pt-BR")} às ${now.getHours()}:${now.getMinutes()}`;
+      await tx.deck.create({
+        data: {
+          userId,
+          nome: deckName,
+          cards: {
+            create: cards.map((card) => ({
+              userId,
+              frente: card.frente,
+              verso: card.verso,
+            })),
+          },
+        },
+      });
+    }
 
-    const alreadyAwarded = history._sum.amount ?? 0;
-    const remaining = Math.max(
-      0,
-      DAILY_LIMITS.MAX_XP_FROM_CREATION - alreadyAwarded,
+    const requestedXp = Math.min(
+      cards.length * XP_VALUES.CREATE_CARD,
+      DAILY_LIMITS.MAX_XP_FROM_CREATION,
     );
-    const awarded = Math.min(Math.max(0, requestedXp), remaining);
+    const xpGained = await grantCreationXp(tx, userId, requestedXp, now);
 
-    await grantXp(tx, userId, awarded, "CREATE_CARD");
-    return awarded;
+    return { success: true, xpGained };
   });
 }
 
