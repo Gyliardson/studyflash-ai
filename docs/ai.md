@@ -14,7 +14,9 @@ The existing `STUDYFLASH_INTERNAL_API_KEY` is a separate server-to-server author
 
 ## Tests
 
-Critical CI tests use an injected scripted provider and make no remote model calls. They cover successful service behavior, invalid generated shapes and provider failure propagation. A real-provider smoke test may be added separately, but it must remain optional/non-gating and require explicit local or deployment credentials.
+Critical CI tests use an injected scripted provider and make no remote model calls. They cover successful service behavior, invalid generated shapes, provider failure propagation, rate-limit fallback, timeout/non-rate-limit behavior, exhausted rate limits, and backup-provider unavailability. The fallback policy is bounded: the backup is attempted at most once and only after a rate-limit-classified primary failure.
+
+A real-provider smoke test may be added separately, but it must remain optional/non-gating and require explicit local or deployment credentials.
 
 ## Failure semantics
 
