@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listarMeusBaralhos, salvarFlashcards } from "../actions";
 import { triggerHudRefresh } from "./UserHUD";
 
@@ -24,6 +24,8 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
     const [saving, setSaving] = useState(false);
     const [creating, setCreating] = useState(false);
     const [mutationError, setMutationError] = useState<string | null>(null);
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const closeButtonRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
         listarMeusBaralhos().then((data) => {
@@ -31,7 +33,34 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
             if (data.length > 0) setSelectedDeck(data[0].id);
             setLoading(false);
         });
+        closeButtonRef.current?.focus();
     }, []);
+
+    useEffect(() => {
+        function handleKeyDown(event: KeyboardEvent) {
+            if (event.key === "Escape" && !saving) {
+                event.preventDefault();
+                onClose();
+                return;
+            }
+            if (event.key !== "Tab" || !dialogRef.current) return;
+            const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+                'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+            ));
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        }
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [onClose, saving]);
 
     function completeSuccessfulSave() {
         setMutationError(null);
@@ -85,26 +114,31 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-100 p-4">
             <div
+                ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="save-modal-title"
+                aria-describedby="save-modal-description"
                 className="bg-popover rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-border"
             >
                 <div className="flex justify-between items-center mb-6">
-                    <h2 id="save-modal-title" className="text-xl font-bold text-popover-foreground">Onde vamos guardar? 🗂️</h2>
-                    <button type="button" onClick={onClose} disabled={saving} aria-label="Fechar" className="text-muted-foreground hover:text-foreground transition disabled:opacity-50 disabled:cursor-not-allowed">
+                    <div>
+                        <h2 id="save-modal-title" className="text-xl font-bold text-popover-foreground">Onde vamos guardar? 🗂️</h2>
+                        <p id="save-modal-description" className="sr-only">Escolha um grupo existente ou crie um novo grupo para salvar os flashcards.</p>
+                    </div>
+                    <button ref={closeButtonRef} type="button" onClick={onClose} disabled={saving} aria-label="Fechar diálogo" className="text-muted-foreground hover:text-foreground transition disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
 
                 {mutationError && (
-                    <div role="alert" className="mb-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    <div role="alert" aria-live="assertive" className="mb-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                         {mutationError}
                     </div>
                 )}
 
                 {loading && (
-                    <div className="flex flex-col items-center py-8 text-muted-foreground">
+                    <div className="flex flex-col items-center py-8 text-muted-foreground" role="status" aria-live="polite">
                         <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mb-2" aria-hidden="true"></div>
                         <p className="text-sm">Buscando seus grupos...</p>
                     </div>
@@ -148,7 +182,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                         setCreating(true);
                                         setMutationError(null);
                                     }}
-                                    className="w-full py-3 border-2 border-dashed border-primary/30 text-primary font-bold rounded-xl hover:bg-primary/10 hover:border-primary transition-all flex items-center justify-center gap-2"
+                                    className="w-full py-3 border-2 border-dashed border-primary/30 text-primary font-bold rounded-xl hover:bg-primary/10 hover:border-primary transition-all flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                                     Criar Novo Grupo
@@ -180,7 +214,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                             setCreating(false);
                                             setMutationError(null);
                                         }}
-                                        className="w-full mt-3 py-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-semibold rounded-xl border border-border transition-all flex items-center justify-center gap-2 active:scale-95"
+                                        className="w-full mt-3 py-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-semibold rounded-xl border border-border transition-all flex items-center justify-center gap-2 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                                         Voltar para lista
@@ -194,7 +228,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                 type="button"
                                 onClick={onClose}
                                 disabled={saving}
-                                className="flex-1 py-3 text-muted-foreground font-bold hover:bg-muted hover:text-foreground rounded-xl transition disabled:opacity-50"
+                                className="flex-1 py-3 text-muted-foreground font-bold hover:bg-muted hover:text-foreground rounded-xl transition disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                             >
                                 Cancelar
                             </button>
@@ -203,12 +237,13 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                 type="button"
                                 onClick={creating || decks.length === 0 ? handleCreateAndSave : handleSaveExisting}
                                 disabled={saving}
-                                className="flex-2 py-3 bg-success-solid text-white font-bold rounded-xl hover:shadow-lg hover:shadow-success-solid/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                aria-busy={saving}
+                                className="flex-2 py-3 bg-success-solid text-white font-bold rounded-xl hover:shadow-lg hover:shadow-success-solid/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                             >
                                 {saving ? (
                                     <>
                                         <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" aria-hidden="true" />
-                                        <span>Salvando...</span>
+                                        <span role="status">Salvando...</span>
                                     </>
                                 ) : (
                                     <>
