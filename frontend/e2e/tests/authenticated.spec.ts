@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
 
 const TEST_USER_EMAIL =
@@ -8,9 +8,15 @@ const TEST_USER_EMAIL =
 const VALIDATION_MESSAGE =
   "Por favor, cole um texto ou anexe um PDF para começar.";
 
-async function signIn(page: Parameters<typeof clerk.signIn>[0]["page"]) {
+async function signIn(page: Page) {
   await page.goto("/");
   await clerk.signIn({ page, emailAddress: TEST_USER_EMAIL });
+}
+
+function blockingAxeViolations(results: Awaited<ReturnType<AxeBuilder["analyze"]>>) {
+  return results.violations.filter(
+    (violation) => violation.impact === "serious" || violation.impact === "critical",
+  );
 }
 
 test("authenticated StudyFlash validation flow uses real Clerk development auth", async ({
@@ -36,19 +42,14 @@ test("authenticated StudyFlash validation flow uses real Clerk development auth"
   expect(aiRequests).toEqual([]);
 
   const accessibility = await new AxeBuilder({ page }).analyze();
-  const blockingViolations = accessibility.violations.filter(
-    (violation) => violation.impact === "serious" || violation.impact === "critical",
-  );
-
+  const blockingViolations = blockingAxeViolations(accessibility);
   expect(
     blockingViolations,
-    blockingViolations
-      .map((violation) => `${violation.id}: ${violation.help}`)
-      .join("\n"),
+    blockingViolations.map((violation) => `${violation.id}: ${violation.help}`).join("\n"),
   ).toEqual([]);
 });
 
-test("collection UI follows authoritative create and delete results", async ({ page }) => {
+test("collection UI follows authoritative create, validation and delete results", async ({ page }) => {
   await signIn(page);
   await page.goto("/colecao");
   await expect(page).toHaveURL(/\/colecao(?:[/?#]|$)/);
@@ -65,6 +66,18 @@ test("collection UI follows authoritative create and delete results", async ({ p
   await createButton.click();
   await expect(page.getByRole("alert")).toContainText("Já existe um grupo com este nome!");
   await expect(page.getByText(name, { exact: true })).toBeVisible();
+
+  await input.fill("x".repeat(81));
+  await createButton.click();
+  await expect(page.getByRole("alert")).toContainText("no máximo 80 caracteres");
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  const blockingViolations = blockingAxeViolations(accessibility);
+  expect(
+    blockingViolations,
+    blockingViolations.map((violation) => `${violation.id}: ${violation.help}`).join("\n"),
+  ).toEqual([]);
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: `Excluir baralho ${name}` }).click();
