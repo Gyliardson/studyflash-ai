@@ -93,6 +93,39 @@ test("collection UI follows authoritative create, validation and delete results"
   await expect(page.getByText(name, { exact: true })).toHaveCount(0);
 });
 
+test("invalid generated cards are rejected by the real save Server Action without partial state", async ({ page }, testInfo) => {
+  const suffix = `${testInfo.retry}-${randomUUID()}`;
+  const deckName = `Invalid Card E2E ${suffix}`;
+  const marker = `invalid-card-marker-${suffix}`;
+
+  await signIn(page);
+  await page.route("**/api/ai/gerar", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ cartoes: [{ frente: "   ", verso: marker }] }),
+    });
+  });
+
+  await page.goto("/dashboard");
+  await page.getByPlaceholder("Cole seu texto de estudo aqui...").fill("conteúdo determinístico de teste");
+  await page.getByRole("button", { name: /Gerar Flashcards/i }).click();
+  await expect(page.getByRole("button", { name: /Salvar na minha Coleção/i })).toBeVisible();
+  await page.getByRole("button", { name: /Salvar na minha Coleção/i }).click();
+
+  const dialog = page.getByRole("dialog", { name: /Onde vamos guardar/i });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Nome do novo grupo:").fill(deckName);
+  await dialog.getByRole("button", { name: "Confirmar" }).click();
+
+  await expect(appAlert(page, "Frente e verso do flashcard são obrigatórios.")).toContainText(
+    "Frente e verso do flashcard são obrigatórios.",
+  );
+  await expect(dialog).toBeVisible();
+  expect(await prisma.deck.count({ where: { nome: deckName } })).toBe(0);
+  expect(await prisma.flashcard.count({ where: { verso: marker } })).toBe(0);
+});
+
 test("collection mutation server predicates are owner-scoped and repeated deletes fail closed", async () => {
   const frontendRoot = resolve(process.cwd(), "..");
   const actionsSource = await readFile(resolve(frontendRoot, "app/actions.ts"), "utf8");
