@@ -103,6 +103,34 @@ test("new deck names are atomic across different user intents while legacy looku
   assert.equal(persisted.nameKey, "biologia");
 });
 
+test("database trigger enforces atomic deck-name uniqueness even outside the idempotent action", async () => {
+  const results = await Promise.allSettled([
+    prisma.deck.create({ data: { userId: userA, nome: "Química" } }),
+    prisma.deck.create({ data: { userId: userA, nome: "química" } }),
+  ]);
+
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+  assert.equal(await prisma.deck.count({ where: { userId: userA } }), 1);
+  const persisted = await prisma.deck.findFirstOrThrow({ where: { userId: userA } });
+  assert.equal(persisted.nameKey, "química");
+});
+
+test("legacy deck rows can remain unbackfilled while application lookup blocks a new colliding name", async () => {
+  const legacy = await prisma.deck.create({ data: { userId: userA, nome: "História" } });
+  await prisma.$executeRaw`UPDATE "Deck" SET "nameKey" = NULL WHERE "id" = ${legacy.id}`;
+
+  const before = await prisma.deck.findUniqueOrThrow({ where: { id: legacy.id } });
+  assert.equal(before.nameKey, null);
+
+  const result = await createDeckForUser(userA, "história", "legacy-name-0001");
+  assert.equal(result.success, false);
+  assert.match(result.error, /já existe/i);
+  assert.equal(await prisma.deck.count({ where: { userId: userA } }), 1);
+  const after = await prisma.deck.findUniqueOrThrow({ where: { id: legacy.id } });
+  assert.equal(after.nameKey, null);
+});
+
 test("study-plan retry keeps the first committed AI result and rejects key reuse for another intent", async () => {
   const requestKey = "plan-retry-0001";
   const intentFingerprint = mutationFingerprint({ topic: "React", difficulty: "Iniciante" });
