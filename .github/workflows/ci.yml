@@ -48,20 +48,22 @@ jobs:
         run: npx prisma generate
 
       - name: Lint security and transaction boundaries
-        run: npx eslint lib/db.ts lib/ai-api.ts lib/ai-failure-policy.ts app/api/ai/gerar/route.ts lib/gamification-transactions.mjs lib/study-session-transactions.mjs lib/study-calendar.mjs
+        run: npx eslint lib/db.ts lib/ai-api.ts lib/ai-failure-policy.ts app/api/ai/gerar/route.ts app/idempotent-actions.ts lib/gamification-transactions.mjs lib/content-creation-transactions.mjs lib/mutation-receipts.mjs lib/study-session-transactions.mjs lib/study-calendar.mjs
 
       - name: Gate server-only AI boundary
         shell: bash
         run: |
           set -euo pipefail
           dashboard_path='app/(platform)/dashboard/page.tsx'
-          if grep -R "NEXT_PUBLIC_API_URL" app/actions.ts "$dashboard_path" app/api/ai/gerar/route.ts lib/ai-api.ts; then
+          if grep -R "NEXT_PUBLIC_API_URL" app/actions.ts app/idempotent-actions.ts "$dashboard_path" app/api/ai/gerar/route.ts lib/ai-api.ts; then
             echo "Public AI backend URL leaked into a protected caller" >&2
             exit 1
           fi
           grep -q 'getAiApiUrl()}/api/gerar-plano' app/actions.ts
           grep -q 'getAiApiUrl()}/api/gerar-cards-topico' app/actions.ts
           grep -q 'getAiApiUrl()}/api/gerar-prova' app/actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-plano' app/idempotent-actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-cards-topico' app/idempotent-actions.ts
           test "$(grep -o 'getAiApiHeaders(' app/actions.ts | wc -l)" -ge 3
           test "$(grep -o 'getAiAbortSignal(' app/actions.ts | wc -l)" -ge 3
           grep -q 'getAiAbortSignal(AI_PDF_PROXY_TIMEOUT_MS)' app/api/ai/gerar/route.ts
@@ -86,6 +88,8 @@ jobs:
           grep -q 'recordReviewForUser' "$actions_path"
           grep -q 'completeTopicForUser' "$actions_path"
           grep -q 'finalizeExamForUser' "$actions_path"
+          grep -q 'saveFlashcardsIdempotentForUser' app/idempotent-actions.ts
+          grep -q 'runMutationWithReceipt' lib/content-creation-transactions.mjs
           if grep -E 'concederXp|processarStreak|xpJaGanhoHoje|simuladosHoje' "$actions_path"; then
             echo "Legacy TOCTOU gamification path reintroduced in production actions" >&2
             exit 1
@@ -194,7 +198,7 @@ jobs:
           }
 
           const counts = report.metadata?.vulnerabilities ?? {};
-          console.log(`Production dependency audit raw counts: critical=${counts.critical ?? 0}, high=${counts.high ?? 0}, moderate=${counts.moderate ?? 0}, low=${counts.low ?? 0}`);
+          console.log(`Production dependency audit raw counts: critical=${counts.critical ?? 0}, high=${counts.high ?? 0, moderate=${counts.moderate ?? 0}, low=${counts.low ?? 0}`);
           for (const item of reviewed) console.log(`Accepted by exact advisory policy: ${item}`);
 
           if (blocking.length > 0) {
@@ -258,6 +262,9 @@ jobs:
 
       - name: Run gamification concurrency tests
         run: node --test --experimental-strip-types tests/gamification-concurrency.test.mjs
+
+      - name: Run idempotent content creation tests
+        run: node --test --experimental-strip-types tests/content-creation-idempotency.test.mjs
 
       - name: Run timezone boundary tests
         env:
