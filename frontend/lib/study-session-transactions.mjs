@@ -39,14 +39,14 @@ function ensureProfile(tx, userId) {
   });
 }
 
-async function grantXp(tx, userId, amount, source) {
+async function grantXp(tx, userId, amount, source, occurredAt = new Date()) {
   if (amount <= 0) return;
   await tx.userProfile.upsert({
     where: { userId },
     create: { userId, xp: amount, weeklyXp: amount },
     update: { xp: { increment: amount }, weeklyXp: { increment: amount } },
   });
-  await tx.xPHistory.create({ data: { userId, amount, source } });
+  await tx.xPHistory.create({ data: { userId, amount, source, createdAt: occurredAt } });
 }
 
 async function processStreak(tx, userId, now) {
@@ -66,7 +66,7 @@ async function processStreak(tx, userId, now) {
       where: { userId },
       data: { currentStreak: nextStreak, longestStreak: Math.max(nextStreak, profile.longestStreak), lastStudyDate: now },
     });
-    await grantXp(tx, userId, XP_VALUES.DAILY_STREAK_BONUS, "STREAK");
+    await grantXp(tx, userId, XP_VALUES.DAILY_STREAK_BONUS, "STREAK", now);
     return;
   }
   await tx.userProfile.update({ where: { userId }, data: { currentStreak: 1, lastStudyDate: now } });
@@ -237,7 +237,7 @@ export function recordStudySessionReviewForUser(userId, sessionId, cardId, evalu
       where: { id: cardId, userId },
       data: { interval, repetition, easinessFactor, nextReview },
     });
-    await grantXp(tx, userId, xpGained, "REVIEW");
+    await grantXp(tx, userId, xpGained, "REVIEW", now);
     await processStreak(tx, userId, now);
     await tx.studySessionCard.update({
       where: { id: item.id },
