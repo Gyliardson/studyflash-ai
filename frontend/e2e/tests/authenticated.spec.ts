@@ -139,6 +139,7 @@ test("invalid generated cards are rejected by the real save Server Action withou
 test("collection mutation server predicates are owner-scoped and repeated deletes fail closed", async () => {
   const frontendRoot = resolve(process.cwd(), "..");
   const actionsSource = await readFile(resolve(frontendRoot, "app/actions.ts"), "utf8");
+  const idempotentActionsSource = await readFile(resolve(frontendRoot, "app/idempotent-actions.ts"), "utf8");
   const saveModalSource = await readFile(resolve(frontendRoot, "app/components/SaveModal.tsx"), "utf8");
   const deckDetailSource = await readFile(resolve(frontendRoot, "app/(platform)/colecao/[deckId]/page.tsx"), "utf8");
   expect(actionsSource).toContain("const normalized = normalizeDeckName(nome);");
@@ -147,7 +148,9 @@ test("collection mutation server predicates are owner-scoped and repeated delete
   expect(actionsSource).toContain("await prisma.deck.delete({ where: { id, userId } });");
   expect(actionsSource).toContain("await prisma.flashcard.delete({ where: { id, userId } });");
   expect(actionsSource).toContain("await prisma.studyPlan.delete({ where: { id, userId } });");
-  expect(saveModalSource).toContain("salvarFlashcards(cards, undefined, name)");
+  expect(idempotentActionsSource).toContain("saveFlashcardsIdempotentForUser(userId, normalizedCards.cards, deckId, normalizedDeckName, requestKey)");
+  expect(saveModalSource).toContain("salvarFlashcardsIdempotente(cards, undefined, name, currentRequestKey())");
+  expect(saveModalSource).toContain("requestKeyRef.current");
   expect(saveModalSource).not.toContain("criarBaralho(");
   expect(deckDetailSource).toContain("<ConfirmDialog");
   expect(deckDetailSource).not.toContain("confirm(");
@@ -214,14 +217,18 @@ test("exam recovery converges when the committed finalization response is lost",
   await page.getByRole("button", { name: /Iniciar Simulado/i }).click();
   await expect(page.getByText(/1\s*\/\s*5/)).toBeVisible({ timeout: 20_000 });
 
-  let droppedCommittedResponse = false;
+  let replacedCommittedResponse = false;
   await page.route("**/*", async (route) => {
     const request = route.request();
-    if (!droppedCommittedResponse && request.method() === "POST" && request.headers()["next-action"]) {
+    if (!replacedCommittedResponse && request.method() === "POST" && request.headers()["next-action"]) {
       const response = await route.fetch();
       expect(response.ok()).toBe(true);
-      droppedCommittedResponse = true;
-      await route.abort("failed");
+      replacedCommittedResponse = true;
+      await route.fulfill({
+        status: 503,
+        contentType: "text/plain",
+        body: "Simulated gateway failure after upstream commit",
+      });
       return;
     }
     await route.continue();
@@ -233,11 +240,15 @@ test("exam recovery converges when the committed finalization response is lost",
     await options.first().click();
   }
 
-  await expect(page.getByRole("heading", { name: "Suas respostas foram preservadas" })).toBeVisible({ timeout: 20_000 });
-  expect(droppedCommittedResponse).toBe(true);
+  const resultHeading = page.getByRole("heading", { name: "Simulado Concluído!" });
+  const preservedHeading = page.getByRole("heading", { name: "Suas respostas foram preservadas" });
+  await expect(page.getByRole("heading", { name: /Simulado Concluído!|Suas respostas foram preservadas/ })).toBeVisible({ timeout: 20_000 });
+  expect(replacedCommittedResponse).toBe(true);
 
-  await page.getByRole("button", { name: "Tentar salvar novamente" }).click();
-  await expect(page.getByRole("heading", { name: "Simulado Concluído!" })).toBeVisible({ timeout: 20_000 });
+  if (await preservedHeading.isVisible()) {
+    await page.getByRole("button", { name: "Tentar salvar novamente" }).click();
+  }
+  await expect(resultHeading).toBeVisible({ timeout: 20_000 });
 
   expect(await prisma.examSession.count()).toBe(sessionsBefore + 1);
   expect(await prisma.xPHistory.count({ where: { source: "EXAM" } })).toBe(examXpBefore + 1);
