@@ -69,4 +69,13 @@ test("portfolio evidence captures representative responsive light and dark produ
   await expect(page.locator("html")).not.toHaveClass(/dark/);
   await page.goto("/perfil");
   await attachScreenshot(page, testInfo, "profile-mobile-light");
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/estudar");
+  await expect(page.getByRole("heading").filter({ hasText: /Sessão de estudo|Revisão concluída|Nada para revisar agora/ }).first()).toBeVisible();
+  await attachScreenshot(page, testInfo, "study-desktop-light");
+
+  await page.goto("/simulado");
+  await expect(page.getByRole("heading", { name: "Configuração de Prova" })).toBeVisible();
+  await attachScreenshot(page, testInfo, "exam-desktop-light");
 });
