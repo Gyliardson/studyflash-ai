@@ -8,6 +8,10 @@ async function signIn(page: Page) {
   await clerk.signIn({ page, emailAddress: TEST_USER_EMAIL });
 }
 
+async function expectAuthenticatedShell(page: Page) {
+  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
+}
+
 async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
   await testInfo.attach(name, {
     body: await page.screenshot({ fullPage: true, animations: "disabled" }),
@@ -49,10 +53,11 @@ test("portfolio evidence captures representative responsive light and dark produ
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/dashboard");
-  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
+  await expectAuthenticatedShell(page);
   await attachScreenshot(page, testInfo, "dashboard-desktop-light");
 
   await page.goto("/configuracoes");
+  await expectAuthenticatedShell(page);
   const dark = page.getByRole("button", { name: /Escuro/ });
   await dark.click();
   await expect(page.locator("html")).toHaveClass(/dark/);
@@ -72,10 +77,12 @@ test("portfolio evidence captures representative responsive light and dark produ
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/estudar");
+  await expectAuthenticatedShell(page);
   await expect(page.getByRole("heading").filter({ hasText: /Sessão de estudo|Revisão concluída|Nada para revisar agora/ }).first()).toBeVisible();
   await attachScreenshot(page, testInfo, "study-desktop-light");
 
   await page.goto("/simulado");
+  await expectAuthenticatedShell(page);
   await expect(page.getByRole("heading", { name: "Configuração de Prova" })).toBeVisible();
   await attachScreenshot(page, testInfo, "exam-desktop-light");
 });
