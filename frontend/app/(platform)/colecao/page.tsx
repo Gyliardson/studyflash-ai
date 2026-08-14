@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-// FIX: Importação corrigida para 'excluirBaralho'
 import { listarMeusBaralhos, listarMeusPlanos, criarBaralho, excluirBaralho, excluirPlano } from "@/app/actions";
 
 export default function ColecaoPage() {
@@ -33,52 +32,59 @@ export default function ColecaoPage() {
     async function handleCreateDeck() {
         if (!newDeckName.trim()) return;
         setIsCreating(true);
-        const res = await criarBaralho(newDeckName);
-        if (res.success) {
-            setNewDeckName("");
-            await carregarDados();
-        } else {
-            alert("Erro ao criar baralho");
+        try {
+            const res = await criarBaralho(newDeckName);
+            if (res.success) {
+                setNewDeckName("");
+                await carregarDados();
+            } else {
+                alert(res.error || "Erro ao criar baralho");
+            }
+        } finally {
+            setIsCreating(false);
         }
-        setIsCreating(false);
     }
 
     async function handleDeleteDeck(id: string) {
         if (!confirm("Tem certeza que deseja excluir este baralho e todos os seus cards?")) return;
-        await excluirBaralho(id);
+        const result = await excluirBaralho(id);
+        if (!result.success) {
+            alert(result.error || "Erro ao excluir baralho.");
+            return;
+        }
         await carregarDados();
     }
 
     async function handleDeletePlan(id: string) {
         if (!confirm("Tem certeza que deseja excluir esta trilha de estudos?")) return;
-        await excluirPlano(id);
+        const result = await excluirPlano(id);
+        if (!result.success) {
+            alert(result.error || "Erro ao excluir plano.");
+            return;
+        }
         await carregarDados();
     }
 
     return (
         <div className="min-h-screen bg-background pb-20 transition-colors duration-300">
-
             <div className="max-w-5xl mx-auto px-4 md:px-6 mt-8">
-                
-                {/* === HEADER DA PÁGINA === */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-extrabold text-foreground tracking-tight mb-2">Minha Biblioteca</h1>
                         <p className="text-muted-foreground">Gerencie seus materiais de estudo e acompanhe seu progresso.</p>
                     </div>
 
-                    {/* Botão Novo (Contextual) */}
                     {activeTab === 'DECKS' ? (
                         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                            <input 
-                                type="text" 
-                                placeholder="Nome do novo baralho..." 
+                            <input
+                                type="text"
+                                placeholder="Nome do novo baralho..."
                                 className="flex-1 w-full md:w-64 px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary outline-none shadow-sm"
                                 value={newDeckName}
                                 onChange={(e) => setNewDeckName(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleCreateDeck()}
                             />
-                            <button 
+                            <button
                                 onClick={handleCreateDeck}
                                 disabled={isCreating || !newDeckName.trim()}
                                 className="w-full sm:w-auto bg-primary text-primary-foreground px-4 py-3 rounded-xl font-bold hover:bg-primary/90 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
@@ -101,7 +107,6 @@ export default function ColecaoPage() {
                     )}
                 </div>
 
-                {/* === BANNER DESTAQUE: SIMULADO === */}
                 <div className="mb-10 relative overflow-hidden rounded-2xl bg-card border border-border shadow-xl shadow-primary/5 group hover:shadow-primary/10 transition-all">
                     <div className="absolute top-0 left-0 w-1 h-full bg-linear-to-b from-primary to-info-solid"></div>
                     <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -128,9 +133,8 @@ export default function ColecaoPage() {
                     </div>
                 </div>
 
-                {/* === NAVEGAÇÃO POR ABAS === */}
                 <div className="flex gap-6 border-b border-border mb-8 overflow-x-auto">
-                    <button 
+                    <button
                         onClick={() => setActiveTab('DECKS')}
                         className={`pb-4 px-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all relative whitespace-nowrap ${activeTab === 'DECKS' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
@@ -138,7 +142,7 @@ export default function ColecaoPage() {
                         Baralhos
                         {activeTab === 'DECKS' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full"></div>}
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('PLANOS')}
                         className={`pb-4 px-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all relative whitespace-nowrap ${activeTab === 'PLANOS' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     >
@@ -148,7 +152,6 @@ export default function ColecaoPage() {
                     </button>
                 </div>
 
-                {/* === CONTEÚDO: BARALHOS === */}
                 {!loading && activeTab === 'DECKS' && (
                     decks.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -158,8 +161,7 @@ export default function ColecaoPage() {
                                         <div className="p-3 bg-primary/10 text-primary rounded-xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                                         </div>
-                                        {/* LIXEIRA DOS DECKS (Invisível até Hover, sempre visível em mobile) */}
-                                        <button 
+                                        <button
                                             onClick={() => handleDeleteDeck(deck.id)}
                                             className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-destructive/10 transition opacity-100 md:opacity-0 md:group-hover:opacity-100"
                                             title="Excluir Baralho"
@@ -167,10 +169,10 @@ export default function ColecaoPage() {
                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </div>
-                                    
+
                                     <h3 className="text-xl font-bold text-card-foreground mb-1 group-hover:text-primary transition-colors truncate">{deck.nome}</h3>
                                     <p className="text-sm text-muted-foreground mb-6">{deck._count?.cards || 0} flashcards</p>
-                                    
+
                                     <div className="flex gap-2">
                                         <Link href={`/colecao/${deck.id}`} className="flex-1">
                                             <button className="w-full py-2 bg-background border border-border text-foreground font-bold rounded-lg hover:bg-muted hover:border-border/80 transition text-sm flex items-center justify-center gap-2">
@@ -199,7 +201,6 @@ export default function ColecaoPage() {
                     )
                 )}
 
-                {/* === CONTEÚDO: PLANOS === */}
                 {!loading && activeTab === 'PLANOS' && (
                     planos.length > 0 ? (
                         <div className="grid grid-cols-1 gap-4">
@@ -219,10 +220,9 @@ export default function ColecaoPage() {
                                             </div>
                                         </div>
                                     </Link>
-                                    
+
                                     <div className="flex items-center gap-4 w-full md:w-auto justify-end">
-                                         {/* LIXEIRA DOS PLANOS (Invisível até Hover) */}
-                                        <button 
+                                        <button
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 handleDeletePlan(plano.id);
