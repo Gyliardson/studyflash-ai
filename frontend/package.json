@@ -7,6 +7,8 @@
     "build": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test:e2e": "npm --prefix e2e test",
+    "test:e2e:headed": "npm --prefix e2e run test:headed",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:status": "prisma migrate status",
     "db:schema:verify": "prisma migrate diff --exit-code --from-config-datasource --to-schema=prisma/schema.prisma"

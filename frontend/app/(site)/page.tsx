@@ -1,10 +1,6 @@
 import Link from "next/link";
-import { SignInButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
 
-export default async function LandingPage() {
-  const { userId } = await auth();
-
+export default function LandingPage() {
   return (
     <div className="flex flex-col items-center">
       {/* Hero Section */}
@@ -21,26 +17,20 @@ export default async function LandingPage() {
             </div>
             <div className="space-x-4">
               <div className="inline-block">
-                {userId ? (
-                   <Link href="/dashboard">
-                     <button className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
-                       Ir para o Dashboard
-                     </button>
-                   </Link>
-                ) : (
-                   <SignInButton mode="modal">
-                     <button className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
-                       Começar Agora
-                     </button>
-                   </SignInButton>
-                )}
+                <Link
+                  href="/dashboard"
+                  className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  Começar Agora
+                </Link>
               </div>
               <div className="inline-block">
-                 <Link href="#features">
-                    <button className="inline-flex h-12 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 text-foreground">
-                      Saiba Mais
-                    </button>
-                 </Link>
+                <Link
+                  href="#features"
+                  className="inline-flex h-12 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
+                >
+                  Saiba Mais
+                </Link>
               </div>
             </div>
           </div>
@@ -50,6 +40,7 @@ export default async function LandingPage() {
       {/* Features Section */}
       <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
         <div className="container mx-auto px-4 md:px-6">
+          <h2 className="sr-only">Recursos do StudyFlash</h2>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:gap-12">
             <div className="flex flex-col items-center space-y-4 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
