@@ -1,7 +1,6 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import type { Deck } from "@prisma/client";
 import prisma from "@/lib/db";
 import { getAiApiHeaders, getAiApiUrl } from "@/lib/ai-api";
 import {
@@ -11,12 +10,9 @@ import {
     saveFlashcardsForUser,
 } from "@/lib/gamification-transactions";
 
-type FlashcardInput = {
-    frente: string;
-    verso: string;
-};
+type FlashcardInput = { frente: string; verso: string };
 
-type MutationResult<T extends object = Record<string, never>> =
+type MutationResult<T extends object = object> =
     | ({ success: true } & T)
     | { success: false; error: string };
 
@@ -52,7 +48,7 @@ function normalizeFlashcards(cards: FlashcardInput[]): MutationResult<{ cards: F
     return { success: true, cards: normalized };
 }
 
-export async function criarBaralho(nome: string): Promise<MutationResult<{ deck: Deck }>> {
+export async function criarBaralho(nome: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Logue para criar grupos." };
 
@@ -86,10 +82,7 @@ export async function listarMeusBaralhos() {
     }
 }
 
-export async function salvarFlashcards(
-    cards: FlashcardInput[],
-    deckId?: string,
-): Promise<MutationResult<{ xpGained: number }>> {
+export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Login necessário." };
 
@@ -108,16 +101,13 @@ export async function listarCardsDoBaralho(deckId: string) {
     const { userId } = await auth();
     if (!userId) return [];
     try {
-        return await prisma.flashcard.findMany({
-            where: { userId, deckId },
-            orderBy: { createdAt: "desc" },
-        });
+        return await prisma.flashcard.findMany({ where: { userId, deckId }, orderBy: { createdAt: "desc" } });
     } catch {
         return [];
     }
 }
 
-export async function excluirBaralho(id: string): Promise<MutationResult> {
+export async function excluirBaralho(id: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Não autorizado" };
     try {
@@ -129,7 +119,7 @@ export async function excluirBaralho(id: string): Promise<MutationResult> {
     }
 }
 
-export async function excluirFlashcard(id: string): Promise<MutationResult> {
+export async function excluirFlashcard(id: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Não autorizado" };
     try {
@@ -140,12 +130,7 @@ export async function excluirFlashcard(id: string): Promise<MutationResult> {
     }
 }
 
-export async function buscarCartoesParaRevisar(
-    modoExtra: boolean = false,
-    deckIds: string[] = [],
-    planId?: string,
-    topicId?: string,
-) {
+export async function buscarCartoesParaRevisar(modoExtra = false, deckIds: string[] = [], planId?: string, topicId?: string) {
     const { userId } = await auth();
     if (!userId) return [];
     try {
@@ -154,21 +139,14 @@ export async function buscarCartoesParaRevisar(
         else if (planId) whereCondition.topic = { planId };
         else if (deckIds.length > 0) whereCondition.deckId = { in: deckIds };
         if (!modoExtra) whereCondition.nextReview = { lte: new Date() };
-        return await prisma.flashcard.findMany({
-            where: whereCondition,
-            orderBy: { nextReview: "asc" },
-            take: 20,
-        });
+        return await prisma.flashcard.findMany({ where: whereCondition, orderBy: { nextReview: "asc" }, take: 20 });
     } catch (error) {
         console.error("Erro ao buscar revisões:", error);
         return [];
     }
 }
 
-export async function registrarRevisao(
-    cardId: string,
-    avaliacao: "errei" | "dificil" | "facil",
-) {
+export async function registrarRevisao(cardId: string, avaliacao: "errei" | "dificil" | "facil") {
     const { userId } = await auth();
     if (!userId) return { success: false };
     try {
@@ -179,11 +157,7 @@ export async function registrarRevisao(
     }
 }
 
-export async function contarTotalFlashcards(
-    deckIds: string[] = [],
-    planId?: string,
-    topicId?: string,
-) {
+export async function contarTotalFlashcards(deckIds: string[] = [], planId?: string, topicId?: string) {
     const { userId } = await auth();
     if (!userId) return 0;
     try {
@@ -215,12 +189,7 @@ export async function gerarSalvarPlano(tema: string, dificuldade: string) {
                 title: planoIA.titulo,
                 description: planoIA.descricao,
                 difficulty: planoIA.dificuldade,
-                topics: {
-                    create: planoIA.topicos.map((topic: { titulo: string }, index: number) => ({
-                        title: topic.titulo,
-                        order: index + 1,
-                    })),
-                },
+                topics: { create: planoIA.topicos.map((topic: { titulo: string }, index: number) => ({ title: topic.titulo, order: index + 1 })) },
             },
             include: { topics: true },
         });
@@ -235,11 +204,7 @@ export async function listarMeusPlanos() {
     const { userId } = await auth();
     if (!userId) return [];
     try {
-        return await prisma.studyPlan.findMany({
-            where: { userId },
-            orderBy: { createdAt: "desc" },
-            include: { topics: { orderBy: { order: "asc" } } },
-        });
+        return await prisma.studyPlan.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, include: { topics: { orderBy: { order: "asc" } } } });
     } catch {
         return [];
     }
@@ -250,12 +215,7 @@ export async function buscarPlanoPorId(id: string) {
     if (!userId) return null;
     return prisma.studyPlan.findUnique({
         where: { id, userId },
-        include: {
-            topics: {
-                orderBy: { order: "asc" },
-                include: { _count: { select: { cards: true } } },
-            },
-        },
+        include: { topics: { orderBy: { order: "asc" }, include: { _count: { select: { cards: true } } } } },
     });
 }
 
@@ -263,10 +223,7 @@ export async function gerarCardsParaTopico(planTitle: string, topicId: string, t
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Não autorizado" };
     try {
-        const ownedTopic = await prisma.topic.findFirst({
-            where: { id: topicId, plan: { userId } },
-            select: { id: true },
-        });
+        const ownedTopic = await prisma.topic.findFirst({ where: { id: topicId, plan: { userId } }, select: { id: true } });
         if (!ownedTopic) return { success: false, error: "Tópico não encontrado" };
         const response = await fetch(`${getAiApiUrl()}/api/gerar-cards-topico`, {
             method: "POST",
@@ -276,14 +233,7 @@ export async function gerarCardsParaTopico(planTitle: string, topicId: string, t
         });
         if (!response.ok) throw new Error("Falha na IA");
         const data = await response.json();
-        await prisma.flashcard.createMany({
-            data: data.cartoes.map((card: { frente: string; verso: string }) => ({
-                userId,
-                frente: card.frente,
-                verso: card.verso,
-                topicId,
-            })),
-        });
+        await prisma.flashcard.createMany({ data: data.cartoes.map((card: FlashcardInput) => ({ userId, frente: card.frente, verso: card.verso, topicId })) });
         return { success: true };
     } catch (error) {
         console.error("Erro ao gerar cards do tópico:", error);
@@ -291,7 +241,7 @@ export async function gerarCardsParaTopico(planTitle: string, topicId: string, t
     }
 }
 
-export async function excluirPlano(id: string): Promise<MutationResult> {
+export async function excluirPlano(id: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Não autorizado" };
     try {
@@ -327,11 +277,7 @@ export async function concluirTopico(topicId: string) {
     }
 }
 
-export async function iniciarSimulado(
-    mode: "DECK" | "TOPIC" | "PLAN" | "GLOBAL",
-    sourceId: string | undefined,
-    quantity: number,
-) {
+export async function iniciarSimulado(mode: "DECK" | "TOPIC" | "PLAN" | "GLOBAL", sourceId: string | undefined, quantity: number) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Login necessário." };
     try {
@@ -339,13 +285,8 @@ export async function iniciarSimulado(
         if (mode === "DECK" && sourceId) whereCondition.deckId = sourceId;
         if (mode === "TOPIC" && sourceId) whereCondition.topicId = sourceId;
         if (mode === "PLAN" && sourceId) whereCondition.topic = { planId: sourceId };
-        const allCards = await prisma.flashcard.findMany({
-            where: whereCondition,
-            select: { id: true, frente: true, verso: true },
-        });
-        if (allCards.length < 4) {
-            return { success: false, error: "Você precisa de pelo menos 4 flashcards para criar alternativas." };
-        }
+        const allCards = await prisma.flashcard.findMany({ where: whereCondition, select: { id: true, frente: true, verso: true } });
+        if (allCards.length < 4) return { success: false, error: "Você precisa de pelo menos 4 flashcards para criar alternativas." };
         const maxQuestions = Math.min(Math.max(1, quantity), 15);
         const selectedCards = [...allCards].sort(() => 0.5 - Math.random()).slice(0, maxQuestions);
         let questoesIA: { card_id: string; alternativas?: string[] }[] = [];
@@ -353,9 +294,7 @@ export async function iniciarSimulado(
             const aiResponse = await fetch(`${getAiApiUrl()}/api/gerar-prova`, {
                 method: "POST",
                 headers: getAiApiHeaders({ "Content-Type": "application/json" }),
-                body: JSON.stringify({
-                    cartoes: selectedCards.map((card) => ({ id: card.id, frente: card.frente, verso: card.verso })),
-                }),
+                body: JSON.stringify({ cartoes: selectedCards.map((card) => ({ id: card.id, frente: card.frente, verso: card.verso })) }),
                 cache: "no-store",
                 signal: AbortSignal.timeout(8000),
             });
@@ -365,15 +304,9 @@ export async function iniciarSimulado(
         }
         const finalExam = selectedCards.map((card) => {
             const aiData = questoesIA.find((question) => question.card_id === card.id);
-            let options = aiData?.alternativas && aiData.alternativas.length >= 2
-                ? [...aiData.alternativas]
-                : null;
+            let options = aiData?.alternativas && aiData.alternativas.length >= 2 ? [...aiData.alternativas] : null;
             if (!options) {
-                const wrongAnswers = allCards
-                    .filter((candidate) => candidate.id !== card.id)
-                    .sort(() => 0.5 - Math.random())
-                    .slice(0, 3)
-                    .map((candidate) => candidate.verso);
+                const wrongAnswers = allCards.filter((candidate) => candidate.id !== card.id).sort(() => 0.5 - Math.random()).slice(0, 3).map((candidate) => candidate.verso);
                 options = [card.verso, ...wrongAnswers];
             }
             return { ...card, options: options.sort(() => 0.5 - Math.random()) };
