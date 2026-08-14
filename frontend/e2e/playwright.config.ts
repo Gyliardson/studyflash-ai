@@ -6,6 +6,7 @@ const publicTests = /(?:smoke|accessibility)\.spec\.ts/;
 const authenticatedTests = /authenticated\.spec\.ts/;
 const criticalA11yTests = /critical-a11y\.spec\.ts/;
 const studyReviewTests = /study-review\.spec\.ts/;
+const pwaTests = /pwa\.spec\.ts/;
 
 export default defineConfig({
   testDir: "./tests",
@@ -88,6 +89,22 @@ export default defineConfig({
         ...devices["Pixel 7"],
         trace: "off",
       },
+    },
+    {
+      name: "pwa-desktop",
+      testMatch: pwaTests,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+        trace: "retain-on-failure",
+      },
+    },
+    {
+      name: "pwa-mobile",
+      testMatch: pwaTests,
+      dependencies: ["setup"],
+      use: { ...devices["Pixel 7"], trace: "retain-on-failure" },
     },
   ],
   webServer: {
