@@ -39,14 +39,14 @@ function ensureProfile(tx, userId) {
   });
 }
 
-async function grantXp(tx, userId, amount, source) {
+async function grantXp(tx, userId, amount, source, occurredAt = new Date()) {
   if (amount <= 0) return;
   await tx.userProfile.upsert({
     where: { userId },
     create: { userId, xp: amount, weeklyXp: amount },
     update: { xp: { increment: amount }, weeklyXp: { increment: amount } },
   });
-  await tx.xPHistory.create({ data: { userId, amount, source } });
+  await tx.xPHistory.create({ data: { userId, amount, source, createdAt: occurredAt } });
 }
 
 async function processStreak(tx, userId, now) {
@@ -66,7 +66,7 @@ async function processStreak(tx, userId, now) {
       where: { userId },
       data: { currentStreak: nextStreak, longestStreak: Math.max(nextStreak, profile.longestStreak), lastStudyDate: now },
     });
-    await grantXp(tx, userId, XP_VALUES.DAILY_STREAK_BONUS, "STREAK");
+    await grantXp(tx, userId, XP_VALUES.DAILY_STREAK_BONUS, "STREAK", now);
     return { streakBonus: true };
   }
   await tx.userProfile.update({ where: { userId }, data: { currentStreak: 1, lastStudyDate: now } });
@@ -86,7 +86,7 @@ async function grantCreationXp(tx, userId, requestedXp, now) {
   });
   const remaining = Math.max(0, DAILY_LIMITS.MAX_XP_FROM_CREATION - (history._sum.amount ?? 0));
   const awarded = Math.min(Math.max(0, requestedXp), remaining);
-  await grantXp(tx, userId, awarded, "CREATE_CARD");
+  await grantXp(tx, userId, awarded, "CREATE_CARD", now);
   return awarded;
 }
 
@@ -147,7 +147,7 @@ export function recordReviewForUser(userId, cardId, evaluation, now = new Date()
     const nextReview = new Date(now);
     nextReview.setDate(nextReview.getDate() + interval);
     await tx.flashcard.update({ where: { id: cardId, userId }, data: { interval, repetition, easinessFactor, nextReview } });
-    await grantXp(tx, userId, xpGained, "REVIEW");
+    await grantXp(tx, userId, xpGained, "REVIEW", now);
     await processStreak(tx, userId, now);
     return { success: true, xpGained, isScheduledReview };
   });
@@ -284,7 +284,7 @@ export function finalizeExamForUser(userId, result, now = new Date()) {
         questions: { create: evaluated },
       },
     });
-    await grantXp(tx, userId, xpGained, "EXAM");
+    await grantXp(tx, userId, xpGained, "EXAM", now);
     if (!limitReached) await processStreak(tx, userId, now);
     return {
       success: true,
