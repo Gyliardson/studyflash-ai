@@ -125,6 +125,14 @@ test("calendar ordinals remain consecutive across a historical 23-hour Sao Paulo
   assert.equal(end.getTime() - start.getTime(), 23 * 60 * 60 * 1000);
 });
 
+test("calendar ranges preserve a historical 25-hour Sao Paulo DST day", () => {
+  const { start, end } = studyDayRange(new Date("2018-02-17T12:00:00.000Z"));
+  assert.equal(start.toISOString(), "2018-02-17T02:00:00.000Z");
+  assert.equal(end.toISOString(), "2018-02-18T03:00:00.000Z");
+  assert.equal(end.getTime() - start.getTime(), 25 * 60 * 60 * 1000);
+  assert.equal(studyCalendarDayDifference(new Date("2018-02-18T12:00:00.000Z"), new Date("2018-02-17T12:00:00.000Z")), 1);
+});
+
 test("creation XP cap includes earlier UTC-date history from the same StudyFlash day", async () => {
   await prisma.userProfile.create({ data: { userId, xp: DAILY_LIMITS.MAX_XP_FROM_CREATION, weeklyXp: DAILY_LIMITS.MAX_XP_FROM_CREATION } });
   await prisma.xPHistory.create({
@@ -193,6 +201,27 @@ test("streak increments exactly at the next StudyFlash calendar day", async () =
   assert.equal(profile.currentStreak, 5);
   assert.equal(profile.xp, XP_VALUES.DAILY_STREAK_BONUS);
   assert.equal(await prisma.xPHistory.count({ where: { userId, source: "STREAK" } }), 1);
+});
+
+test("streak resets to one after a missed StudyFlash calendar day without awarding a streak bonus", async () => {
+  await prisma.userProfile.create({
+    data: {
+      userId,
+      xp: 0,
+      weeklyXp: 0,
+      currentStreak: 7,
+      longestStreak: 9,
+      lastStudyDate: new Date("2026-08-13T12:00:00.000Z"),
+    },
+  });
+
+  const result = await processStudyStreakForUser(userId, new Date("2026-08-15T12:00:00.000Z"));
+  assert.equal(result.streakBonus, false);
+  const profile = await prisma.userProfile.findUniqueOrThrow({ where: { userId } });
+  assert.equal(profile.currentStreak, 1);
+  assert.equal(profile.longestStreak, 9);
+  assert.equal(profile.lastStudyDate?.toISOString(), "2026-08-15T12:00:00.000Z");
+  assert.equal(await prisma.xPHistory.count({ where: { userId, source: "STREAK" } }), 0);
 });
 
 test("exam daily XP cap counts sessions from the full StudyFlash day across UTC dates", async () => {
