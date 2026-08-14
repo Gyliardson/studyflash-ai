@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "./db.ts";
 import { DAILY_LIMITS, XP_VALUES } from "./gamification.ts";
+import { studyCalendarDayDifference, studyDayRange } from "./study-calendar.mjs";
 
 const MAX_SERIALIZABLE_ATTEMPTS = 5;
 const DAILY_EXAM_XP_LIMIT = 3;
@@ -48,16 +49,6 @@ async function grantXp(tx, userId, amount, source) {
   await tx.xPHistory.create({ data: { userId, amount, source } });
 }
 
-function startOfLocalDay(value) {
-  const result = new Date(value);
-  result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-function localCalendarDayDifference(current, previous) {
-  return Math.round((startOfLocalDay(current).getTime() - startOfLocalDay(previous).getTime()) / 86_400_000);
-}
-
 async function processStreak(tx, userId, now) {
   const profile = await ensureProfile(tx, userId);
   if (!profile.lastStudyDate) {
@@ -67,7 +58,7 @@ async function processStreak(tx, userId, now) {
     });
     return { streakBonus: false };
   }
-  const diffDays = localCalendarDayDifference(now, profile.lastStudyDate);
+  const diffDays = studyCalendarDayDifference(now, profile.lastStudyDate);
   if (diffDays <= 0) return { streakBonus: false };
   if (diffDays === 1) {
     const nextStreak = profile.currentStreak + 1;
@@ -88,9 +79,10 @@ export function processStudyStreakForUser(userId, now = new Date()) {
 
 async function grantCreationXp(tx, userId, requestedXp, now) {
   await ensureProfile(tx, userId);
+  const { start, end } = studyDayRange(now);
   const history = await tx.xPHistory.aggregate({
     _sum: { amount: true },
-    where: { userId, source: "CREATE_CARD", createdAt: { gte: startOfLocalDay(now) } },
+    where: { userId, source: "CREATE_CARD", createdAt: { gte: start, lt: end } },
   });
   const remaining = Math.max(0, DAILY_LIMITS.MAX_XP_FROM_CREATION - (history._sum.amount ?? 0));
   const awarded = Math.min(Math.max(0, requestedXp), remaining);
@@ -270,7 +262,8 @@ export function finalizeExamForUser(userId, result, now = new Date()) {
     const totalQuestions = attempt.questions.length;
     const correctAnswers = evaluated.filter((answer) => answer.isCorrect).length;
     const score = correctAnswers / totalQuestions;
-    const sessionsToday = await tx.examSession.count({ where: { userId, createdAt: { gte: startOfLocalDay(now) } } });
+    const { start, end } = studyDayRange(now);
+    const sessionsToday = await tx.examSession.count({ where: { userId, createdAt: { gte: start, lt: end } } });
     const limitReached = sessionsToday >= DAILY_EXAM_XP_LIMIT;
     const xpGained = limitReached ? 0 : calculateExamXp(attempt.difficulty, correctAnswers, score);
     const session = await tx.examSession.create({
