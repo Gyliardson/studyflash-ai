@@ -64,7 +64,7 @@ const DIFFICULTIES = {
     }
 };
 
-type ExamStep = 'CONFIG' | 'LOADING' | 'EXAM' | 'RESULT';
+type ExamStep = 'CONFIG' | 'LOADING' | 'EXAM' | 'FINALIZE_ERROR' | 'RESULT';
 type ExamAnswer = { flashcardId: string; selectedOption: string | null; timeTaken: number };
 
 export default function SimuladoContent() {
@@ -86,6 +86,8 @@ export default function SimuladoContent() {
     const [questionStartTime, setQuestionStartTime] = useState<number>(0);
     const [timeLeft, setTimeLeft] = useState<number>(0);
     const [finalResult, setFinalResult] = useState<any>(null);
+    const [configError, setConfigError] = useState<string | null>(null);
+    const [finalizeError, setFinalizeError] = useState<string | null>(null);
 
     useEffect(() => {
         Promise.all([listarMeusBaralhos(), listarMeusPlanos()]).then(([d, p]) => {
@@ -117,23 +119,38 @@ export default function SimuladoContent() {
     }, [step, currentIndex, difficulty]);
 
     async function handleStartExam() {
-        if (sourceType !== 'GLOBAL' && !sourceId) return alert("Selecione um Baralho, Trilha ou Tópico!");
-        setStep('LOADING');
-        setLoadingText("A IA está criando pegadinhas para suas questões...");
-        const res = await iniciarSimulado(sourceType, sourceId || undefined, quantity, difficulty);
-        if (!res.success || !res.cards || res.cards.length === 0 || !res.attemptId) {
-            alert(res.error || "Erro ao gerar prova. Verifique se você tem cartões suficientes.");
-            setStep('CONFIG');
+        setConfigError(null);
+        setFinalizeError(null);
+
+        if (sourceType !== 'GLOBAL' && !sourceId) {
+            setConfigError("Selecione um baralho, trilha ou tópico antes de iniciar o simulado.");
             return;
         }
-        setAttemptId(res.attemptId);
-        setExamCards(res.cards);
-        setCurrentIndex(0);
-        setAnswers([]);
-        setStartTime(Date.now());
-        setQuestionStartTime(Date.now());
-        if (DIFFICULTIES[difficulty].timePerQuestion > 0) setTimeLeft(DIFFICULTIES[difficulty].timePerQuestion);
-        setStep('EXAM');
+
+        setStep('LOADING');
+        setLoadingText("Preparando questões a partir dos seus flashcards…");
+
+        try {
+            const res = await iniciarSimulado(sourceType, sourceId || undefined, quantity, difficulty);
+            if (!res.success || !res.cards || res.cards.length === 0 || !res.attemptId) {
+                setConfigError(res.error || "Não foi possível preparar o simulado. Verifique se há flashcards suficientes e tente novamente.");
+                setStep('CONFIG');
+                return;
+            }
+
+            setAttemptId(res.attemptId);
+            setExamCards(res.cards);
+            setCurrentIndex(0);
+            setAnswers([]);
+            setStartTime(Date.now());
+            setQuestionStartTime(Date.now());
+            if (DIFFICULTIES[difficulty].timePerQuestion > 0) setTimeLeft(DIFFICULTIES[difficulty].timePerQuestion);
+            setStep('EXAM');
+        } catch (error) {
+            console.error("Erro ao iniciar simulado:", error);
+            setConfigError("Não foi possível iniciar o simulado agora. Confira sua conexão e tente novamente.");
+            setStep('CONFIG');
+        }
     }
 
     async function confirmAnswer(optionSelected: string | null, timeOut: boolean = false) {
@@ -148,26 +165,37 @@ export default function SimuladoContent() {
             setQuestionStartTime(Date.now());
             if (DIFFICULTIES[difficulty].timePerQuestion > 0) setTimeLeft(DIFFICULTIES[difficulty].timePerQuestion);
         } else {
-            finishExam(newAnswers);
+            void finishExam(newAnswers);
         }
     }
 
     async function finishExam(finalAnswers: ExamAnswer[]) {
+        setFinalizeError(null);
         setStep('LOADING');
-        setLoadingText("Calculando resultado...");
+        setLoadingText("Confirmando respostas e calculando o resultado…");
+
         if (!attemptId) {
-            alert("A tentativa do simulado expirou. Inicie uma nova prova.");
+            setConfigError("Esta tentativa não está mais disponível. Inicie um novo simulado para continuar.");
             setStep('CONFIG');
             return;
         }
+
         const totalTime = (Date.now() - startTime) / 1000;
-        const res = await finalizarSimulado({ attemptId, timeSpentSeconds: totalTime, answers: finalAnswers });
-        if (res.success) {
-            setFinalResult({ ...res, totalTime, limitReached: res.limitReached });
-            setStep('RESULT');
-        } else {
-            alert(res.error || "Erro ao salvar resultado.");
-            setStep('CONFIG');
+
+        try {
+            const res = await finalizarSimulado({ attemptId, timeSpentSeconds: totalTime, answers: finalAnswers });
+            if (res.success) {
+                setFinalResult({ ...res, totalTime, limitReached: res.limitReached });
+                setStep('RESULT');
+                return;
+            }
+
+            setFinalizeError(res.error || "Não foi possível confirmar o resultado. Suas respostas continuam nesta tentativa e você pode tentar salvar novamente.");
+            setStep('FINALIZE_ERROR');
+        } catch (error) {
+            console.error("Erro ao finalizar simulado:", error);
+            setFinalizeError("Não foi possível confirmar o resultado por uma falha de conexão. Suas respostas continuam nesta tentativa e você pode tentar novamente.");
+            setStep('FINALIZE_ERROR');
         }
     }
 
@@ -200,13 +228,13 @@ export default function SimuladoContent() {
                         <fieldset className="space-y-4">
                             <legend className="text-xs font-bold text-muted-foreground uppercase tracking-widest">1. Origem das Questões</legend>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:h-32">
-                                <button type="button" aria-pressed={sourceType === 'GLOBAL'} onClick={() => { setSourceType('GLOBAL'); setSourceId(""); }} className={`group relative h-full rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center p-4 md:p-2 ${sourceType === 'GLOBAL' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border text-muted-foreground hover:border-primary/50 hover:bg-muted'}`}>
+                                <button type="button" aria-pressed={sourceType === 'GLOBAL'} onClick={() => { setSourceType('GLOBAL'); setSourceId(""); setConfigError(null); }} className={`group relative h-full rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 text-center p-4 md:p-2 ${sourceType === 'GLOBAL' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border text-muted-foreground hover:border-primary/50 hover:bg-muted'}`}>
                                     <div className={`p-2 rounded-full transition-colors ${sourceType === 'GLOBAL' ? 'bg-primary/20' : 'bg-muted group-hover:bg-primary/10'}`} aria-hidden="true"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
                                     <div className="font-bold text-xs">Global</div>
                                 </button>
-                                <CustomDropdown options={decks.map(d => ({ id: d.id, label: d.nome }))} value={sourceType === 'DECK' ? sourceId : ''} onChange={(val) => { setSourceType('DECK'); setSourceId(val); }} placeholder="Baralho" isActive={sourceType === 'DECK'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" /></svg>} />
-                                <CustomDropdown options={planos.map(p => ({ id: p.id, label: p.title }))} value={sourceType === 'PLAN' ? sourceId : ''} onChange={(val) => { setSourceType('PLAN'); setSourceId(val); }} placeholder="Trilha" isActive={sourceType === 'PLAN'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.08 12.08 0 0118.825 17 11.95 11.95 0 0012 20.055 11.95 11.95 0 005.176 17a12.08 12.08 0 01.665-6.422L12 14z" /></svg>} />
-                                <CustomDropdown options={planos.flatMap(p => p.topics.map((t:any) => ({ id: t.id, label: `${p.title} - ${t.title}` })))} value={sourceType === 'TOPIC' ? sourceId : ''} onChange={(val) => { setSourceType('TOPIC'); setSourceId(val); }} placeholder="Tópico" isActive={sourceType === 'TOPIC'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>} />
+                                <CustomDropdown options={decks.map(d => ({ id: d.id, label: d.nome }))} value={sourceType === 'DECK' ? sourceId : ''} onChange={(val) => { setSourceType('DECK'); setSourceId(val); setConfigError(null); }} placeholder="Baralho" isActive={sourceType === 'DECK'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" /></svg>} />
+                                <CustomDropdown options={planos.map(p => ({ id: p.id, label: p.title }))} value={sourceType === 'PLAN' ? sourceId : ''} onChange={(val) => { setSourceType('PLAN'); setSourceId(val); setConfigError(null); }} placeholder="Trilha" isActive={sourceType === 'PLAN'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.08 12.08 0 0118.825 17 11.95 11.95 0 0012 20.055 11.95 11.95 0 005.176 17a12.08 12.08 0 01.665-6.422L12 14z" /></svg>} />
+                                <CustomDropdown options={planos.flatMap(p => p.topics.map((t:any) => ({ id: t.id, label: `${p.title} - ${t.title}` })))} value={sourceType === 'TOPIC' ? sourceId : ''} onChange={(val) => { setSourceType('TOPIC'); setSourceId(val); setConfigError(null); }} placeholder="Tópico" isActive={sourceType === 'TOPIC'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>} />
                             </div>
                         </fieldset>
 
@@ -233,6 +261,12 @@ export default function SimuladoContent() {
                             </div>
                         </div>
 
+                        {configError && (
+                            <div role="alert" className="rounded-2xl border border-danger-border bg-danger-bg px-4 py-3 text-sm font-medium text-danger-fg">
+                                {configError}
+                            </div>
+                        )}
+
                         <button type="button" onClick={handleStartExam} className="w-full py-5 bg-primary text-primary-foreground font-bold rounded-2xl text-lg shadow-xl shadow-primary/20 hover:bg-primary/90 transition transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3 mt-8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                             <span>Iniciar Simulado</span><svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                         </button>
@@ -243,7 +277,7 @@ export default function SimuladoContent() {
             {step === 'LOADING' && (
                 <div className="flex flex-col items-center justify-center py-32 animate-in fade-in" role="status" aria-live="polite" aria-atomic="true">
                     <div className="relative mb-8" aria-hidden="true"><div className="w-20 h-20 border-4 border-primary/20 border-t-primary rounded-full animate-spin" /><div className="absolute inset-0 flex items-center justify-center text-primary"><svg className="w-8 h-8 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg></div></div>
-                    <div className="w-full text-center px-4"><h2 className="text-xl font-bold text-foreground mb-2">{loadingText}</h2><p className="text-muted-foreground text-sm max-w-xs mx-auto">Estamos consultando seus flashcards e criando alternativas inteligentes.</p></div>
+                    <div className="w-full text-center px-4"><h2 className="text-xl font-bold text-foreground mb-2">{loadingText}</h2><p className="text-muted-foreground text-sm max-w-xs mx-auto">Aguarde enquanto o servidor confirma o estado desta tentativa.</p></div>
                 </div>
             )}
 
@@ -266,6 +300,22 @@ export default function SimuladoContent() {
                         })}
                     </div>
                 </div>
+            )}
+
+            {step === 'FINALIZE_ERROR' && (
+                <section className="mx-auto max-w-xl rounded-3xl border border-danger-border bg-card p-6 md:p-8 shadow-xl" aria-labelledby="finalize-error-title">
+                    <p className="text-xs font-bold uppercase tracking-widest text-danger-fg">Resultado ainda não confirmado</p>
+                    <h2 id="finalize-error-title" className="mt-2 text-2xl font-black text-foreground">Suas respostas foram preservadas</h2>
+                    <p role="alert" className="mt-3 text-sm leading-relaxed text-muted-foreground">{finalizeError}</p>
+                    <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                        <button type="button" onClick={() => void finishExam(answers)} className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                            Tentar salvar novamente
+                        </button>
+                        <button type="button" onClick={() => { setAttemptId(null); setExamCards([]); setAnswers([]); setFinalizeError(null); setConfigError("O resultado anterior não foi confirmado. Configure um novo simulado quando estiver pronto."); setStep('CONFIG'); }} className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border bg-background px-5 py-3 font-bold text-foreground transition hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                            Voltar à configuração
+                        </button>
+                    </div>
+                </section>
             )}
 
             {step === 'RESULT' && finalResult && (

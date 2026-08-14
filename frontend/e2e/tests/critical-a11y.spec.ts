@@ -57,7 +57,7 @@ test("dashboard exposes named generation controls and keyboard-safe save dialog"
   await expectNoBlockingAxeViolations(page);
 });
 
-test("collection, deck detail and profile representative routes pass blocking Axe checks", async ({ page }) => {
+test("collection destructive confirmation, deck detail and profile remain accessible", async ({ page }) => {
   await page.goto("/colecao");
   await expect(page).toHaveURL(/\/colecao(?:[/?#]|$)/);
   await expect(page.getByRole("heading").first()).toBeVisible();
@@ -66,6 +66,17 @@ test("collection, deck detail and profile representative routes pass blocking Ax
   const fixtureHeading = page.getByRole("heading", { name: E2E_DECK_NAME });
   await expect(fixtureHeading).toBeVisible();
   const fixtureCard = fixtureHeading.locator("..");
+
+  const deleteButton = fixtureCard.getByRole("button", { name: `Excluir baralho ${E2E_DECK_NAME}` });
+  await deleteButton.click();
+  const destructiveDialog = page.getByRole("alertdialog", { name: "Excluir baralho?" });
+  await expect(destructiveDialog).toBeVisible();
+  await expect(destructiveDialog.getByRole("button", { name: "Cancelar" })).toBeFocused();
+  await expectNoBlockingAxeViolations(page);
+  await page.keyboard.press("Escape");
+  await expect(destructiveDialog).toHaveCount(0);
+  await expect(deleteButton).toBeFocused();
+
   const editLink = fixtureCard.getByRole("link", { name: "Editar" });
   await editLink.focus();
   await expect(editLink).toBeFocused();

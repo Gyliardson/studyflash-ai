@@ -79,9 +79,23 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
     await signIn(page);
     await page.goto(`/estudar?deckId=${deck.id}`);
     await expect(page).toHaveURL(new RegExp(`/estudar\\?deckId=${deck.id}`));
+    if (testInfo.project.name.includes("desktop")) {
+      await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
+    } else {
+      await expect(page.getByRole("button", { name: "Abrir menu" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
+    }
     await expect(page.getByText(firstFront, { exact: true })).toBeVisible();
     await expect(page.getByText("1 / 2", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sessão de estudo" })).toBeVisible();
     await expectNoBlockingAxeViolations(page);
+
+    if (testInfo.project.name.includes("desktop")) {
+      await testInfo.attach("study-active-desktop-light", {
+        body: await page.screenshot({ fullPage: true, animations: "disabled" }),
+        contentType: "image/png",
+      });
+    }
 
     const activeSession = await prisma.studySession.findFirstOrThrow({
       where: { userId, scopeKey: `DECKS:${deck.id}`, status: "ACTIVE" },
@@ -94,11 +108,11 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
     });
 
     await submitEasy(page, testInfo.project.name);
-    const error = page.getByRole("alert").filter({ hasText: "Sua revisão ainda não foi confirmada." });
+    const error = page.getByRole("alert").filter({ hasText: "A revisão ainda não foi confirmada." });
     await expect(error).toContainText("Não foi possível salvar sua revisão. Tente novamente.");
     await expect(page.getByText(firstFront, { exact: true })).toBeVisible();
     await expect(page.getByText("1 / 2", { exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Sessão Finalizada!" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Revisão concluída" })).toHaveCount(0);
     await expectNoBlockingAxeViolations(page);
     expect(await prisma.xPHistory.count({ where: { userId, source: "REVIEW" } })).toBe(0);
     expect(await prisma.studySessionCard.count({
@@ -109,7 +123,7 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
       where: { userId },
       data: { xp: 0, weeklyXp: 0 },
     });
-    const retryButton = page.getByRole("button", { name: "Tentar novamente" });
+    const retryButton = page.getByRole("button", { name: "Reenviar esta avaliação" });
     await retryButton.focus();
     await expect(retryButton).toBeFocused();
     await page.keyboard.press("Enter");
@@ -128,12 +142,13 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
     expect(await prisma.xPHistory.count({ where: { userId, source: "REVIEW" } })).toBe(1);
 
     await submitEasy(page, testInfo.project.name);
-    await expect(page.getByRole("heading", { name: "Sessão Finalizada!" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Revisão concluída" })).toBeVisible();
+    await expect(page.getByText(/Todas as avaliações desta fila foram confirmadas pelo servidor/i)).toBeVisible();
     await expectNoBlockingAxeViolations(page);
     expect(await prisma.xPHistory.count({ where: { userId, source: "REVIEW" } })).toBe(2);
 
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Sessão Finalizada!" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Revisão concluída" })).toBeVisible();
     await expect(page.getByText(firstFront, { exact: true })).toHaveCount(0);
     await expect(page.getByText(secondFront, { exact: true })).toHaveCount(0);
     expect(await prisma.xPHistory.count({ where: { userId, source: "REVIEW" } })).toBe(2);

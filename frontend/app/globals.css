@@ -34,7 +34,7 @@
   --success-solid: #047857; /* emerald-700 */
 
   --warning-bg: #fffbeb; /* amber-50 */
-  --warning-fg: #92400e; /* amber-800 */
+  --warning-fg: #78350f; /* amber-900; preserves AA contrast even for subdued warning copy */
   --warning-border: #fde68a; /* amber-200 */
   --warning-ring: #f59e0b; /* amber-500 */
   --warning-solid: #b45309; /* amber-700 */
