@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { buscarPlanoPorId, gerarCardsParaTopico } from "@/app/actions";
+import { useEffect, useRef, useState } from "react";
+import { buscarPlanoPorId } from "@/app/actions";
+import { gerarCardsParaTopicoIdempotente } from "@/app/idempotent-actions";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { triggerHudRefresh } from "@/app/components/UserHUD";
@@ -29,6 +30,7 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
     const [generationError, setGenerationError] = useState<string | null>(null);
     const [generationSuccess, setGenerationSuccess] = useState<string | null>(null);
     const [id, setId] = useState<string>("");
+    const generationKeysRef = useRef<Record<string, string>>({});
 
     useEffect(() => {
         params.then((resolved) => setId(resolved.id));
@@ -55,23 +57,26 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
 
     async function handleGerarConteudo(topicId: string, topicTitle: string) {
         if (generatingTopicIds.includes(topicId)) return;
+        const requestKey = generationKeysRef.current[topicId] ?? crypto.randomUUID();
+        generationKeysRef.current[topicId] = requestKey;
 
         setGenerationError(null);
         setGenerationSuccess(null);
         setGeneratingTopicIds((current) => [...current, topicId]);
         try {
-            const result = await gerarCardsParaTopico(plano!.title, topicId, topicTitle);
+            const result = await gerarCardsParaTopicoIdempotente(topicId, requestKey);
             if (!result.success) {
                 setGenerationError(result.error || `Não foi possível gerar conteúdo para “${topicTitle}”. Tente novamente.`);
                 return;
             }
 
+            delete generationKeysRef.current[topicId];
             triggerHudRefresh();
             setGenerationSuccess(`Conteúdo de “${topicTitle}” criado e salvo.`);
             await carregarPlano();
         } catch (error) {
             console.error("Erro ao gerar conteúdo do tópico:", error);
-            setGenerationError(`Não foi possível gerar conteúdo para “${topicTitle}”. Tente novamente.`);
+            setGenerationError(`Não foi possível confirmar a criação de “${topicTitle}”. Tente novamente; o mesmo pedido será recuperado sem duplicar cards.`);
         } finally {
             setGeneratingTopicIds((current) => current.filter((topic) => topic !== topicId));
         }
