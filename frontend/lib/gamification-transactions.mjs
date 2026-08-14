@@ -4,6 +4,7 @@ import { DAILY_LIMITS, XP_VALUES } from "./gamification.ts";
 
 const MAX_SERIALIZABLE_ATTEMPTS = 5;
 const DAILY_EXAM_XP_LIMIT = 3;
+const EXAM_ATTEMPT_TTL_MS = 2 * 60 * 60 * 1000;
 const EXAM_DIFFICULTIES = new Set(["EASY", "MEDIUM", "HARD", "IMPOSSIBLE"]);
 const EXAM_SOURCE_TYPES = new Set(["DECK", "TOPIC", "PLAN", "GLOBAL"]);
 
@@ -174,13 +175,64 @@ async function assertOwnedExamSource(tx, userId, sourceType, sourceId) {
   return Boolean(await tx.studyPlan.findFirst({ where: { id: sourceId, userId }, select: { id: true } }));
 }
 
-async function assertOwnedExamAnswers(tx, userId, answers) {
-  if (!Array.isArray(answers) || answers.length === 0) return false;
+function validateAttemptQuestions(questions) {
+  if (!Array.isArray(questions) || questions.length === 0) return false;
+  const ids = questions.map((question) => question.flashcardId);
+  if (ids.some((id) => typeof id !== "string" || !id)) return false;
+  if (new Set(ids).size !== ids.length) return false;
+  return questions.every((question) =>
+    typeof question.prompt === "string" && question.prompt.length > 0
+    && typeof question.expectedAnswer === "string" && question.expectedAnswer.length > 0
+    && Array.isArray(question.options) && question.options.length >= 2
+    && question.options.every((option) => typeof option === "string")
+    && question.options.includes(question.expectedAnswer));
+}
+
+export function createExamAttemptForUser(userId, input, now = new Date()) {
+  return runSerializable(async (tx) => {
+    if (!EXAM_DIFFICULTIES.has(input.difficulty)) return { success: false, error: "Invalid exam difficulty." };
+    if (!await assertOwnedExamSource(tx, userId, input.sourceType, input.sourceId)) return { success: false, error: "Invalid exam source." };
+    if (!validateAttemptQuestions(input.questions)) return { success: false, error: "Invalid exam questions." };
+
+    const ids = input.questions.map((question) => question.flashcardId);
+    const ownedCount = await tx.flashcard.count({ where: { userId, id: { in: ids } } });
+    if (ownedCount !== ids.length) return { success: false, error: "Invalid exam questions." };
+
+    const expiresAt = new Date(now.getTime() + EXAM_ATTEMPT_TTL_MS);
+    const attempt = await tx.examAttempt.create({
+      data: {
+        userId,
+        sourceType: input.sourceType,
+        sourceDeckId: input.sourceType === "DECK" ? input.sourceId : undefined,
+        sourceTopicId: input.sourceType === "TOPIC" ? input.sourceId : undefined,
+        sourcePlanId: input.sourceType === "PLAN" ? input.sourceId : undefined,
+        difficulty: input.difficulty,
+        expiresAt,
+        createdAt: now,
+        questions: {
+          create: input.questions.map((question, order) => ({
+            flashcardId: question.flashcardId,
+            prompt: question.prompt,
+            expectedAnswer: question.expectedAnswer,
+            options: question.options,
+            order,
+          })),
+        },
+      },
+    });
+    return { success: true, attemptId: attempt.id, expiresAt };
+  });
+}
+
+function validateAttemptAnswers(questions, answers) {
+  if (!Array.isArray(answers) || answers.length !== questions.length) return false;
   const ids = answers.map((answer) => answer.flashcardId);
-  if (ids.some((id) => typeof id !== "string")) return false;
-  const uniqueIds = [...new Set(ids)];
-  if (uniqueIds.length !== ids.length) return false;
-  return await tx.flashcard.count({ where: { userId, id: { in: uniqueIds } } }) === uniqueIds.length;
+  if (ids.some((id) => typeof id !== "string" || !id)) return false;
+  if (new Set(ids).size !== ids.length) return false;
+  const expectedIds = new Set(questions.map((question) => question.flashcardId));
+  return ids.every((id) => expectedIds.has(id)) && answers.every((answer) =>
+    (answer.selectedOption === null || typeof answer.selectedOption === "string")
+    && Number.isFinite(Number(answer.timeTaken)));
 }
 
 function calculateExamXp(difficulty, correctAnswers, score) {
@@ -195,34 +247,80 @@ function calculateExamXp(difficulty, correctAnswers, score) {
 
 export function finalizeExamForUser(userId, result, now = new Date()) {
   return runSerializable(async (tx) => {
-    if (!EXAM_DIFFICULTIES.has(result.difficulty)) return { success: false, error: "Invalid exam difficulty." };
-    if (!await assertOwnedExamSource(tx, userId, result.sourceType, result.sourceId)) return { success: false, error: "Invalid exam source." };
-    if (!await assertOwnedExamAnswers(tx, userId, result.answers)) return { success: false, error: "Invalid exam answers." };
-    const totalQuestions = result.answers.length;
-    const correctAnswers = result.answers.filter((answer) => answer.isCorrect === true).length;
+    if (typeof result.attemptId !== "string" || !result.attemptId) {
+      return { success: false, error: "Invalid exam attempt." };
+    }
+
+    const attempt = await tx.examAttempt.findFirst({
+      where: { id: result.attemptId, userId },
+      include: { questions: { orderBy: { order: "asc" } } },
+    });
+    if (!attempt) return { success: false, error: "Invalid exam attempt." };
+    if (attempt.status !== "ACTIVE") return { success: false, error: "Exam attempt already finalized." };
+    if (attempt.expiresAt <= now) {
+      await tx.examAttempt.updateMany({
+        where: { id: attempt.id, userId, status: "ACTIVE" },
+        data: { status: "EXPIRED" },
+      });
+      return { success: false, error: "Exam attempt expired." };
+    }
+    if (!validateAttemptAnswers(attempt.questions, result.answers)) {
+      return { success: false, error: "Invalid exam answers." };
+    }
+
+    const claimed = await tx.examAttempt.updateMany({
+      where: { id: attempt.id, userId, status: "ACTIVE" },
+      data: { status: "COMPLETED", finalizedAt: now },
+    });
+    if (claimed.count !== 1) return { success: false, error: "Exam attempt already finalized." };
+
+    const answerByCard = new Map(result.answers.map((answer) => [answer.flashcardId, answer]));
+    const evaluated = attempt.questions.map((question) => {
+      const answer = answerByCard.get(question.flashcardId);
+      const isCorrect = answer?.selectedOption === question.expectedAnswer;
+      return {
+        flashcardId: question.flashcardId,
+        isCorrect,
+        timeTakenSeconds: Math.max(0, Number(answer?.timeTaken) || 0),
+      };
+    });
+    const totalQuestions = attempt.questions.length;
+    const correctAnswers = evaluated.filter((answer) => answer.isCorrect).length;
     const score = correctAnswers / totalQuestions;
     const sessionsToday = await tx.examSession.count({ where: { userId, createdAt: { gte: startOfLocalDay(now) } } });
     const limitReached = sessionsToday >= DAILY_EXAM_XP_LIMIT;
-    const xpGained = limitReached ? 0 : calculateExamXp(result.difficulty, correctAnswers, score);
+    const xpGained = limitReached ? 0 : calculateExamXp(attempt.difficulty, correctAnswers, score);
     const session = await tx.examSession.create({
       data: {
         userId,
-        sourceType: result.sourceType,
-        sourceDeckId: result.sourceType === "DECK" ? result.sourceId : undefined,
-        sourceTopicId: result.sourceType === "TOPIC" ? result.sourceId : undefined,
-        sourcePlanId: result.sourceType === "PLAN" ? result.sourceId : undefined,
+        attemptId: attempt.id,
+        sourceType: attempt.sourceType,
+        sourceDeckId: attempt.sourceDeckId,
+        sourceTopicId: attempt.sourceTopicId,
+        sourcePlanId: attempt.sourcePlanId,
         totalQuestions,
         correctAnswers,
         score,
         timeSpentSeconds: Math.max(0, Math.floor(Number(result.timeSpentSeconds) || 0)),
-        difficulty: result.difficulty,
+        difficulty: attempt.difficulty,
         xpAwarded: xpGained,
         createdAt: now,
-        questions: { create: result.answers.map((answer) => ({ flashcardId: answer.flashcardId, isCorrect: answer.isCorrect === true, timeTakenSeconds: Math.max(0, Number(answer.timeTaken) || 0) })) },
+        questions: { create: evaluated },
       },
     });
     await grantXp(tx, userId, xpGained, "EXAM");
     if (!limitReached) await processStreak(tx, userId, now);
-    return { success: true, sessionId: session.id, xpGained, score, limitReached };
+    return {
+      success: true,
+      sessionId: session.id,
+      xpGained,
+      score,
+      correctAnswers,
+      totalQuestions,
+      difficulty: attempt.difficulty,
+      sourceType: attempt.sourceType,
+      sourceId: attempt.sourceDeckId ?? attempt.sourceTopicId ?? attempt.sourcePlanId ?? undefined,
+      limitReached,
+    };
   });
 }
