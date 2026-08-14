@@ -4,6 +4,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
 import prisma from "../../lib/db.ts";
+import { saveFlashcardsForUser } from "../../lib/gamification-transactions.ts";
 
 const TEST_USER_EMAIL =
   process.env.E2E_CLERK_TEST_EMAIL ?? "studyflash.e2e+clerk_test@example.com";
@@ -93,15 +94,20 @@ test("collection UI follows authoritative create, validation and delete results"
 
 test("collection mutation server predicates are owner-scoped and repeated deletes fail closed", async () => {
   const actionsSource = await readFile(new URL("../../app/actions.ts", import.meta.url), "utf8");
+  const saveModalSource = await readFile(new URL("../../app/components/SaveModal.tsx", import.meta.url), "utf8");
   expect(actionsSource).toContain("const normalized = normalizeDeckName(nome);");
   expect(actionsSource).toContain("const normalized = normalizeFlashcards(cards);");
+  expect(actionsSource).toContain("saveFlashcardsForUser(userId, normalized.cards, deckId, undefined, normalizedDeckName)");
   expect(actionsSource).toContain("await prisma.deck.delete({ where: { id, userId } });");
   expect(actionsSource).toContain("await prisma.flashcard.delete({ where: { id, userId } });");
   expect(actionsSource).toContain("await prisma.studyPlan.delete({ where: { id, userId } });");
+  expect(saveModalSource).toContain("salvarFlashcards(cards, undefined, name)");
+  expect(saveModalSource).not.toContain("criarBaralho(");
 
   const suffix = randomUUID();
   const ownerId = `e2e-owner-${suffix}`;
   const foreignId = `e2e-foreign-${suffix}`;
+  const atomicDeckName = `Atomic E2E ${suffix}`;
 
   const ownerDeck = await prisma.deck.create({ data: { userId: ownerId, nome: `Owner ${suffix}` } });
   const foreignDeck = await prisma.deck.create({ data: { userId: foreignId, nome: `Foreign ${suffix}` } });
@@ -109,6 +115,36 @@ test("collection mutation server predicates are owner-scoped and repeated delete
   const foreignCard = await prisma.flashcard.create({ data: { userId: foreignId, frente: "Foreign?", verso: "Foreign!" } });
 
   try {
+    const atomicCreate = await saveFlashcardsForUser(
+      ownerId,
+      [{ frente: "Atomic front", verso: "Atomic back" }],
+      undefined,
+      new Date("2026-08-14T12:00:00Z"),
+      atomicDeckName,
+    );
+    expect(atomicCreate.success).toBe(true);
+
+    const persistedAtomicDeck = await prisma.deck.findFirst({
+      where: { userId: ownerId, nome: atomicDeckName },
+      include: { cards: true },
+    });
+    expect(persistedAtomicDeck).not.toBeNull();
+    expect(persistedAtomicDeck?.cards).toHaveLength(1);
+    expect(persistedAtomicDeck?.cards[0]).toMatchObject({ frente: "Atomic front", verso: "Atomic back", userId: ownerId });
+
+    const xpRowsBeforeDuplicate = await prisma.xPHistory.count({ where: { userId: ownerId, source: "CREATE_CARD" } });
+    const duplicateCreate = await saveFlashcardsForUser(
+      ownerId,
+      [{ frente: "Must not persist", verso: "Must not persist" }],
+      undefined,
+      new Date("2026-08-14T12:01:00Z"),
+      atomicDeckName,
+    );
+    expect(duplicateCreate).toMatchObject({ success: false, error: "Já existe um grupo com este nome!" });
+    expect(await prisma.deck.count({ where: { userId: ownerId, nome: atomicDeckName } })).toBe(1);
+    expect(await prisma.flashcard.count({ where: { userId: ownerId, deck: { nome: atomicDeckName } } })).toBe(1);
+    expect(await prisma.xPHistory.count({ where: { userId: ownerId, source: "CREATE_CARD" } })).toBe(xpRowsBeforeDuplicate);
+
     await prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } });
     expect(await prisma.deck.count({ where: { id: ownerDeck.id } })).toBe(0);
     await expect(prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } })).rejects.toThrow();
@@ -125,5 +161,7 @@ test("collection mutation server predicates are owner-scoped and repeated delete
   } finally {
     await prisma.flashcard.deleteMany({ where: { userId: { in: [ownerId, foreignId] } } });
     await prisma.deck.deleteMany({ where: { userId: { in: [ownerId, foreignId] } } });
+    await prisma.xPHistory.deleteMany({ where: { userId: ownerId } });
+    await prisma.userProfile.deleteMany({ where: { userId: ownerId } });
   }
 });
