@@ -2,26 +2,24 @@
 
 Deterministic Playwright checks for the StudyFlash frontend.
 
-From `frontend/` run:
+The suite uses desktop and mobile Chromium with stable `pt-BR` locale and `America/Sao_Paulo` timezone. Public tests retain traces only on failure. Authenticated tests deliberately keep tracing disabled so reusable Clerk session material is not published as evidence.
 
-```bash
-npm ci
-npm --prefix e2e ci
-npm --prefix e2e run install:chromium
-npm run build
-npm run test:e2e
-```
+## Clerk development test environment
 
-The runner starts the production build on port 3100. It exercises desktop and mobile Chromium with a stable locale and timezone, retains traces on failure, and captures failure screenshots.
+Authenticated E2E uses a dedicated Clerk **development instance** only. Provide its development credentials as environment variables:
 
-Current coverage starts with public application boot and automated accessibility scanning. Additional product flows should extend this package as their deterministic test prerequisites become available.
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` for the Next.js runtime;
+- `CLERK_PUBLISHABLE_KEY` for `@clerk/testing`;
+- `CLERK_SECRET_KEY` server-side for Clerk Testing Tokens and test sign-in.
 
-## Clerk test environment
+In GitHub Actions these variables are mapped from repository secrets. Never commit or print their values, and never substitute production credentials.
 
-StudyFlash uses Clerk in the server runtime, including `clerkMiddleware()` and server-side `auth()` calls. A production build can compile with a placeholder publishable key, but a truthful browser run of the application requires a real **Clerk development instance** with development-only API keys.
+The E2E setup calls `clerkSetup()` and uses only a synthetic `+clerk_test` identity. Tests use Clerk's official `clerk.signIn()` helper. No application auth bypass or fake session exists.
 
-Do not use production Clerk credentials, fake sessions, or an application auth bypass to make E2E green. The dedicated test setup tracked in issue #16 should provide revocable development credentials through local environment variables / GitHub Actions secrets and use only synthetic test identities.
+No Playwright storage state is written. `.auth/` and `storage-state*.json` are gitignored defensively, and authenticated projects have traces disabled.
 
-Until that prerequisite is provisioned, browser failures caused by missing Clerk server credentials are an explicit environment blocker rather than evidence that the protected application boundary works. Public smoke/a11y infrastructure can continue to be developed, but authenticated E2E coverage must not be claimed.
+The gate-critical authenticated flow signs in, reaches the protected dashboard, submits an empty generation request, verifies the deterministic validation message, confirms no AI request is made, and runs Axe against that authenticated state.
 
-Reference: https://clerk.com/docs/guides/development/testing/playwright/overview
+The suite must not depend on production Neon, production Clerk, or a remote LLM.
+
+Official Clerk reference: https://clerk.com/docs/guides/development/testing/playwright/overview
