@@ -1,7 +1,20 @@
--- Add a nullable normalized-name key only for new deck writes. Existing rows remain
--- NULL so this migration never rewrites or deletes user data. Application-level
--- legacy-name lookup still prevents creating a new deck that collides with an old row.
+-- Add a nullable normalized-name key only for new/updated deck writes. Existing rows
+-- remain NULL so this migration never rewrites or deletes user data.
 ALTER TABLE "Deck" ADD COLUMN "nameKey" TEXT;
+
+-- Enforce one deterministic database normalization regardless of which application
+-- path creates the deck. This also protects legacy create callers from concurrent
+-- same-name races while leaving pre-migration rows untouched.
+CREATE FUNCTION "set_deck_name_key"() RETURNS trigger AS $$
+BEGIN
+    NEW."nameKey" := lower(btrim(NEW."nome"));
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "Deck_set_nameKey"
+BEFORE INSERT OR UPDATE OF "nome" ON "Deck"
+FOR EACH ROW EXECUTE FUNCTION "set_deck_name_key"();
 
 CREATE UNIQUE INDEX "Deck_userId_nameKey_key" ON "Deck"("userId", "nameKey");
 
