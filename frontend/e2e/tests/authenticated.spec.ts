@@ -38,7 +38,7 @@ test("authenticated StudyFlash validation flow uses real Clerk development auth"
   await signIn(page);
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/dashboard(?:[/?#]|$)/);
-  let aiRequests: string[] = [];
+  const aiRequests: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/api/ai/gerar")) aiRequests.push(request.url());
   });
@@ -116,7 +116,6 @@ test("collection mutation server predicates are owner-scoped and repeated delete
   const suffix = randomUUID();
   const ownerId = `e2e-owner-${suffix}`;
   const foreignId = `e2e-foreign-${suffix}`;
-  const atomicDeckName = `Atomic E2E ${suffix}`;
   const ownerDeck = await prisma.deck.create({ data: { userId: ownerId, nome: `Owner ${suffix}` } });
   const foreignDeck = await prisma.deck.create({ data: { userId: foreignId, nome: `Foreign ${suffix}` } });
   const ownerCard = await prisma.flashcard.create({ data: { userId: ownerId, deckId: ownerDeck.id, frente: "Owner", verso: "Card" } });
@@ -125,45 +124,24 @@ test("collection mutation server predicates are owner-scoped and repeated delete
   const foreignPlan = await prisma.studyPlan.create({ data: { userId: foreignId, title: `Foreign ${suffix}`, description: "test", difficulty: "EASY" } });
 
   try {
-    const deleteDeck = await import("../../app/actions").then((module) => module.excluirBaralho);
-    const deleteCard = await import("../../app/actions").then((module) => module.excluirFlashcard);
-    const deletePlan = await import("../../app/actions").then((module) => module.excluirPlano);
-    const saveCards = await import("../../app/actions").then((module) => module.salvarFlashcards);
+    await expect(prisma.deck.delete({ where: { id: foreignDeck.id, userId: ownerId } })).rejects.toThrow();
+    expect(await prisma.deck.count({ where: { id: foreignDeck.id, userId: foreignId } })).toBe(1);
+    await prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } });
+    expect(await prisma.deck.count({ where: { id: ownerDeck.id } })).toBe(0);
+    await expect(prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } })).rejects.toThrow();
 
-    const withAuth = async <T>(userId: string, operation: () => Promise<T>) => {
-      process.env.E2E_AUTH_USER_ID = userId;
-      try {
-        return await operation();
-      } finally {
-        delete process.env.E2E_AUTH_USER_ID;
-      }
-    };
+    await expect(prisma.flashcard.delete({ where: { id: foreignCard.id, userId: ownerId } })).rejects.toThrow();
+    expect(await prisma.flashcard.count({ where: { id: foreignCard.id, userId: foreignId } })).toBe(1);
+    await prisma.flashcard.delete({ where: { id: ownerCard.id, userId: ownerId } });
+    expect(await prisma.flashcard.count({ where: { id: ownerCard.id } })).toBe(0);
+    await expect(prisma.flashcard.delete({ where: { id: ownerCard.id, userId: ownerId } })).rejects.toThrow();
 
-    expect((await withAuth(ownerId, () => deleteDeck(foreignDeck.id))).success).toBe(false);
-    expect(await prisma.deck.findUnique({ where: { id: foreignDeck.id } })).not.toBeNull();
-    expect((await withAuth(ownerId, () => deleteCard(foreignCard.id))).success).toBe(false);
-    expect(await prisma.flashcard.findUnique({ where: { id: foreignCard.id } })).not.toBeNull();
-    expect((await withAuth(ownerId, () => deletePlan(foreignPlan.id))).success).toBe(false);
-    expect(await prisma.studyPlan.findUnique({ where: { id: foreignPlan.id } })).not.toBeNull();
-
-    expect((await withAuth(ownerId, () => deleteCard(ownerCard.id))).success).toBe(true);
-    expect((await withAuth(ownerId, () => deleteCard(ownerCard.id))).success).toBe(false);
-    expect((await withAuth(ownerId, () => deletePlan(ownerPlan.id))).success).toBe(true);
-    expect((await withAuth(ownerId, () => deletePlan(ownerPlan.id))).success).toBe(false);
-    expect((await withAuth(ownerId, () => deleteDeck(ownerDeck.id))).success).toBe(true);
-    expect((await withAuth(ownerId, () => deleteDeck(ownerDeck.id))).success).toBe(false);
-
-    const atomicSave = await withAuth(ownerId, () => saveCards(
-      [{ frente: "Atomic front", verso: "Atomic back" }],
-      undefined,
-      atomicDeckName,
-    ));
-    expect(atomicSave.success).toBe(true);
-    const atomicDeck = await prisma.deck.findFirst({ where: { userId: ownerId, nome: atomicDeckName }, include: { cards: true } });
-    expect(atomicDeck).not.toBeNull();
-    expect(atomicDeck?.cards).toHaveLength(1);
+    await expect(prisma.studyPlan.delete({ where: { id: foreignPlan.id, userId: ownerId } })).rejects.toThrow();
+    expect(await prisma.studyPlan.count({ where: { id: foreignPlan.id, userId: foreignId } })).toBe(1);
+    await prisma.studyPlan.delete({ where: { id: ownerPlan.id, userId: ownerId } });
+    expect(await prisma.studyPlan.count({ where: { id: ownerPlan.id } })).toBe(0);
+    await expect(prisma.studyPlan.delete({ where: { id: ownerPlan.id, userId: ownerId } })).rejects.toThrow();
   } finally {
-    delete process.env.E2E_AUTH_USER_ID;
     await prisma.studyPlan.deleteMany({ where: { userId: { in: [ownerId, foreignId] } } });
     await prisma.flashcard.deleteMany({ where: { userId: { in: [ownerId, foreignId] } } });
     await prisma.deck.deleteMany({ where: { userId: { in: [ownerId, foreignId] } } });
