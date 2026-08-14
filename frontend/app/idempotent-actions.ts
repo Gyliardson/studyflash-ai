@@ -107,7 +107,7 @@ export async function salvarFlashcardsIdempotente(cards: FlashcardInput[], deckI
   }
 }
 
-export async function gerarSalvarPlanoIdempotente(tema: string, dificuldade: string, requestKey: string) {
+export async function gerarSalvarPlanoIdempotente(tema: string, dificuldade: string, requestKey: string): Promise<MutationResult<{ planoId: string }>> {
   const { userId } = await auth();
   if (!userId) return { success: false, error: "Login necessário para criar planos." };
   const intent = normalizePlanIntent(tema, dificuldade);
