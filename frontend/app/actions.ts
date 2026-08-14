@@ -5,6 +5,7 @@ import prisma from "@/lib/db";
 import { getAiApiHeaders, getAiApiUrl } from "@/lib/ai-api";
 import {
     completeTopicForUser,
+    createExamAttemptForUser,
     finalizeExamForUser,
     recordReviewForUser,
     saveFlashcardsForUser,
@@ -284,9 +285,12 @@ export async function iniciarSimulado(
     mode: "DECK" | "TOPIC" | "PLAN" | "GLOBAL",
     sourceId: string | undefined,
     quantity: number,
+    difficulty: "EASY" | "MEDIUM" | "HARD" | "IMPOSSIBLE",
 ) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Login necessário." };
+    if (mode !== "GLOBAL" && !sourceId) return { success: false, error: "Fonte de prova inválida." };
+
     try {
         const whereCondition: Record<string, unknown> = { userId };
         if (mode === "DECK" && sourceId) whereCondition.deckId = sourceId;
@@ -318,7 +322,9 @@ export async function iniciarSimulado(
         }
         const finalExam = selectedCards.map((card) => {
             const aiData = questoesIA.find((question) => question.card_id === card.id);
-            let options = aiData?.alternativas && aiData.alternativas.length >= 2
+            let options = aiData?.alternativas
+                && aiData.alternativas.length >= 2
+                && aiData.alternativas.includes(card.verso)
                 ? [...aiData.alternativas]
                 : null;
             if (!options) {
@@ -331,7 +337,26 @@ export async function iniciarSimulado(
             }
             return { ...card, options: options.sort(() => 0.5 - Math.random()) };
         });
-        return { success: true, cards: finalExam };
+
+        const attempt = await createExamAttemptForUser(userId, {
+            sourceType: mode,
+            sourceId,
+            difficulty,
+            questions: finalExam.map((card) => ({
+                flashcardId: card.id,
+                prompt: card.frente,
+                expectedAnswer: card.verso,
+                options: card.options,
+            })),
+        });
+        if (!attempt.success) return attempt;
+
+        return {
+            success: true,
+            attemptId: attempt.attemptId,
+            expiresAt: attempt.expiresAt,
+            cards: finalExam.map((card) => ({ id: card.id, frente: card.frente, options: card.options })),
+        };
     } catch (error) {
         console.error("Erro crítico ao iniciar simulado:", error);
         return { success: false, error: "Falha ao gerar a prova." };
@@ -339,13 +364,9 @@ export async function iniciarSimulado(
 }
 
 export async function finalizarSimulado(resultado: {
-    totalQuestions: number;
-    correctAnswers: number;
+    attemptId: string;
     timeSpentSeconds: number;
-    difficulty: "EASY" | "MEDIUM" | "HARD" | "IMPOSSIBLE";
-    sourceType: string;
-    sourceId?: string;
-    answers: { flashcardId: string; isCorrect: boolean; timeTaken: number }[];
+    answers: { flashcardId: string; selectedOption: string | null; timeTaken: number }[];
 }) {
     const { userId } = await auth();
     if (!userId) return { success: false };
@@ -353,6 +374,6 @@ export async function finalizarSimulado(resultado: {
         return await finalizeExamForUser(userId, resultado);
     } catch (error) {
         console.error("Erro ao salvar simulado:", error);
-        return { success: false };
+        return { success: false, error: "Falha ao finalizar a prova." };
     }
 }
