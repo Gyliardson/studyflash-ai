@@ -47,8 +47,8 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Lint security boundaries
-        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts lib/gamification-transactions.mjs
+      - name: Lint security and transaction boundaries
+        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts lib/gamification-transactions.mjs lib/study-session-transactions.mjs lib/study-calendar.mjs
 
       - name: Gate server-only AI boundary
         shell: bash
@@ -79,6 +79,19 @@ jobs:
           grep -q 'finalizeExamForUser' "$actions_path"
           if grep -E 'concederXp|processarStreak|xpJaGanhoHoje|simuladosHoje' "$actions_path"; then
             echo "Legacy TOCTOU gamification path reintroduced in production actions" >&2
+            exit 1
+          fi
+
+      - name: Gate explicit StudyFlash calendar policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'studyDayRange' lib/gamification-transactions.mjs
+          grep -q 'studyCalendarDayDifference' lib/gamification-transactions.mjs
+          grep -q 'studyCalendarDayDifference' lib/study-session-transactions.mjs
+          grep -q 'America/Sao_Paulo' lib/study-calendar.mjs
+          if grep -E 'startOfLocalDay|localCalendarDayDifference|setHours\(0' lib/gamification-transactions.mjs lib/study-session-transactions.mjs; then
+            echo "Implicit process-local daily boundary reintroduced" >&2
             exit 1
           fi
 
@@ -236,6 +249,11 @@ jobs:
 
       - name: Run gamification concurrency tests
         run: node --test --experimental-strip-types tests/gamification-concurrency.test.mjs
+
+      - name: Run timezone boundary tests
+        env:
+          TZ: UTC
+        run: node --test --experimental-strip-types tests/timezone-boundaries.test.mjs
 
   backend-quality:
     name: Backend syntax and deterministic tests

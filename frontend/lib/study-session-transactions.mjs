@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "./db.ts";
 import { XP_VALUES } from "./gamification.ts";
+import { studyCalendarDayDifference } from "./study-calendar.mjs";
 
 const MAX_SERIALIZABLE_ATTEMPTS = 5;
 const VALID_EVALUATIONS = new Set(["errei", "dificil", "facil"]);
@@ -38,24 +39,14 @@ function ensureProfile(tx, userId) {
   });
 }
 
-async function grantXp(tx, userId, amount, source) {
+async function grantXp(tx, userId, amount, source, occurredAt = new Date()) {
   if (amount <= 0) return;
   await tx.userProfile.upsert({
     where: { userId },
     create: { userId, xp: amount, weeklyXp: amount },
     update: { xp: { increment: amount }, weeklyXp: { increment: amount } },
   });
-  await tx.xPHistory.create({ data: { userId, amount, source } });
-}
-
-function startOfLocalDay(value) {
-  const result = new Date(value);
-  result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-function localCalendarDayDifference(current, previous) {
-  return Math.round((startOfLocalDay(current).getTime() - startOfLocalDay(previous).getTime()) / 86_400_000);
+  await tx.xPHistory.create({ data: { userId, amount, source, createdAt: occurredAt } });
 }
 
 async function processStreak(tx, userId, now) {
@@ -67,7 +58,7 @@ async function processStreak(tx, userId, now) {
     });
     return;
   }
-  const diffDays = localCalendarDayDifference(now, profile.lastStudyDate);
+  const diffDays = studyCalendarDayDifference(now, profile.lastStudyDate);
   if (diffDays <= 0) return;
   if (diffDays === 1) {
     const nextStreak = profile.currentStreak + 1;
@@ -75,7 +66,7 @@ async function processStreak(tx, userId, now) {
       where: { userId },
       data: { currentStreak: nextStreak, longestStreak: Math.max(nextStreak, profile.longestStreak), lastStudyDate: now },
     });
-    await grantXp(tx, userId, XP_VALUES.DAILY_STREAK_BONUS, "STREAK");
+    await grantXp(tx, userId, XP_VALUES.DAILY_STREAK_BONUS, "STREAK", now);
     return;
   }
   await tx.userProfile.update({ where: { userId }, data: { currentStreak: 1, lastStudyDate: now } });
@@ -246,7 +237,7 @@ export function recordStudySessionReviewForUser(userId, sessionId, cardId, evalu
       where: { id: cardId, userId },
       data: { interval, repetition, easinessFactor, nextReview },
     });
-    await grantXp(tx, userId, xpGained, "REVIEW");
+    await grantXp(tx, userId, xpGained, "REVIEW", now);
     await processStreak(tx, userId, now);
     await tx.studySessionCard.update({
       where: { id: item.id },
