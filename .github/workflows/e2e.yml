@@ -20,6 +20,10 @@ concurrency:
 jobs:
   browser:
     name: Public, auth and accessibility browser gates
+    # Standard pull_request events already withhold repository Actions secrets
+    # from forked code. Keep that platform boundary explicit as defense in depth:
+    # authenticated Clerk E2E runs only for pushes and same-repository PRs.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
