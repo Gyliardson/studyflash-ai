@@ -58,9 +58,9 @@ export default function Header() {
                         {isMenuOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
                     </button>
 
-                    <Link href="/dashboard" className="flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <Link href="/dashboard" aria-label="StudyFlash — criar material" className="flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground" aria-hidden="true">SF</span>
-                        <span className="hidden text-lg font-extrabold tracking-tight text-foreground sm:inline">
+                        <span className="hidden text-lg font-extrabold tracking-tight text-foreground sm:inline" aria-hidden="true">
                             Study<span className="text-primary">Flash</span>
                         </span>
                     </Link>
