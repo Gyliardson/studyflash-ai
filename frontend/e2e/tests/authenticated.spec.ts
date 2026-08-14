@@ -1,6 +1,9 @@
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
+import prisma from "../../lib/db.ts";
 
 const TEST_USER_EMAIL =
   process.env.E2E_CLERK_TEST_EMAIL ?? "studyflash.e2e+clerk_test@example.com";
@@ -86,4 +89,41 @@ test("collection UI follows authoritative create, validation and delete results"
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: `Excluir baralho ${name}` }).click();
   await expect(page.getByText(name, { exact: true })).toHaveCount(0);
+});
+
+test("collection mutation server predicates are owner-scoped and repeated deletes fail closed", async () => {
+  const actionsSource = await readFile(new URL("../../app/actions.ts", import.meta.url), "utf8");
+  expect(actionsSource).toContain("const normalized = normalizeDeckName(nome);");
+  expect(actionsSource).toContain("const normalized = normalizeFlashcards(cards);");
+  expect(actionsSource).toContain("await prisma.deck.delete({ where: { id, userId } });");
+  expect(actionsSource).toContain("await prisma.flashcard.delete({ where: { id, userId } });");
+  expect(actionsSource).toContain("await prisma.studyPlan.delete({ where: { id, userId } });");
+
+  const suffix = randomUUID();
+  const ownerId = `e2e-owner-${suffix}`;
+  const foreignId = `e2e-foreign-${suffix}`;
+
+  const ownerDeck = await prisma.deck.create({ data: { userId: ownerId, nome: `Owner ${suffix}` } });
+  const foreignDeck = await prisma.deck.create({ data: { userId: foreignId, nome: `Foreign ${suffix}` } });
+  const ownerCard = await prisma.flashcard.create({ data: { userId: ownerId, frente: "Owner?", verso: "Owner!" } });
+  const foreignCard = await prisma.flashcard.create({ data: { userId: foreignId, frente: "Foreign?", verso: "Foreign!" } });
+
+  try {
+    await prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } });
+    expect(await prisma.deck.count({ where: { id: ownerDeck.id } })).toBe(0);
+    await expect(prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } })).rejects.toThrow();
+
+    await expect(prisma.deck.delete({ where: { id: foreignDeck.id, userId: ownerId } })).rejects.toThrow();
+    expect(await prisma.deck.count({ where: { id: foreignDeck.id, userId: foreignId } })).toBe(1);
+
+    await prisma.flashcard.delete({ where: { id: ownerCard.id, userId: ownerId } });
+    expect(await prisma.flashcard.count({ where: { id: ownerCard.id } })).toBe(0);
+    await expect(prisma.flashcard.delete({ where: { id: ownerCard.id, userId: ownerId } })).rejects.toThrow();
+
+    await expect(prisma.flashcard.delete({ where: { id: foreignCard.id, userId: ownerId } })).rejects.toThrow();
+    expect(await prisma.flashcard.count({ where: { id: foreignCard.id, userId: foreignId } })).toBe(1);
+  } finally {
+    await prisma.flashcard.deleteMany({ where: { userId: { in: [ownerId, foreignId] } } });
+    await prisma.deck.deleteMany({ where: { userId: { in: [ownerId, foreignId] } } });
+  }
 });
