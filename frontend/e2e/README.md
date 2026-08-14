@@ -20,6 +20,8 @@ No Playwright storage state is written. `.auth/` and `storage-state*.json` are g
 
 The gate-critical authenticated flow signs in, reaches the protected dashboard, focuses and submits the real generation control with no text/PDF, verifies the deterministic validation message, confirms no AI request is made, and runs Axe against that authenticated state.
 
+`product-ux.spec.ts` is a dedicated authenticated portfolio-evidence suite. Its project runs in the normal Browser E2E gate and captures deterministic full-page screenshots with animations disabled for representative light/dark desktop/mobile surfaces. The workflow publishes the Playwright report and test results on every run so successful visual evidence remains inspectable for the exact tested head SHA. Screenshot evidence must be inspected before claiming visual approval; a green Browser E2E run alone is not visual certification.
+
 CI provisions disposable PostgreSQL 16, applies migrations, verifies migration history and schema parity, then builds the production Next.js application before starting Playwright. The E2E dependency graph is committed and installed with `npm ci`.
 
 The suite must not depend on production Neon, production Clerk, or a remote LLM.
