@@ -6,7 +6,6 @@ const publicTests = /(?:smoke|accessibility)\.spec\.ts/;
 
 export default defineConfig({
   testDir: "./tests",
-  globalSetup: "./global.setup.ts",
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 1 : undefined,
   outputDir: "test-results",
@@ -20,8 +19,13 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "setup",
+      testMatch: /global\.setup\.ts/,
+    },
+    {
       name: "public-desktop",
       testMatch: publicTests,
+      dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
@@ -31,11 +35,13 @@ export default defineConfig({
     {
       name: "public-mobile",
       testMatch: publicTests,
+      dependencies: ["setup"],
       use: { ...devices["Pixel 7"], trace: "retain-on-failure" },
     },
     {
       name: "authenticated-desktop",
       testMatch: /authenticated\.spec\.ts/,
+      dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
