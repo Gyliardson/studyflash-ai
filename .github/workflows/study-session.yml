@@ -1,0 +1,74 @@
+name: Study Session Integrity
+
+on:
+  push:
+    branches:
+      - portfolio/revamp-2026
+      - 'work/**'
+  pull_request:
+    branches:
+      - portfolio/revamp-2026
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: study-session-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  study-session-integrity:
+    name: Study review retry and resume (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: studyflash_study_session
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d studyflash_study_session"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_study_session
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply migrations to empty disposable PostgreSQL
+        run: npm run db:migrate:deploy
+
+      - name: Verify migration history
+        run: npm run db:migrate:status
+
+      - name: Verify database matches Prisma schema
+        run: npm run db:schema:verify
+
+      - name: Lint study transaction boundary
+        run: npx eslint lib/study-session-transactions.mjs app/study-actions.ts 'app/(platform)/estudar/page.tsx'
+
+      - name: Run study retry and resume tests
+        run: node --test --experimental-strip-types tests/study-session.test.mjs
