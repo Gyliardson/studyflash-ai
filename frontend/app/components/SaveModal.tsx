@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { criarBaralho, listarMeusBaralhos, salvarFlashcards } from "../actions";
 import { triggerHudRefresh } from "./UserHUD";
 
@@ -10,13 +10,20 @@ interface SaveModalProps {
     onSuccess: () => void;
 }
 
+type DeckOption = {
+    id: string;
+    nome: string;
+    _count: { cards: number };
+};
+
 export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps) {
-    const [decks, setDecks] = useState<any[]>([]);
+    const [decks, setDecks] = useState<DeckOption[]>([]);
     const [selectedDeck, setSelectedDeck] = useState("");
     const [newDeckName, setNewDeckName] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [creating, setCreating] = useState(false);
+    const [mutationError, setMutationError] = useState<string | null>(null);
 
     useEffect(() => {
         listarMeusBaralhos().then((data) => {
@@ -26,66 +33,110 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
         });
     }, []);
 
-    async function handleCreateAndSave() {
-        if (!newDeckName.trim()) return alert("Digite um nome para o grupo!");
-        setSaving(true);
-
-        const resDeck = await criarBaralho(newDeckName);
-
-        // --- Tratamento de erro específico ---
-        if (!resDeck.success || !resDeck.deck) {
-            setSaving(false);
-            // Mostra o erro exato que veio do backend (ex: "Já existe um grupo...")
-            return alert(resDeck.error || "Erro ao criar grupo.");
-        }
-        // ---------------------------------------------------
-
-        await salvarFlashcards(cards, resDeck.deck.id);
-        setSaving(false);
+    function completeSuccessfulSave() {
+        setMutationError(null);
         triggerHudRefresh();
         onSuccess();
     }
 
-    async function handleSaveExisting() {
-        if (!selectedDeck) return alert("Selecione um grupo!");
+    async function handleCreateAndSave() {
+        const name = newDeckName.trim();
+        if (!name) {
+            setMutationError("Digite um nome para o grupo.");
+            return;
+        }
+
+        setMutationError(null);
         setSaving(true);
-        await salvarFlashcards(cards, selectedDeck);
-        setSaving(false);
-        triggerHudRefresh();
-        onSuccess();
+        try {
+            const deckResult = await criarBaralho(name);
+            if (!deckResult.success || !deckResult.deck) {
+                setMutationError(deckResult.error || "Erro ao criar grupo.");
+                return;
+            }
+
+            const saveResult = await salvarFlashcards(cards, deckResult.deck.id);
+            if (!saveResult.success) {
+                setDecks((current) => [
+                    { id: deckResult.deck.id, nome: deckResult.deck.nome, _count: { cards: 0 } },
+                    ...current.filter((deck) => deck.id !== deckResult.deck.id),
+                ]);
+                setSelectedDeck(deckResult.deck.id);
+                setCreating(false);
+                setNewDeckName("");
+                setMutationError(`${saveResult.error || "Falha ao salvar os flashcards."} O grupo criado foi mantido para você tentar novamente.`);
+                return;
+            }
+
+            completeSuccessfulSave();
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleSaveExisting() {
+        if (!selectedDeck) {
+            setMutationError("Selecione um grupo.");
+            return;
+        }
+
+        setMutationError(null);
+        setSaving(true);
+        try {
+            const result = await salvarFlashcards(cards, selectedDeck);
+            if (!result.success) {
+                setMutationError(result.error || "Falha ao salvar os flashcards. Tente novamente.");
+                return;
+            }
+
+            completeSuccessfulSave();
+        } finally {
+            setSaving(false);
+        }
     }
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-100 p-4">
-            <div className="bg-popover rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-border">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="save-modal-title"
+                className="bg-popover rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200 border border-border"
+            >
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-popover-foreground">Onde vamos guardar? 🗂️</h2>
-                    <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    <h2 id="save-modal-title" className="text-xl font-bold text-popover-foreground">Onde vamos guardar? 🗂️</h2>
+                    <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground transition">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
 
-                {/* LOADING */}
+                {mutationError && (
+                    <div role="alert" className="mb-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                        {mutationError}
+                    </div>
+                )}
+
                 {loading && (
                     <div className="flex flex-col items-center py-8 text-muted-foreground">
-                        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mb-2"></div>
+                        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mb-2" aria-hidden="true"></div>
                         <p className="text-sm">Buscando seus grupos...</p>
                     </div>
                 )}
 
-                {/* CONTEÚDO */}
                 {!loading && (
                     <div className="space-y-5">
-
-                        {/* MODO: SELECIONAR EXISTENTE */}
                         {decks.length > 0 && !creating && (
                             <div className="animate-in slide-in-from-left-2 duration-200">
-                                <label className="block text-sm font-bold text-muted-foreground mb-2">Escolha um grupo existente:</label>
+                                <label htmlFor="save-modal-deck" className="block text-sm font-bold text-muted-foreground mb-2">Escolha um grupo existente:</label>
                                 <div className="relative">
                                     <select
+                                        id="save-modal-deck"
                                         className="w-full p-3 pl-4 pr-10 border border-border rounded-xl bg-card text-card-foreground font-medium focus:border-ring focus:ring-4 focus:ring-ring/20 outline-none appearance-none transition-all cursor-pointer hover:border-primary/50"
                                         value={selectedDeck}
-                                        onChange={(e) => setSelectedDeck(e.target.value)}
+                                        onChange={(event) => {
+                                            setSelectedDeck(event.target.value);
+                                            setMutationError(null);
+                                        }}
                                     >
                                         {decks.map((deck) => (
                                             <option key={deck.id} value={deck.id}>
@@ -93,87 +144,93 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                             </option>
                                         ))}
                                     </select>
-                                    {/* Ícone customizado do Select */}
-                                    <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-muted-foreground">
+                                    <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-muted-foreground" aria-hidden="true">
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                                     </div>
                                 </div>
 
-                                <div className="relative flex py-5 items-center">
+                                <div className="relative flex py-5 items-center" aria-hidden="true">
                                     <div className="grow border-t border-border"></div>
                                     <span className="shrink-0 mx-4 text-muted-foreground text-xs font-semibold uppercase tracking-wider">Ou</span>
                                     <div className="grow border-t border-border"></div>
                                 </div>
 
                                 <button
-                                    onClick={() => setCreating(true)}
+                                    type="button"
+                                    onClick={() => {
+                                        setCreating(true);
+                                        setMutationError(null);
+                                    }}
                                     className="w-full py-3 border-2 border-dashed border-primary/30 text-primary font-bold rounded-xl hover:bg-primary/10 hover:border-primary transition-all flex items-center justify-center gap-2"
                                 >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                                     Criar Novo Grupo
                                 </button>
                             </div>
                         )}
 
-                        {/* MODO: CRIAR NOVO */}
                         {(creating || decks.length === 0) && (
                             <div className="animate-in slide-in-from-right-2 duration-200">
-                                <label className="block text-sm font-bold text-muted-foreground mb-2">Nome do novo grupo:</label>
+                                <label htmlFor="save-modal-new-deck" className="block text-sm font-bold text-muted-foreground mb-2">Nome do novo grupo:</label>
                                 <input
+                                    id="save-modal-new-deck"
                                     type="text"
+                                    maxLength={80}
                                     placeholder="Ex: Biologia Celular, Verbos Irregulares..."
                                     className="w-full p-3 border-2 border-border rounded-xl bg-card text-card-foreground placeholder-muted-foreground font-medium focus:border-ring focus:ring-4 focus:ring-ring/20 outline-none transition-all"
                                     value={newDeckName}
-                                    onChange={(e) => setNewDeckName(e.target.value)}
+                                    onChange={(event) => {
+                                        setNewDeckName(event.target.value);
+                                        setMutationError(null);
+                                    }}
                                     autoFocus
                                 />
 
-                                {/* BOTÃO VOLTAR MELHORADO */}
                                 {decks.length > 0 && (
                                     <button
-                                        onClick={() => setCreating(false)}
+                                        type="button"
+                                        onClick={() => {
+                                            setCreating(false);
+                                            setMutationError(null);
+                                        }}
                                         className="w-full mt-3 py-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-semibold rounded-xl border border-border transition-all flex items-center justify-center gap-2 active:scale-95"
                                     >
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                                         Voltar para lista
                                     </button>
                                 )}
                             </div>
                         )}
 
-                        {/* AÇÕES PRINCIPAIS */}
                         <div className="flex gap-3 mt-6 pt-5 border-t border-border">
                             <button
+                                type="button"
                                 onClick={onClose}
-                                className="flex-1 py-3 text-muted-foreground font-bold hover:bg-muted hover:text-foreground rounded-xl transition"
+                                disabled={saving}
+                                className="flex-1 py-3 text-muted-foreground font-bold hover:bg-muted hover:text-foreground rounded-xl transition disabled:opacity-50"
                             >
                                 Cancelar
                             </button>
 
-                            {/* POLISH: Changed gradient to be less neon green in light mode, defaulting to a solid look or a more subtle gradient if needed. 
-                                Actually, green-600 to emerald-600 is fine, but green-500 is a bit bright. 
-                                I'll keep the current one (green-600 to emerald-600) as it's readable. 
-                                The user mentioned "Avoid neon". green-500 can be neon. 
-                                I will darken the start color slightly for better text contrast. */}
                             <button
+                                type="button"
                                 onClick={creating || decks.length === 0 ? handleCreateAndSave : handleSaveExisting}
                                 disabled={saving}
                                 className="flex-2 py-3 bg-success-solid text-white font-bold rounded-xl hover:shadow-lg hover:shadow-success-solid/30 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {saving ? (
                                     <>
-                                        <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+                                        <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" aria-hidden="true" />
                                         <span>Salvando...</span>
                                     </>
                                 ) : (
                                     <>
                                         <span>Confirmar</span>
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
                                     </>
                                 )}
                             </button>
                         </div>
-
                     </div>
                 )}
             </div>
