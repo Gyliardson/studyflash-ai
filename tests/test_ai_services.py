@@ -1,5 +1,6 @@
 import unittest
 
+from app.ai_errors import AIInvalidInputError, AIInvalidOutputError
 from app.ai_provider import (
     AIProviderError,
     AIProviderRateLimitError,
@@ -121,6 +122,11 @@ class AIProviderPolicyTests(unittest.TestCase):
 
 
 class AIServiceTests(unittest.IsolatedAsyncioTestCase):
+    def test_short_flashcard_input_is_typed_invalid_input(self):
+        provider = ScriptedProvider()
+        with self.assertRaises(AIInvalidInputError):
+            gerar_flashcards_service("curto", provider=provider)
+
     def test_flashcards_use_injected_provider_without_remote_credentials(self):
         provider = ScriptedProvider()
         result = gerar_flashcards_service("conteúdo técnico " * 10, provider=provider)
@@ -129,7 +135,7 @@ class AIServiceTests(unittest.IsolatedAsyncioTestCase):
     def test_flashcard_validation_rejects_empty_generated_set(self):
         provider = ScriptedProvider()
         provider.flashcards = ConjuntoFlashcards(cartoes=[])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AIInvalidOutputError):
             gerar_flashcards_service("conteúdo técnico " * 10, provider=provider)
 
     def test_topic_generation_requires_exactly_three_cards(self):
@@ -137,7 +143,7 @@ class AIServiceTests(unittest.IsolatedAsyncioTestCase):
         provider.topic_cards = ConjuntoFlashcards(
             cartoes=[Flashcard(frente="Uma", verso="Resposta")]
         )
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AIInvalidOutputError):
             gerar_conteudo_topico_service("Curso", "Tópico", provider=provider)
 
     def test_study_plan_rejects_invalid_topic_count(self):
@@ -148,7 +154,7 @@ class AIServiceTests(unittest.IsolatedAsyncioTestCase):
             dificuldade="Iniciante",
             topicos=[Topico(titulo="Único")],
         )
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AIInvalidOutputError):
             gerar_plano_service("Python", "Iniciante", provider=provider)
 
     async def test_exam_requires_four_unique_options_and_correct_answer(self):
@@ -162,7 +168,7 @@ class AIServiceTests(unittest.IsolatedAsyncioTestCase):
         provider = ScriptedProvider()
         provider.exam = QuestaoProvaGeracao(alternativas=["Correta"])
         card = ItemSimuladoInput(id="card-1", frente="Pergunta", verso="Correta")
-        with self.assertRaises(ValueError):
+        with self.assertRaises(AIInvalidOutputError):
             await gerar_distratores_batch([card], provider=provider)
 
     async def test_provider_failure_is_not_converted_to_valid_exam_data(self):
