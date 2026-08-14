@@ -8,11 +8,29 @@ const TEST_USER_EMAIL =
 const VALIDATION_MESSAGE =
   "Por favor, cole um texto ou anexe um PDF para começar.";
 
+async function signIn(page: Parameters<typeof clerk.signIn>[0]["page"]) {
+  await page.goto("/");
+  await clerk.signIn({ page, emailAddress: TEST_USER_EMAIL });
+}
+
+async function expectNoBlockingAxeViolations(page: Parameters<typeof clerk.signIn>[0]["page"]) {
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  const blockingViolations = accessibility.violations.filter(
+    (violation) => violation.impact === "serious" || violation.impact === "critical",
+  );
+
+  expect(
+    blockingViolations,
+    blockingViolations
+      .map((violation) => `${violation.id}: ${violation.help}`)
+      .join("\n"),
+  ).toEqual([]);
+}
+
 test("authenticated StudyFlash validation flow uses real Clerk development auth", async ({
   page,
 }) => {
-  await page.goto("/");
-  await clerk.signIn({ page, emailAddress: TEST_USER_EMAIL });
+  await signIn(page);
 
   const aiRequests: string[] = [];
   page.on("request", (request) => {
@@ -30,16 +48,35 @@ test("authenticated StudyFlash validation flow uses real Clerk development auth"
 
   await expect(page.getByText(VALIDATION_MESSAGE, { exact: true })).toBeVisible();
   expect(aiRequests).toEqual([]);
+  await expectNoBlockingAxeViolations(page);
+});
 
-  const accessibility = await new AxeBuilder({ page }).analyze();
-  const blockingViolations = accessibility.violations.filter(
-    (violation) => violation.impact === "serious" || violation.impact === "critical",
-  );
+test("authenticated exam runs through the real server-authoritative attempt boundary", async ({
+  page,
+}) => {
+  await signIn(page);
+  await page.goto("/simulado");
+  await expect(page).toHaveURL(/\/simulado(?:[/?#]|$)/);
 
-  expect(
-    blockingViolations,
-    blockingViolations
-      .map((violation) => `${violation.id}: ${violation.help}`)
-      .join("\n"),
-  ).toEqual([]);
+  // Use the no-timer mode so the browser test is deterministic. The fixture has
+  // five synthetic cards and the backend falls back locally if the remote AI
+  // provider is not configured, so no external LLM is a critical dependency.
+  await page.getByRole("button", { name: /Prática/i }).click();
+  await page.getByRole("button", { name: /Iniciar Simulado/i }).click();
+
+  await expect(page.getByText(/1\s*\/\s*5/)).toBeVisible({ timeout: 20_000 });
+
+  for (let question = 1; question <= 5; question += 1) {
+    const answerButtons = page.locator(".grid.grid-cols-1.gap-3 > button");
+    await expect(answerButtons.first()).toBeVisible();
+    await answerButtons.first().click();
+    if (question < 5) {
+      await expect(page.getByText(new RegExp(`${question + 1}\\s*\\/\\s*5`))).toBeVisible();
+    }
+  }
+
+  await expect(page.getByRole("heading", { name: "Simulado Concluído!" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Acertos", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Precisão/i)).toBeVisible();
+  await expectNoBlockingAxeViolations(page);
 });
