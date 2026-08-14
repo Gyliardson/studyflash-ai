@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
 
 const TEST_USER_EMAIL = process.env.E2E_CLERK_TEST_EMAIL ?? "studyflash.e2e+clerk_test@example.com";
@@ -8,7 +8,7 @@ async function signIn(page: Page) {
   await clerk.signIn({ page, emailAddress: TEST_USER_EMAIL });
 }
 
-async function attachScreenshot(page: Page, testInfo: Parameters<typeof test>[1] extends never ? never : any, name: string) {
+async function attachScreenshot(page: Page, testInfo: TestInfo, name: string) {
   await testInfo.attach(name, {
     body: await page.screenshot({ fullPage: true, animations: "disabled" }),
     contentType: "image/png",
@@ -63,8 +63,7 @@ test("portfolio evidence captures representative responsive light and dark produ
   await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
   await attachScreenshot(page, testInfo, "collection-mobile-dark");
 
-  const lightPreference = page.getByRole("link", { name: "Configurações" });
-  await lightPreference.click();
+  await page.goto("/configuracoes");
   await page.getByRole("button", { name: /Claro/ }).click();
   await expect(page.locator("html")).not.toHaveClass(/dark/);
   await page.goto("/perfil");
