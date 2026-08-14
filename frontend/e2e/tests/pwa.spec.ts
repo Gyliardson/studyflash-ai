@@ -30,7 +30,7 @@ async function cachedSameOriginURLs(page: Page) {
   });
 }
 
-test("production worker controls the app, manifest is installable-shaped, and uncached navigation has a deterministic offline fallback", async ({ page, context }) => {
+test("production worker controls the app, Chromium accepts installability, and uncached navigation has a deterministic offline fallback", async ({ page, context }) => {
   await ensureServiceWorkerControl(page);
 
   const manifestResponse = await page.request.get("/manifest.webmanifest");
@@ -46,6 +46,20 @@ test("production worker controls the app, manifest is installable-shaped, and un
   ]));
   expect((await page.request.get("/icon-192.png")).ok()).toBe(true);
   expect((await page.request.get("/icon-512.png")).ok()).toBe(true);
+
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Page.enable");
+  const appManifest = await cdp.send("Page.getAppManifest");
+  expect(appManifest.errors).toEqual([]);
+  const installability = await cdp.send("Page.getInstallabilityErrors");
+  expect(installability.installabilityErrors).toEqual([]);
+
+  await page.evaluate(async () => {
+    await caches.open("studyflash-next-static-v0");
+    await caches.open("studyflash-retired-auth-cache-v0");
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect.poll(() => page.evaluate(async () => (await caches.keys()).filter((name) => name.startsWith("studyflash-") && name.endsWith("-v0")))).toEqual([]);
 
   await context.setOffline(true);
   try {
