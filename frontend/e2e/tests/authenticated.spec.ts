@@ -163,12 +163,6 @@ test("collection mutation server predicates are owner-scoped and repeated delete
   const foreignPlan = await prisma.studyPlan.create({ data: { userId: foreignId, title: `Foreign ${suffix}`, description: "test", difficulty: "EASY" } });
 
   try {
-    await expect(prisma.deck.delete({ where: { id: foreignDeck.id, userId: ownerId } })).rejects.toThrow();
-    expect(await prisma.deck.count({ where: { id: foreignDeck.id, userId: foreignId } })).toBe(1);
-    await prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } });
-    expect(await prisma.deck.count({ where: { id: ownerDeck.id } })).toBe(0);
-    await expect(prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } })).rejects.toThrow();
-
     await expect(prisma.flashcard.delete({ where: { id: foreignCard.id, userId: ownerId } })).rejects.toThrow();
     expect(await prisma.flashcard.count({ where: { id: foreignCard.id, userId: foreignId } })).toBe(1);
     await prisma.flashcard.delete({ where: { id: ownerCard.id, userId: ownerId } });
@@ -180,6 +174,12 @@ test("collection mutation server predicates are owner-scoped and repeated delete
     await prisma.studyPlan.delete({ where: { id: ownerPlan.id, userId: ownerId } });
     expect(await prisma.studyPlan.count({ where: { id: ownerPlan.id } })).toBe(0);
     await expect(prisma.studyPlan.delete({ where: { id: ownerPlan.id, userId: ownerId } })).rejects.toThrow();
+
+    await expect(prisma.deck.delete({ where: { id: foreignDeck.id, userId: ownerId } })).rejects.toThrow();
+    expect(await prisma.deck.count({ where: { id: foreignDeck.id, userId: foreignId } })).toBe(1);
+    await prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } });
+    expect(await prisma.deck.count({ where: { id: ownerDeck.id } })).toBe(0);
+    await expect(prisma.deck.delete({ where: { id: ownerDeck.id, userId: ownerId } })).rejects.toThrow();
   } finally {
     await prisma.studyPlan.deleteMany({ where: { userId: { in: [ownerId, foreignId] } } });
     await prisma.flashcard.deleteMany({ where: { userId: { in: [ownerId, foreignId] } } });
