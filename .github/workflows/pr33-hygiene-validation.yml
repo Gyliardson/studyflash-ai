@@ -45,7 +45,7 @@ jobs:
           grep -Fq 'Active engineering professionalization' README.md
           grep -Fqi 'not release-certified' README.md
           grep -Fq 'portfolio/revamp-2026' README.md
-          grep -Fqi 'qualified' README.md
+          grep -Fqi 'PWA/offline behavior is under active validation' README.md
 
           grep -Fq 'StudyFlash — Changelog' CHANGELOG.md
           grep -Fqi 'StudiFlow' CHANGELOG.md
