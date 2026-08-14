@@ -19,6 +19,10 @@ function blockingAxeViolations(results: Awaited<ReturnType<AxeBuilder["analyze"]
   );
 }
 
+function appAlert(page: Page, text: string) {
+  return page.locator('[role="alert"]').filter({ hasText: text });
+}
+
 test("authenticated StudyFlash validation flow uses real Clerk development auth", async ({
   page,
 }) => {
@@ -49,12 +53,12 @@ test("authenticated StudyFlash validation flow uses real Clerk development auth"
   ).toEqual([]);
 });
 
-test("collection UI follows authoritative create, validation and delete results", async ({ page }) => {
+test("collection UI follows authoritative create, validation and delete results", async ({ page }, testInfo) => {
   await signIn(page);
   await page.goto("/colecao");
   await expect(page).toHaveURL(/\/colecao(?:[/?#]|$)/);
 
-  const name = "E2E Mutation Deck";
+  const name = `E2E Mutation Deck ${testInfo.retry}`;
   const input = page.getByLabel("Nome do novo baralho");
   const createButton = page.getByRole("button", { name: "Criar" });
 
@@ -64,12 +68,12 @@ test("collection UI follows authoritative create, validation and delete results"
 
   await input.fill(name);
   await createButton.click();
-  await expect(page.getByRole("alert")).toContainText("Já existe um grupo com este nome!");
+  await expect(appAlert(page, "Já existe um grupo com este nome!")).toContainText("Já existe um grupo com este nome!");
   await expect(page.getByText(name, { exact: true })).toBeVisible();
 
   await input.fill("x".repeat(81));
   await createButton.click();
-  await expect(page.getByRole("alert")).toContainText("no máximo 80 caracteres");
+  await expect(appAlert(page, "no máximo 80 caracteres")).toContainText("no máximo 80 caracteres");
   await expect(page.getByText(name, { exact: true })).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page }).analyze();
