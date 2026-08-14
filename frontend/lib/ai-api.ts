@@ -1,5 +1,7 @@
 import "server-only";
 
+import { AI_ACTION_TIMEOUT_MS } from "./ai-failure-policy";
+
 const DEFAULT_AI_API_URL = "http://127.0.0.1:8000";
 const INTERNAL_HEADER = "X-StudyFlash-Internal-Key";
 
@@ -19,4 +21,8 @@ export function getAiApiHeaders(extra: HeadersInit = {}): Headers {
   const headers = new Headers(extra);
   headers.set(INTERNAL_HEADER, getAiApiKey());
   return headers;
+}
+
+export function getAiAbortSignal(timeoutMs = AI_ACTION_TIMEOUT_MS): AbortSignal {
+  return AbortSignal.timeout(timeoutMs);
 }
