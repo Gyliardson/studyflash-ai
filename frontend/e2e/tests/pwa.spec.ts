@@ -4,6 +4,14 @@ import { expect, test, type Page } from "@playwright/test";
 
 const TEST_USER_EMAIL = process.env.E2E_CLERK_TEST_EMAIL ?? "studyflash.e2e+clerk_test@example.com";
 
+async function waitForStableServiceWorkerControl(page: Page) {
+  await page.evaluate(async () => {
+    if (!("serviceWorker" in navigator)) throw new Error("Service workers are unavailable in this browser context");
+    await navigator.serviceWorker.ready;
+  });
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.state ?? null)).toBe("activated");
+}
+
 async function ensureServiceWorkerControl(page: Page) {
   await page.goto("/");
   await page.evaluate(async () => {
@@ -13,7 +21,7 @@ async function ensureServiceWorkerControl(page: Page) {
   if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller)))) {
     await page.reload({ waitUntil: "domcontentloaded" });
   }
-  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  await waitForStableServiceWorkerControl(page);
 }
 
 async function cachedSameOriginURLs(page: Page) {
@@ -63,6 +71,12 @@ test("production worker controls the app, Chromium accepts installability, and u
   });
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect.poll(() => page.evaluate(async () => (await caches.keys()).filter((name) => name.startsWith("studyflash-") && name.endsWith("-v0")))).toEqual([]);
+  // The reload above is part of the cache-cleanup lifecycle probe. Before taking
+  // Chromium offline, require the post-reload page to be controlled by an
+  // activated worker again; otherwise an offline navigation can race a
+  // controller transition and leave the previous document committed even when
+  // Workbox already produced the correct fallback response.
+  await waitForStableServiceWorkerControl(page);
 
   await context.setOffline(true);
   try {
