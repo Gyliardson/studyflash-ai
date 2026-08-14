@@ -82,15 +82,23 @@ export async function listarMeusBaralhos() {
     }
 }
 
-export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string) {
+export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string, newDeckName?: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Login necessário." };
 
     const normalized = normalizeFlashcards(cards);
     if (!normalized.success) return normalized;
 
+    let normalizedDeckName: string | undefined;
+    if (newDeckName !== undefined) {
+        if (deckId) return { success: false, error: "Destino de flashcards inválido." };
+        const deckNameResult = normalizeDeckName(newDeckName);
+        if (!deckNameResult.success) return deckNameResult;
+        normalizedDeckName = deckNameResult.name;
+    }
+
     try {
-        return await saveFlashcardsForUser(userId, normalized.cards, deckId);
+        return await saveFlashcardsForUser(userId, normalized.cards, deckId, undefined, normalizedDeckName);
     } catch (error) {
         console.error("Erro ao salvar:", error);
         return { success: false, error: "Falha ao salvar no banco." };
