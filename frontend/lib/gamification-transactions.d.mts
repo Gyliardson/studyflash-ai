@@ -31,7 +31,8 @@ export function saveFlashcardsForUser(
   cards: { frente: string; verso: string }[],
   deckId?: string,
   now?: Date,
-): Promise<{ success: boolean; error?: string; xpGained?: number }>;
+  newDeckName?: string,
+): Promise<{ success: boolean; error?: string; xpGained?: number; deckId?: string }>;
 
 export function recordReviewForUser(
   userId: string,
@@ -49,12 +50,7 @@ export function createExamAttemptForUser(
   userId: string,
   input: ExamAttemptInput,
   now?: Date,
-): Promise<{
-  success: boolean;
-  error?: string;
-  attemptId?: string;
-  expiresAt?: Date;
-}>;
+): Promise<{ success: boolean; error?: string; attemptId?: string; expiresAt?: Date }>;
 
 export function finalizeExamForUser(
   userId: string,
@@ -74,13 +70,5 @@ export function finalizeExamForUser(
   limitReached?: boolean;
 }>;
 
-export function processStudyStreakForUser(
-  userId: string,
-  now?: Date,
-): Promise<{ streakBonus: boolean }>;
-
-export function grantCreationXpForUser(
-  userId: string,
-  requestedXp: number,
-  now?: Date,
-): Promise<number>;
+export function processStudyStreakForUser(userId: string, now?: Date): Promise<{ streakBonus: boolean }>;
+export function grantCreationXpForUser(userId: string, requestedXp: number, now?: Date): Promise<number>;
