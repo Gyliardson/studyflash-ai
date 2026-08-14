@@ -13,17 +13,17 @@ const withPWA = withPWAInit({
   workboxOptions: {
     disableDevLogs: true,
     cleanupOutdatedCaches: true,
-    // Precache only the generic offline boundary so PrecacheFallbackPlugin can
-    // resolve it while account-owned documents remain network-authoritative.
-    // Bump this revision whenever the offline document meaningfully changes.
-    additionalManifestEntries: [{ url: "/offline", revision: "studyflash-offline-v1" }],
+    // Keep the emergency navigation fallback independent from the Next.js/Clerk
+    // runtime. A static document can render with the network fully unavailable and
+    // cannot accidentally expose account-owned application state.
+    additionalManifestEntries: [{ url: "/offline-fallback.html", revision: "studyflash-offline-v2" }],
     runtimeCaching: [
       {
         urlPattern: ({ request }) => request.mode === "navigate",
         handler: "NetworkOnly",
         options: {
           precacheFallback: {
-            fallbackURL: "/offline",
+            fallbackURL: "/offline-fallback.html",
           },
         },
       },
