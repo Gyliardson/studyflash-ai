@@ -138,6 +138,12 @@ class AIServiceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(AIInvalidOutputError):
             gerar_flashcards_service("conteúdo técnico " * 10, provider=provider)
 
+    def test_flashcard_validation_rejects_unexpected_payload_type(self):
+        provider = ScriptedProvider()
+        provider.flashcards = None
+        with self.assertRaises(AIInvalidOutputError):
+            gerar_flashcards_service("conteúdo técnico " * 10, provider=provider)
+
     def test_topic_generation_requires_exactly_three_cards(self):
         provider = ScriptedProvider()
         provider.topic_cards = ConjuntoFlashcards(
@@ -157,6 +163,12 @@ class AIServiceTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(AIInvalidOutputError):
             gerar_plano_service("Python", "Iniciante", provider=provider)
 
+    def test_study_plan_rejects_unexpected_payload_type(self):
+        provider = ScriptedProvider()
+        provider.plan = None
+        with self.assertRaises(AIInvalidOutputError):
+            gerar_plano_service("Python", "Iniciante", provider=provider)
+
     async def test_exam_requires_four_unique_options_and_correct_answer(self):
         provider = ScriptedProvider()
         card = ItemSimuladoInput(id="card-1", frente="Pergunta", verso="Correta")
@@ -167,6 +179,13 @@ class AIServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_exam_rejects_one_option_fallback_shape(self):
         provider = ScriptedProvider()
         provider.exam = QuestaoProvaGeracao(alternativas=["Correta"])
+        card = ItemSimuladoInput(id="card-1", frente="Pergunta", verso="Correta")
+        with self.assertRaises(AIInvalidOutputError):
+            await gerar_distratores_batch([card], provider=provider)
+
+    async def test_exam_rejects_unexpected_payload_type(self):
+        provider = ScriptedProvider()
+        provider.exam = None
         card = ItemSimuladoInput(id="card-1", frente="Pergunta", verso="Correta")
         with self.assertRaises(AIInvalidOutputError):
             await gerar_distratores_batch([card], provider=provider)
