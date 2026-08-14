@@ -8,6 +8,13 @@ async function signIn(page: Page) {
   await clerk.signIn({ page, emailAddress: TEST_USER_EMAIL });
 }
 
+async function attachScreenshot(page: Page, testInfo: Parameters<typeof test>[1] extends never ? never : any, name: string) {
+  await testInfo.attach(name, {
+    body: await page.screenshot({ fullPage: true, animations: "disabled" }),
+    contentType: "image/png",
+  });
+}
+
 test("authenticated primary navigation exposes the supported product areas", async ({ page }) => {
   await signIn(page);
   await page.goto("/dashboard");
@@ -35,4 +42,31 @@ test("appearance settings change only the supported local theme preference", asy
   await light.click();
   await expect(light).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("html")).not.toHaveClass(/dark/);
+});
+
+test("portfolio evidence captures representative responsive light and dark product surfaces", async ({ page }, testInfo) => {
+  await signIn(page);
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/dashboard");
+  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
+  await attachScreenshot(page, testInfo, "dashboard-desktop-light");
+
+  await page.goto("/configuracoes");
+  const dark = page.getByRole("button", { name: /Escuro/ });
+  await dark.click();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await attachScreenshot(page, testInfo, "settings-desktop-dark");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/colecao");
+  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
+  await attachScreenshot(page, testInfo, "collection-mobile-dark");
+
+  const lightPreference = page.getByRole("link", { name: "Configurações" });
+  await lightPreference.click();
+  await page.getByRole("button", { name: /Claro/ }).click();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  await page.goto("/perfil");
+  await attachScreenshot(page, testInfo, "profile-mobile-light");
 });
