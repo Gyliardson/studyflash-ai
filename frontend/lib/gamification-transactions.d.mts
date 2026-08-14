@@ -15,7 +15,8 @@ export function saveFlashcardsForUser(
   cards: { frente: string; verso: string }[],
   deckId?: string,
   now?: Date,
-): Promise<{ success: boolean; error?: string; xpGained?: number }>;
+  newDeckName?: string,
+): Promise<{ success: boolean; error?: string; xpGained?: number; deckId?: string }>;
 
 export function recordReviewForUser(
   userId: string,
