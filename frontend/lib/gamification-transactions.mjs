@@ -12,10 +12,6 @@ function isRetryableTransactionConflict(error) {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
   if (error.code === "P2034") return true;
   if (error.code !== "P2002") return false;
-
-  // Two concurrent first-use requests may both attempt to bootstrap the same
-  // UserProfile. userId is the model's only unique business key, so this
-  // conflict is safe to retry from the start of the serializable transaction.
   return error.meta?.modelName === "UserProfile";
 }
 
@@ -180,12 +176,14 @@ function validateAttemptQuestions(questions) {
   const ids = questions.map((question) => question.flashcardId);
   if (ids.some((id) => typeof id !== "string" || !id)) return false;
   if (new Set(ids).size !== ids.length) return false;
-  return questions.every((question) =>
-    typeof question.prompt === "string" && question.prompt.length > 0
-    && typeof question.expectedAnswer === "string" && question.expectedAnswer.length > 0
-    && Array.isArray(question.options) && question.options.length >= 2
-    && question.options.every((option) => typeof option === "string")
-    && question.options.includes(question.expectedAnswer));
+  return questions.every((question) => {
+    if (typeof question.prompt !== "string" || question.prompt.length === 0) return false;
+    if (typeof question.expectedAnswer !== "string" || question.expectedAnswer.length === 0) return false;
+    if (!Array.isArray(question.options) || question.options.length < 2 || question.options.length > 6) return false;
+    if (!question.options.every((option) => typeof option === "string" && option.length > 0)) return false;
+    if (new Set(question.options).size !== question.options.length) return false;
+    return question.options.includes(question.expectedAnswer);
+  });
 }
 
 export function createExamAttemptForUser(userId, input, now = new Date()) {
@@ -226,13 +224,20 @@ export function createExamAttemptForUser(userId, input, now = new Date()) {
 
 function validateAttemptAnswers(questions, answers) {
   if (!Array.isArray(answers) || answers.length !== questions.length) return false;
-  const ids = answers.map((answer) => answer.flashcardId);
+  const ids = answers.map((answer) => answer?.flashcardId);
   if (ids.some((id) => typeof id !== "string" || !id)) return false;
   if (new Set(ids).size !== ids.length) return false;
-  const expectedIds = new Set(questions.map((question) => question.flashcardId));
-  return ids.every((id) => expectedIds.has(id)) && answers.every((answer) =>
-    (answer.selectedOption === null || typeof answer.selectedOption === "string")
-    && Number.isFinite(Number(answer.timeTaken)));
+
+  const questionByCard = new Map(questions.map((question) => [question.flashcardId, question]));
+  return answers.every((answer) => {
+    const question = questionByCard.get(answer.flashcardId);
+    if (!question) return false;
+    if (typeof answer.timeTaken !== "number" || !Number.isFinite(answer.timeTaken) || answer.timeTaken < 0) return false;
+    if (answer.selectedOption === null) return true;
+    if (typeof answer.selectedOption !== "string") return false;
+    const options = Array.isArray(question.options) ? question.options : [];
+    return options.includes(answer.selectedOption);
+  });
 }
 
 function calculateExamXp(difficulty, correctAnswers, score) {
@@ -281,7 +286,7 @@ export function finalizeExamForUser(userId, result, now = new Date()) {
       return {
         flashcardId: question.flashcardId,
         isCorrect,
-        timeTakenSeconds: Math.max(0, Number(answer?.timeTaken) || 0),
+        timeTakenSeconds: Math.max(0, answer?.timeTaken ?? 0),
       };
     });
     const totalQuestions = attempt.questions.length;
