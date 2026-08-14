@@ -13,7 +13,7 @@ Default nested budgets are:
 
 The inner provider timeout must remain shorter than outer application deadlines. The provider adapter sets SDK `max_retries=0`; StudyFlash owns retry/fallback policy explicitly. The backup Groq model is attempted at most once and only when the primary model is rate-limited.
 
-`AI_PROVIDER_TIMEOUT_SECONDS` is configurable for backend operations, but changing it requires reviewing the outer budgets above. Values outside the accepted range fall back to the default rather than creating an effectively unbounded provider request.
+`AI_PROVIDER_TIMEOUT_SECONDS` is configurable only within the bounded interval above zero and at most **9 seconds**, keeping an individual provider request below the 10-second exam fallback deadline. Invalid, non-positive, or larger values fall back to the 8-second default rather than creating an effectively unbounded or mis-nested request budget.
 
 ## Backend failure contract
 
@@ -36,4 +36,4 @@ Exam generation intentionally has a deterministic local fallback because plausib
 
 ## Deterministic validation
 
-CI must validate this contract without any remote LLM call. Unit tests cover provider fallback cardinality, timeout/error classification, HTTP mappings, nested frontend budgets, fallback eligibility, and non-leakage of synthetic private exception text.
+CI must validate this contract without any remote LLM call. Unit tests cover provider fallback cardinality, timeout/error classification, structured-output shape failures, HTTP mappings, nested frontend budgets, fallback eligibility, and non-leakage of synthetic private exception text.
