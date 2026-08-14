@@ -4,6 +4,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100";
 const readinessURL = new URL("/manifest.webmanifest", baseURL).toString();
 const publicTests = /(?:smoke|accessibility)\.spec\.ts/;
 const authenticatedTests = /authenticated\.spec\.ts/;
+const productUxTests = /product-ux\.spec\.ts/;
 const criticalA11yTests = /critical-a11y\.spec\.ts/;
 const studyReviewTests = /study-review\.spec\.ts/;
 const pwaTests = /pwa\.spec\.ts/;
@@ -50,6 +51,16 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
         trace: "off",
+      },
+    },
+    {
+      name: "product-ux-desktop",
+      testMatch: productUxTests,
+      dependencies: ["setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1440, height: 900 },
+        trace: "retain-on-failure",
       },
     },
     {
