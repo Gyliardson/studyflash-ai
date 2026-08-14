@@ -3,9 +3,17 @@
 import Link from "next/link";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import UserHUD from "./UserHUD";
-import { useState, useEffect, useRef } from "react";
-import { Menu, X, Sun, Moon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { BookOpen, BrainCircuit, Library, Menu, Moon, Plus, Sun, UserRound, X } from "lucide-react";
 import { useTheme } from "next-themes";
+
+const primaryLinks = [
+    { href: "/dashboard", label: "Criar", icon: Plus },
+    { href: "/colecao", label: "Coleção", icon: Library },
+    { href: "/planos", label: "Planos", icon: BookOpen },
+    { href: "/simulado", label: "Simulados", icon: BrainCircuit },
+    { href: "/perfil", label: "Perfil", icon: UserRound },
+];
 
 export default function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -34,57 +42,65 @@ export default function Header() {
     };
 
     return (
-        <header className="w-full max-w-6xl mx-auto mb-8 sticky top-4 z-50 px-4 md:px-6">
-            <div className="flex justify-between items-center py-4 px-6 bg-card border border-border rounded-2xl shadow-sm transition-colors duration-300">
-                <div className="flex items-center gap-4 md:gap-8">
+        <header className="sticky top-3 z-50 mx-auto mb-8 w-full max-w-7xl px-3 md:top-4 md:px-6">
+            <div className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-lg shadow-black/5 backdrop-blur md:px-5">
+                <div className="flex min-w-0 items-center gap-3">
                     <button
                         ref={menuButtonRef}
                         type="button"
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
-                        className="md:hidden text-foreground p-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        className="rounded-lg p-2 text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
                         aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
                         aria-expanded={isMenuOpen}
                         aria-controls="mobile-primary-navigation"
                     >
-                        {isMenuOpen ? <X size={24} aria-hidden="true" /> : <Menu size={24} aria-hidden="true" />}
+                        {isMenuOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
                     </button>
 
-                    <Link href="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                        <span className="text-2xl" aria-hidden="true">⚡</span>
-                        <span className="text-xl font-extrabold text-foreground tracking-tight">
+                    <Link href="/dashboard" className="flex shrink-0 items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground" aria-hidden="true">SF</span>
+                        <span className="hidden text-lg font-extrabold tracking-tight text-foreground sm:inline">
                             Study<span className="text-primary">Flash</span>
                         </span>
                     </Link>
-
-                    <SignedIn>
-                        <nav aria-label="Navegação principal" className="hidden md:flex gap-6 text-sm font-medium text-foreground">
-                            <Link href="/dashboard" className="hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Criar Novo</Link>
-                            <Link href="/colecao" className="hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Minha Coleção</Link>
-                        </nav>
-                    </SignedIn>
                 </div>
 
-                <div className="flex items-center gap-2 md:gap-4">
+                <SignedIn>
+                    <nav aria-label="Navegação principal" className="hidden items-center gap-1 lg:flex">
+                        {primaryLinks.map(({ href, label, icon: Icon }) => (
+                            <Link
+                                key={href}
+                                href={href}
+                                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <Icon className="h-4 w-4" aria-hidden="true" />
+                                {label}
+                            </Link>
+                        ))}
+                    </nav>
+                </SignedIn>
+
+                <div className="flex shrink-0 items-center gap-2">
                     {mounted && (
                         <button
                             type="button"
                             onClick={toggleTheme}
-                            className="p-2 rounded-lg bg-secondary text-foreground hover:bg-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                            className="rounded-lg border border-border bg-background p-2 text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             aria-label={resolvedTheme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
                         >
-                            {resolvedTheme === "dark" ? <Moon size={20} aria-hidden="true" /> : <Sun size={20} aria-hidden="true" />}
+                            {resolvedTheme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
                         </button>
                     )}
 
                     <SignedIn>
-                        <div className="hidden md:block"><UserHUD /></div>
+                        <div className="hidden xl:block"><UserHUD /></div>
                     </SignedIn>
 
-                    <div className="pl-2 md:pl-4 border-l border-border ml-1 md:ml-2 flex items-center">
+                    <div className="flex items-center border-l border-border pl-2">
                         <SignedOut>
                             <SignInButton mode="modal">
-                                <button type="button" className="group px-4 md:px-6 py-2 md:py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs md:text-sm transition-all hover:bg-primary/90 hover:shadow-lg active:scale-95 flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                                    <span>Entrar</span>
+                                <button type="button" className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    Entrar
                                 </button>
                             </SignInButton>
                         </SignedOut>
@@ -92,7 +108,7 @@ export default function Header() {
                         <SignedIn>
                             <UserButton
                                 afterSignOutUrl="/"
-                                appearance={{ elements: { avatarBox: "w-8 h-8 md:w-10 md:h-10 border-2 border-border shadow-sm hover:scale-105 transition-transform" } }}
+                                appearance={{ elements: { avatarBox: "w-9 h-9 border border-border shadow-sm" } }}
                             />
                         </SignedIn>
                     </div>
@@ -100,13 +116,24 @@ export default function Header() {
             </div>
 
             {isMenuOpen && (
-                <div id="mobile-primary-navigation" className="md:hidden absolute top-full left-0 right-0 mt-2 mx-4 bg-card border border-border rounded-2xl shadow-xl p-4 animate-in slide-in-from-top-2 z-40">
+                <div id="mobile-primary-navigation" className="absolute left-3 right-3 top-full z-40 mt-2 rounded-2xl border border-border bg-card p-3 shadow-xl lg:hidden md:left-6 md:right-6">
                     <SignedIn>
-                        <nav aria-label="Navegação principal móvel" className="flex flex-col gap-2">
-                            <Link href="/dashboard" onClick={() => setIsMenuOpen(false)} className="p-3 rounded-xl hover:bg-accent text-foreground font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Criar Novo</Link>
-                            <Link href="/colecao" onClick={() => setIsMenuOpen(false)} className="p-3 rounded-xl hover:bg-accent text-foreground font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Minha Coleção</Link>
+                        <nav aria-label="Navegação principal móvel" className="grid gap-1 sm:grid-cols-2">
+                            {primaryLinks.map(({ href, label, icon: Icon }) => (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    onClick={() => setIsMenuOpen(false)}
+                                    className="flex items-center gap-3 rounded-xl p-3 text-sm font-semibold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                        <Icon className="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                    {label}
+                                </Link>
+                            ))}
                         </nav>
-                        <div className="pt-4 mt-2 border-t border-border"><UserHUD /></div>
+                        <div className="mt-2 border-t border-border pt-3"><UserHUD /></div>
                     </SignedIn>
                 </div>
             )}
