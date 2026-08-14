@@ -56,6 +56,16 @@ async function cachedSameOriginURLs(page: Page) {
   });
 }
 
+test("direct online fallback probe enables retry without entering a reload loop", async ({ page }) => {
+  await page.goto("/offline-fallback.html", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/offline-fallback\.html$/);
+  await expect(page.getByRole("heading", { name: "Você está sem conexão" })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("Conexão disponível. Você pode tentar novamente.");
+  await expect(page.getByRole("button", { name: "Tentar novamente" })).toBeEnabled();
+  await page.waitForTimeout(250);
+  await expect(page).toHaveURL(/\/offline-fallback\.html$/);
+});
+
 test("production worker controls the app, Chromium accepts installability, and uncached navigation has a deterministic offline fallback", async ({ page, context }) => {
   const offlineDocumentResponse = await page.request.get("/offline-fallback.html");
   expect(offlineDocumentResponse.ok(), "The dependency-free offline document must stay publicly fetchable so Workbox can precache it").toBe(true);
