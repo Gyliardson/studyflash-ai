@@ -11,6 +11,7 @@ export default function DetalhesBaralhoPage({ params }: { params: Promise<{ deck
     const [cards, setCards] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [deckId, setDeckId] = useState<string>("");
+    const [mutationError, setMutationError] = useState<string | null>(null);
 
     useEffect(() => {
         params.then((resolvedParams) => {
@@ -37,13 +38,14 @@ export default function DetalhesBaralhoPage({ params }: { params: Promise<{ deck
     const handleExcluirCard = async (id: string) => {
         if (!confirm("Excluir este cartão permanentemente?")) return;
 
+        setMutationError(null);
         const result = await excluirFlashcard(id);
         if (result.success) {
             setCards((currentCards) => currentCards.filter((card) => card.id !== id));
             return;
         }
 
-        alert(result.error || "Erro ao excluir.");
+        setMutationError(`${result.error || "Erro ao excluir o cartão."} O cartão foi mantido; tente novamente.`);
     };
 
     return (
@@ -62,6 +64,15 @@ export default function DetalhesBaralhoPage({ params }: { params: Promise<{ deck
                         <p className="text-muted-foreground">{cards.length} cartões encontrados</p>
                     </div>
                 </div>
+
+                {mutationError && (
+                    <div role="alert" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                        <p>{mutationError}</p>
+                        <button type="button" onClick={() => setMutationError(null)} className="font-semibold underline underline-offset-2">
+                            Fechar
+                        </button>
+                    </div>
+                )}
 
                 {loading && (
                     <div className="flex justify-center py-20">
