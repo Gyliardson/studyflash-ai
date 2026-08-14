@@ -101,17 +101,20 @@
         const retry = document.getElementById("retry");
         const status = document.getElementById("connection-status");
 
-        const refreshState = () => {
+        const renderConnectionState = () => {
           const online = navigator.onLine;
           retry.disabled = !online;
-          status.textContent = online ? "Conexão restaurada. Recarregando…" : "Aguardando a conexão voltar…";
-          if (online) window.location.reload();
+          status.textContent = online ? "Conexão disponível. Você pode tentar novamente." : "Aguardando a conexão voltar…";
         };
 
         retry.addEventListener("click", () => window.location.reload());
-        window.addEventListener("online", refreshState);
-        window.addEventListener("offline", refreshState);
-        refreshState();
+        window.addEventListener("online", () => {
+          retry.disabled = false;
+          status.textContent = "Conexão restaurada. Recarregando…";
+          window.location.reload();
+        });
+        window.addEventListener("offline", renderConnectionState);
+        renderConnectionState();
       })();
     </script>
   </body>
