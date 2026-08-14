@@ -90,7 +90,7 @@
         <p class="description"><strong>StudyFlash não mantém conteúdos da sua conta em cache offline.</strong> Isso evita exibir decks, sessões, simulados ou progresso autenticado desatualizados.</p>
         <div class="status" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="connection-status">Aguardando a conexão voltar…</span></div>
         <div class="actions">
-          <button id="retry" type="button">Tentar novamente</button>
+          <button id="retry" type="button" disabled>Tentar novamente</button>
           <a href="/">Ir para a página inicial</a>
         </div>
         <p class="note">Quando a rede voltar, esta página será recarregada para buscar o estado confirmado pelo servidor.</p>
@@ -101,20 +101,37 @@
         const retry = document.getElementById("retry");
         const status = document.getElementById("connection-status");
 
-        const renderConnectionState = () => {
-          const online = navigator.onLine;
-          retry.disabled = !online;
-          status.textContent = online ? "Conexão disponível. Você pode tentar novamente." : "Aguardando a conexão voltar…";
+        const markOffline = () => {
+          retry.disabled = true;
+          status.textContent = "Aguardando a conexão voltar…";
+        };
+
+        const markOnline = () => {
+          retry.disabled = false;
+          status.textContent = "Conexão disponível. Você pode tentar novamente.";
+        };
+
+        const probeConnection = async () => {
+          try {
+            const response = await fetch(`/?connectivity-probe=${Date.now()}`, {
+              method: "HEAD",
+              cache: "no-store",
+              credentials: "same-origin",
+            });
+            if (!response.ok) throw new Error("Connectivity probe failed");
+            markOnline();
+          } catch {
+            markOffline();
+          }
         };
 
         retry.addEventListener("click", () => window.location.reload());
         window.addEventListener("online", () => {
-          retry.disabled = false;
           status.textContent = "Conexão restaurada. Recarregando…";
           window.location.reload();
         });
-        window.addEventListener("offline", renderConnectionState);
-        renderConnectionState();
+        window.addEventListener("offline", markOffline);
+        void probeConnection();
       })();
     </script>
   </body>
