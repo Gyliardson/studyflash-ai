@@ -15,6 +15,7 @@ export default function Home() {
     const [loadingText, setLoadingText] = useState("Gerando Flashcards ✨");
     const [erro, setErro] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const saveButtonRef = useRef<HTMLButtonElement>(null);
 
     const [saving, setSaving] = useState(false);
     const [showModal, setShowModal] = useState(false);
@@ -89,6 +90,11 @@ export default function Home() {
 
     function handleSalvar() {
         setShowModal(true);
+    }
+
+    function closeSaveModalAndRestoreFocus() {
+        setShowModal(false);
+        requestAnimationFrame(() => saveButtonRef.current?.focus());
     }
 
     return (
@@ -186,6 +192,7 @@ export default function Home() {
                     <div className="w-full flex justify-center mt-4 mb-8">
                         {isSignedIn ? (
                             <button
+                                ref={saveButtonRef}
                                 type="button"
                                 onClick={handleSalvar}
                                 disabled={saving}
@@ -225,7 +232,7 @@ export default function Home() {
             {showModal && (
                 <SaveModal
                     cards={flashcards}
-                    onClose={() => setShowModal(false)}
+                    onClose={closeSaveModalAndRestoreFocus}
                     onSuccess={() => {
                         setShowModal(false);
                         alert("Salvo com sucesso na sua coleção! 🎉");
