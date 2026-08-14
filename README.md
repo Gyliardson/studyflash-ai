@@ -35,8 +35,10 @@ See the project backlog and `[PROGRAM] Portfolio Professionalization` issue for 
 
 Historical development notes are available in [CHANGELOG.md](./CHANGELOG.md). Earlier entries may describe capabilities that are currently being revalidated as part of the professionalization program.
 
-## License status
+## License
 
-**No license policy has been selected yet.** Until the maintainer makes an explicit licensing decision, do not assume permission to use, copy, modify, or redistribute this code.
+**Proprietary / All Rights Reserved.**
 
-The repository should not be made public as part of the current pre-publication process until the maintainer deliberately selects the intended licensing policy.
+The source is publicly visible for portfolio, evaluation, educational review, and transparency purposes. Public visibility does **not** grant permission to use, copy, modify, redistribute, sublicense, sell, or create derivative works from the project except with prior express written permission from the copyright holder.
+
+See [LICENSE](./LICENSE) for the complete notice. Third-party dependencies remain subject to their own licenses.
