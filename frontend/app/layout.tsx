@@ -2,9 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-import { ClerkProvider } from "@clerk/nextjs";
-import { ptPT } from "@clerk/localizations";
-import { Analytics } from "@vercel/analytics/react";
+// Imports do Clerk
+import { ClerkProvider } from '@clerk/nextjs'
+import { ptPT } from '@clerk/localizations'
+
+// 1. Importar o Analytics
+import { Analytics } from "@vercel/analytics/react"
 import { ThemeProvider } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
