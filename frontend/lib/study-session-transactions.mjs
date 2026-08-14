@@ -117,8 +117,9 @@ function pendingCards(session) {
 export function startOrResumeStudySessionForUser(userId, input = {}, now = new Date()) {
   return runSerializable(async (tx) => {
     const scope = normalizeScope(userId, input);
+    const modeExtra = Boolean(input?.modeExtra);
     const active = await tx.studySession.findFirst({
-      where: { userId, scopeKey: scope.scopeKey, status: "ACTIVE" },
+      where: { userId, scopeKey: scope.scopeKey, modeExtra, status: "ACTIVE" },
       orderBy: { updatedAt: "desc" },
       include: {
         cards: {
@@ -146,7 +147,6 @@ export function startOrResumeStudySessionForUser(userId, input = {}, now = new D
       });
     }
 
-    const modeExtra = Boolean(input?.modeExtra);
     const where = modeExtra ? scope.where : { ...scope.where, nextReview: { lte: now } };
     const cards = await tx.flashcard.findMany({
       where,
