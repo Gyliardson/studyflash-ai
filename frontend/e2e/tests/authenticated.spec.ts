@@ -51,32 +51,62 @@ test("authenticated StudyFlash validation flow uses real Clerk development auth"
   await expectNoBlockingAxeViolations(page);
 });
 
-test("collection UI follows authoritative create, validation and delete results", async ({ page }, testInfo) => {
+test("collection UI follows authoritative create, validation and destructive confirmation results", async ({ page }, testInfo) => {
+  const suffix = `${testInfo.retry}-${randomUUID()}`;
+  const name = `E2E Mutation Deck ${suffix}`;
+  const cardFront = `Delete confirmation ${suffix}`;
+  let deckId: string | null = null;
+
   await signIn(page);
   await page.goto("/colecao");
   await expect(page).toHaveURL(/\/colecao(?:[/?#]|$)/);
-  const name = `E2E Mutation Deck ${testInfo.retry}`;
-  const input = page.getByLabel("Nome do novo baralho");
-  const createButton = page.getByRole("button", { name: "Criar" });
-  await input.fill(name);
-  await createButton.click();
-  await expect(page.getByText(name, { exact: true })).toBeVisible();
-  await input.fill(name);
-  await createButton.click();
-  await expect(appAlert(page, "Já existe um grupo com este nome!")).toContainText("Já existe um grupo com este nome!");
-  await expect(page.getByText(name, { exact: true })).toBeVisible();
-  await input.fill("x".repeat(81));
-  await createButton.click();
-  await expect(appAlert(page, "no máximo 80 caracteres")).toContainText("no máximo 80 caracteres");
-  await expect(page.getByText(name, { exact: true })).toBeVisible();
-  await expectNoBlockingAxeViolations(page);
 
-  const deleteButton = page.getByRole("button", { name: `Excluir baralho ${name}` });
-  await deleteButton.click();
-  const deleteDialog = page.getByRole("alertdialog", { name: "Excluir baralho?" });
-  await expect(deleteDialog).toBeVisible();
-  await deleteDialog.getByRole("button", { name: "Excluir" }).click();
-  await expect(page.getByText(name, { exact: true })).toHaveCount(0);
+  try {
+    const input = page.getByLabel("Nome do novo baralho");
+    const createButton = page.getByRole("button", { name: "Criar" });
+    await input.fill(name);
+    await createButton.click();
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+    await input.fill(name);
+    await createButton.click();
+    await expect(appAlert(page, "Já existe um grupo com este nome!")).toContainText("Já existe um grupo com este nome!");
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+    await input.fill("x".repeat(81));
+    await createButton.click();
+    await expect(appAlert(page, "no máximo 80 caracteres")).toContainText("no máximo 80 caracteres");
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+    await expectNoBlockingAxeViolations(page);
+
+    const deck = await prisma.deck.findFirstOrThrow({ where: { nome: name }, orderBy: { createdAt: "desc" } });
+    deckId = deck.id;
+    const card = await prisma.flashcard.create({
+      data: { userId: deck.userId, deckId: deck.id, frente: cardFront, verso: "Persisted until explicit confirmation" },
+    });
+
+    await page.goto(`/colecao/${deck.id}`);
+    await expect(page.getByText(cardFront, { exact: true })).toBeVisible();
+    await expect(page.getByRole("status", { name: /Carregando cartões do baralho/i })).toHaveCount(0);
+    await page.getByTitle("Excluir Flashcard").click();
+    const cardDialog = page.getByRole("alertdialog", { name: "Excluir cartão?" });
+    await expect(cardDialog).toBeVisible();
+    await expect(page.getByText(cardFront, { exact: true })).toBeVisible();
+    await cardDialog.getByRole("button", { name: "Excluir cartão" }).click();
+    await expect(page.getByText(cardFront, { exact: true })).toHaveCount(0);
+    expect(await prisma.flashcard.count({ where: { id: card.id } })).toBe(0);
+
+    await page.goto("/colecao");
+    const deleteButton = page.getByRole("button", { name: `Excluir baralho ${name}` });
+    await deleteButton.click();
+    const deleteDialog = page.getByRole("alertdialog", { name: "Excluir baralho?" });
+    await expect(deleteDialog).toBeVisible();
+    await deleteDialog.getByRole("button", { name: "Excluir" }).click();
+    await expect(page.getByText(name, { exact: true })).toHaveCount(0);
+  } finally {
+    if (deckId) {
+      await prisma.flashcard.deleteMany({ where: { deckId } });
+      await prisma.deck.deleteMany({ where: { id: deckId } });
+    }
+  }
 });
 
 test("invalid generated cards are rejected by the real save Server Action without partial state", async ({ page }, testInfo) => {
@@ -104,6 +134,7 @@ test("collection mutation server predicates are owner-scoped and repeated delete
   const frontendRoot = resolve(process.cwd(), "..");
   const actionsSource = await readFile(resolve(frontendRoot, "app/actions.ts"), "utf8");
   const saveModalSource = await readFile(resolve(frontendRoot, "app/components/SaveModal.tsx"), "utf8");
+  const deckDetailSource = await readFile(resolve(frontendRoot, "app/(platform)/colecao/[deckId]/page.tsx"), "utf8");
   expect(actionsSource).toContain("const normalized = normalizeDeckName(nome);");
   expect(actionsSource).toContain("const normalized = normalizeFlashcards(cards);");
   expect(actionsSource).toContain("saveFlashcardsForUser(userId, normalized.cards, deckId, undefined, normalizedDeckName)");
@@ -112,6 +143,8 @@ test("collection mutation server predicates are owner-scoped and repeated delete
   expect(actionsSource).toContain("await prisma.studyPlan.delete({ where: { id, userId } });");
   expect(saveModalSource).toContain("salvarFlashcards(cards, undefined, name)");
   expect(saveModalSource).not.toContain("criarBaralho(");
+  expect(deckDetailSource).toContain("<ConfirmDialog");
+  expect(deckDetailSource).not.toContain("confirm(");
 
   const suffix = randomUUID();
   const ownerId = `e2e-owner-${suffix}`;
