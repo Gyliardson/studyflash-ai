@@ -1,7 +1,7 @@
 export const AI_PROVIDER_TIMEOUT_SECONDS = 8;
+export const AI_EXAM_FALLBACK_TIMEOUT_MS = 10_000;
 export const AI_ACTION_TIMEOUT_MS = 12_000;
 export const AI_PDF_PROXY_TIMEOUT_MS = 15_000;
-export const AI_EXAM_FALLBACK_TIMEOUT_MS = 8_000;
 
 export type AiFailureKind = "invalid-input" | "rate-limit" | "timeout" | "unavailable" | "invalid-output" | "unexpected";
 
