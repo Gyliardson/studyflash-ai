@@ -237,3 +237,34 @@ test('rejects mixed source type/source ID combinations', async () => {
     data: examData({ sourceTopicId: topicA.id }),
   }));
 });
+
+test('owned card delete succeeds once and a repeated delete fails without recreating state', async () => {
+  const card = await prisma.flashcard.create({ data: { userId: userA, frente: 'Delete me', verso: 'Once' } });
+
+  const deleted = await prisma.flashcard.delete({ where: { id: card.id, userId: userA } });
+  assert.equal(deleted.id, card.id);
+  assert.equal(await prisma.flashcard.count({ where: { id: card.id } }), 0);
+
+  await assert.rejects(() => prisma.flashcard.delete({ where: { id: card.id, userId: userA } }));
+  assert.equal(await prisma.flashcard.count({ where: { id: card.id } }), 0);
+});
+
+test('cross-user card delete fails and preserves the foreign row', async () => {
+  const foreign = await prisma.flashcard.create({ data: { userId: userB, frente: 'Foreign', verso: 'Keep' } });
+
+  await assert.rejects(() => prisma.flashcard.delete({ where: { id: foreign.id, userId: userA } }));
+
+  const preserved = await prisma.flashcard.findUnique({ where: { id: foreign.id } });
+  assert.equal(preserved?.userId, userB);
+});
+
+test('owned deck and plan deletes honor the same user-scoped predicate', async () => {
+  const deck = await prisma.deck.create({ data: { userId: userA, nome: 'Disposable deck' } });
+  const plan = await prisma.studyPlan.create({ data: { userId: userA, title: 'Disposable plan', difficulty: 'EASY' } });
+
+  await assert.doesNotReject(() => prisma.deck.delete({ where: { id: deck.id, userId: userA } }));
+  await assert.doesNotReject(() => prisma.studyPlan.delete({ where: { id: plan.id, userId: userA } }));
+
+  assert.equal(await prisma.deck.count({ where: { id: deck.id } }), 0);
+  assert.equal(await prisma.studyPlan.count({ where: { id: plan.id } }), 0);
+});
