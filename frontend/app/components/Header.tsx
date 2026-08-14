@@ -35,7 +35,7 @@ export default function Header() {
 
     return (
         <header className="w-full max-w-6xl mx-auto mb-8 sticky top-4 z-50 px-4 md:px-6">
-            <div className="flex justify-between items-center py-4 px-6 bg-card/80 backdrop-blur-md border border-border rounded-2xl shadow-sm transition-colors duration-300">
+            <div className="flex justify-between items-center py-4 px-6 bg-card border border-border rounded-2xl shadow-sm transition-colors duration-300">
                 <div className="flex items-center gap-4 md:gap-8">
                     <button
                         ref={menuButtonRef}
@@ -57,7 +57,7 @@ export default function Header() {
                     </Link>
 
                     <SignedIn>
-                        <nav aria-label="Navegação principal" className="hidden md:flex gap-6 text-sm font-medium text-muted-foreground">
+                        <nav aria-label="Navegação principal" className="hidden md:flex gap-6 text-sm font-medium text-foreground">
                             <Link href="/dashboard" className="hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Criar Novo</Link>
                             <Link href="/colecao" className="hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Minha Coleção</Link>
                         </nav>
@@ -69,7 +69,7 @@ export default function Header() {
                         <button
                             type="button"
                             onClick={toggleTheme}
-                            className="p-2 rounded-lg bg-secondary text-muted-foreground hover:bg-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                            className="p-2 rounded-lg bg-secondary text-foreground hover:bg-muted transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                             aria-label={resolvedTheme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
                         >
                             {resolvedTheme === "dark" ? <Moon size={20} aria-hidden="true" /> : <Sun size={20} aria-hidden="true" />}
