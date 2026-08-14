@@ -119,7 +119,10 @@ export function startOrResumeStudySessionForUser(userId, input = {}, now = new D
     const scope = normalizeScope(userId, input);
     const modeExtra = Boolean(input?.modeExtra);
     const active = await tx.studySession.findFirst({
-      where: { userId, scopeKey: scope.scopeKey, modeExtra, status: "ACTIVE" },
+      // Normal page loads do not know whether the persisted interrupted session
+      // was a due-only or "study more" queue. Resume the durable active queue
+      // for the scope first; modeExtra is only used when creating a new queue.
+      where: { userId, scopeKey: scope.scopeKey, status: "ACTIVE" },
       orderBy: { updatedAt: "desc" },
       include: {
         cards: {
