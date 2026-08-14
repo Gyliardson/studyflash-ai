@@ -19,7 +19,7 @@ const withPWA = withPWAInit({
         handler: "NetworkOnly",
         options: {
           precacheFallback: {
-            fallbackURL: "/_offline",
+            fallbackURL: "/offline",
           },
         },
       },
