@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
 import prisma from "../../lib/db.ts";
@@ -10,6 +11,14 @@ const MAX_INT32 = 2_147_483_647;
 async function signIn(page: Page) {
   await page.goto("/");
   await clerk.signIn({ page, emailAddress: TEST_USER_EMAIL });
+}
+
+async function expectNoBlockingAxeViolations(page: Page) {
+  const results = await new AxeBuilder({ page }).analyze();
+  const blocking = results.violations.filter((violation) =>
+    violation.impact === "critical" || violation.impact === "serious"
+  );
+  expect(blocking, JSON.stringify(blocking, null, 2)).toEqual([]);
 }
 
 async function syntheticUserId() {
@@ -72,13 +81,12 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
     await expect(page).toHaveURL(new RegExp(`/estudar\\?deckId=${deck.id}`));
     await expect(page.getByText(firstFront, { exact: true })).toBeVisible();
     await expect(page.getByText("1 / 2", { exact: true })).toBeVisible();
+    await expectNoBlockingAxeViolations(page);
 
     const activeSession = await prisma.studySession.findFirstOrThrow({
       where: { userId, scopeKey: `DECKS:${deck.id}`, status: "ACTIVE" },
     });
 
-    // Force a real PostgreSQL integer-overflow failure inside the authoritative
-    // XP transaction. The review transaction must roll back completely.
     await prisma.userProfile.upsert({
       where: { userId },
       create: { userId, xp: MAX_INT32, weeklyXp: MAX_INT32 },
@@ -91,12 +99,12 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
     await expect(page.getByText(firstFront, { exact: true })).toBeVisible();
     await expect(page.getByText("1 / 2", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Sessão Finalizada!" })).toHaveCount(0);
+    await expectNoBlockingAxeViolations(page);
     expect(await prisma.xPHistory.count({ where: { userId, source: "REVIEW" } })).toBe(0);
     expect(await prisma.studySessionCard.count({
       where: { sessionId: activeSession.id, status: "PENDING" },
     })).toBe(2);
 
-    // Remove only the injected failure condition, then use the visible retry UI.
     await prisma.userProfile.update({
       where: { userId },
       data: { xp: 0, weeklyXp: 0 },
@@ -113,8 +121,6 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
       where: { sessionId: activeSession.id, status: "COMMITTED" },
     })).toBe(1);
 
-    // Reload must rebuild the browser queue from durable pending state. The
-    // committed first card must not be resurrected or awarded again.
     await page.reload();
     await expect(page.getByText(secondFront, { exact: true })).toBeVisible();
     await expect(page.getByText(firstFront, { exact: true })).toHaveCount(0);
@@ -123,6 +129,7 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
 
     await submitEasy(page, testInfo.project.name);
     await expect(page.getByRole("heading", { name: "Sessão Finalizada!" })).toBeVisible();
+    await expectNoBlockingAxeViolations(page);
     expect(await prisma.xPHistory.count({ where: { userId, source: "REVIEW" } })).toBe(2);
 
     await page.reload();
