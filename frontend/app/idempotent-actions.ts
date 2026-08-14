@@ -115,7 +115,7 @@ export async function gerarSalvarPlanoIdempotente(tema: string, dificuldade: str
   const fingerprint = mutationFingerprint({ topic: intent.topic, difficulty: intent.difficulty });
 
   try {
-    const replay = await readMutationReplay({
+    const replay = await readMutationReplay<{ planoId: string }>({
       userId,
       kind: "CREATE_STUDY_PLAN",
       requestKey,
@@ -123,7 +123,7 @@ export async function gerarSalvarPlanoIdempotente(tema: string, dificuldade: str
       replay: async (receipt, db) => {
         if (!receipt.resultId) return { success: false, error: "Resultado da criação indisponível." };
         const plan = await db.studyPlan.findUnique({ where: { id: receipt.resultId, userId }, select: { id: true } });
-        return plan ? { success: true, planoId: plan.id } : { success: false, error: "O plano criado anteriormente não existe mais." };
+        return plan ? { success: true, planoId: plan.id as string } : { success: false, error: "O plano criado anteriormente não existe mais." };
       },
     });
     if (replay) return replay;
