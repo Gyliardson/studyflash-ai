@@ -33,7 +33,7 @@ class AIProvider(Protocol):
 TModel = TypeVar("TModel", bound=BaseModel)
 TResult = TypeVar("TResult")
 DEFAULT_PROVIDER_TIMEOUT_SECONDS = 8.0
-MAX_PROVIDER_TIMEOUT_SECONDS = 30.0
+MAX_PROVIDER_TIMEOUT_SECONDS = 9.0
 
 
 def _provider_timeout_seconds() -> float:
