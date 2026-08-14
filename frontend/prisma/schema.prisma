@@ -101,6 +101,8 @@ model ExamSession {
   difficulty       String // 'EASY', 'MEDIUM', 'HARD', 'IMPOSSIBLE'
   xpAwarded        Int
   createdAt        DateTime @default(now())
+  attemptId        String?  @unique
+  attempt          ExamAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
 
   questions ExamQuestion[]
 
@@ -121,6 +123,41 @@ model ExamQuestion {
 
   @@index([sessionId])
   @@index([flashcardId])
+}
+
+model ExamAttempt {
+  id            String   @id @default(uuid())
+  userId        String
+  sourceDeckId  String?
+  sourceTopicId String?
+  sourcePlanId  String?
+  sourceType    String
+  difficulty    String
+  status        String   @default("ACTIVE")
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  finalizedAt   DateTime?
+
+  questions ExamAttemptQuestion[]
+  session   ExamSession?
+
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+model ExamAttemptQuestion {
+  id             String      @id @default(uuid())
+  attemptId      String
+  attempt        ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  flashcardId    String
+  prompt         String
+  expectedAnswer String
+  options        Json
+  order          Int
+
+  @@unique([attemptId, flashcardId])
+  @@unique([attemptId, order])
+  @@index([attemptId])
 }
 
 // === GAMIFICATION SYSTEM (v0.4.0) ===

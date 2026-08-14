@@ -9,15 +9,15 @@ import Link from "next/link";
 
 function CustomDropdown({ 
     options, 
-    value, 
-    onChange, 
-    placeholder, 
+    value,
+    onChange,
+    placeholder,
     icon,
-    isActive 
-}: { 
-    options: { id: string; label: string }[], 
-    value: string, 
-    onChange: (val: string) => void, 
+    isActive
+}: {
+    options: { id: string; label: string }[],
+    value: string,
+    onChange: (val: string) => void,
     placeholder: string,
     icon: React.ReactNode,
     isActive: boolean
@@ -129,6 +129,7 @@ const DIFFICULTIES = {
 };
 
 type ExamStep = 'CONFIG' | 'LOADING' | 'EXAM' | 'RESULT';
+type ExamAnswer = { flashcardId: string; selectedOption: string | null; timeTaken: number };
 
 export default function SimuladoContent() {
     const searchParams = useSearchParams();
@@ -146,9 +147,10 @@ export default function SimuladoContent() {
     const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | 'IMPOSSIBLE'>('MEDIUM');
 
     // Prova
+    const [attemptId, setAttemptId] = useState<string | null>(null);
     const [examCards, setExamCards] = useState<any[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [answers, setAnswers] = useState<{ flashcardId: string; isCorrect: boolean; timeTaken: number }[]>([]);
+    const [answers, setAnswers] = useState<ExamAnswer[]>([]);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     
     // Timers
@@ -200,14 +202,15 @@ export default function SimuladoContent() {
         setStep('LOADING');
         setLoadingText("A IA está criando pegadinhas para suas questões...");
         
-        const res = await iniciarSimulado(sourceType, sourceId || undefined, quantity);
+        const res = await iniciarSimulado(sourceType, sourceId || undefined, quantity, difficulty);
         
-        if (!res.success || !res.cards || res.cards.length === 0) {
+        if (!res.success || !res.cards || res.cards.length === 0 || !res.attemptId) {
             alert(res.error || "Erro ao gerar prova. Verifique se você tem cartões suficientes.");
             setStep('CONFIG');
             return;
         }
 
+        setAttemptId(res.attemptId);
         setExamCards(res.cards);
         setCurrentIndex(0);
         setAnswers([]);
@@ -222,12 +225,11 @@ export default function SimuladoContent() {
     async function confirmAnswer(optionSelected: string | null, timeOut: boolean = false) {
         const timeTaken = (Date.now() - questionStartTime) / 1000;
         const currentCard = examCards[currentIndex];
-        const isCorrect = !timeOut && optionSelected === currentCard.verso;
 
-        const newAnswer = { 
-            flashcardId: currentCard.id, 
-            isCorrect, 
-            timeTaken 
+        const newAnswer: ExamAnswer = { 
+            flashcardId: currentCard.id,
+            selectedOption: timeOut ? null : optionSelected,
+            timeTaken
         };
 
         const newAnswers = [...answers, newAnswer];
@@ -245,34 +247,32 @@ export default function SimuladoContent() {
         }
     }
 
-    async function finishExam(finalAnswers: typeof answers) {
+    async function finishExam(finalAnswers: ExamAnswer[]) {
         setStep('LOADING');
         setLoadingText("Calculando resultado...");
 
-        const totalTime = (Date.now() - startTime) / 1000;
-        const correctCount = finalAnswers.filter(a => a.isCorrect).length;
+        if (!attemptId) {
+            alert("A tentativa do simulado expirou. Inicie uma nova prova.");
+            setStep('CONFIG');
+            return;
+        }
 
+        const totalTime = (Date.now() - startTime) / 1000;
         const res = await finalizarSimulado({
-            totalQuestions: examCards.length,
-            correctAnswers: correctCount,
+            attemptId,
             timeSpentSeconds: totalTime,
-            difficulty,
-            sourceType,
-            sourceId,
             answers: finalAnswers
         });
 
         if (res.success) {
             setFinalResult({ 
-                ...res, 
-                totalTime, 
-                correctAnswers: correctCount, 
-                totalQuestions: examCards.length,
+                ...res,
+                totalTime,
                 limitReached: res.limitReached
             });
             setStep('RESULT');
         } else {
-            alert("Erro ao salvar resultado.");
+            alert(res.error || "Erro ao salvar resultado.");
             setStep('CONFIG');
         }
     }
@@ -445,7 +445,6 @@ export default function SimuladoContent() {
                             <svg className="w-8 h-8 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
                         </div>
                     </div>
-                    {/* Fixed Text Alignment for Mobile - Centered as requested */}
                     <div className="w-full text-center px-4">
                         <h2 className="text-xl font-bold text-foreground mb-2">{loadingText}</h2>
                         <p className="text-muted-foreground text-sm max-w-xs mx-auto">Estamos consultando seus flashcards e criando alternativas inteligentes.</p>
@@ -453,11 +452,9 @@ export default function SimuladoContent() {
                 </div>
             )}
 
-            {/* ... RESTO DO CÓDIGO PERMANECE IGUAL, JÁ TEM SUPORTE A DARK MODE ... */}
             {/* === PROVA (EXAM) === */}
             {step === 'EXAM' && examCards.length > 0 && (
                 <div className="max-w-3xl mx-auto animate-in slide-in-from-right-8 duration-500 select-none">
-                    {/* ... */}
                     <div className="bg-card p-4 rounded-2xl shadow-sm border border-border flex justify-between items-center mb-6 sticky top-4 z-40">
                         <div className="flex items-center gap-4">
                             <div className="flex flex-col">
@@ -526,7 +523,7 @@ export default function SimuladoContent() {
                                 {finalResult.score >= 0.9 ? "👑" : finalResult.score >= 0.7 ? "🎉" : "💪"}
                             </div>
                             <h2 className="text-3xl font-extrabold mb-1">Simulado Concluído!</h2>
-                            <p className="opacity-90 font-medium">Desafio {DIFFICULTIES[difficulty].label} Finalizado</p>
+                            <p className="opacity-90 font-medium">Desafio {DIFFICULTIES[finalResult.difficulty as keyof typeof DIFFICULTIES]?.label ?? "Concluído"} Finalizado</p>
                         </div>
                     </div>
 
@@ -537,7 +534,6 @@ export default function SimuladoContent() {
                                 <div className="text-3xl font-black text-foreground">{finalResult.correctAnswers}<span className="text-muted-foreground text-xl">/{finalResult.totalQuestions}</span></div>
                             </div>
                             
-                            {/* LÓGICA DE EXIBIÇÃO DE XP LIMITADO */}
                             <div className={`p-5 rounded-2xl border text-center ${finalResult.limitReached ? 'bg-muted border-border opacity-70' : 'bg-primary/10 border-primary/20'}`}>
                                 <div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${finalResult.limitReached ? 'text-muted-foreground' : 'text-primary'}`}>
                                     {finalResult.limitReached ? "Limite Diário" : "XP Total"}
@@ -548,7 +544,6 @@ export default function SimuladoContent() {
                             </div>
                         </div>
                         
-                        {/* Mensagem explicativa se atingiu o limite */}
                         {finalResult.limitReached && (
                             <div className="mb-6 p-3 bg-warning-bg border border-warning-border rounded-xl text-xs text-warning-fg text-center">
                                 Você atingiu o limite de 3 simulados valendo XP por dia. Continue praticando para fixar o conteúdo! 🧠
@@ -562,7 +557,6 @@ export default function SimuladoContent() {
                             </div>
                             <div className="flex justify-between items-center p-4 bg-muted rounded-xl border border-border">
                                 <span className="text-sm font-medium text-muted-foreground">Precisão</span>
-                                {/* POLISH: Adjusted emerald-600 to emerald-700 for text contrast */}
                                 <span className={`font-bold ${finalResult.score >= 0.7 ? "text-success-fg" : "text-foreground"}`}>{Math.round(finalResult.score * 100)}%</span>
                             </div>
                         </div>

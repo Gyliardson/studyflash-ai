@@ -5,6 +5,7 @@ import prisma from "../lib/db.ts";
 import { DAILY_LIMITS, XP_VALUES } from "../lib/gamification.ts";
 import {
   completeTopicForUser,
+  createExamAttemptForUser,
   finalizeExamForUser,
   processStudyStreakForUser,
   recordReviewForUser,
@@ -18,6 +19,8 @@ const now = new Date("2026-08-13T12:00:00.000Z");
 async function resetDatabase() {
   await prisma.examQuestion.deleteMany();
   await prisma.examSession.deleteMany();
+  await prisma.examAttemptQuestion.deleteMany();
+  await prisma.examAttempt.deleteMany();
   await prisma.flashcard.deleteMany();
   await prisma.topic.deleteMany();
   await prisma.studyPlan.deleteMany();
@@ -35,23 +38,52 @@ after(async () => {
   await prisma.$disconnect();
 });
 
-async function createDueCard(userId = userA) {
+async function createDueCard(userId = userA, overrides = {}) {
   return prisma.flashcard.create({
     data: {
       userId,
       frente: "Question",
       verso: "Answer",
       nextReview: new Date(now.getTime() - 60_000),
+      ...overrides,
     },
   });
 }
 
-function examResult(cardId) {
+async function createAttempt({
+  userId = userA,
+  difficulty = "EASY",
+  sourceType = "GLOBAL",
+  sourceId,
+  cards,
+  createdAt = now,
+} = {}) {
+  const attemptCards = cards ?? [await createDueCard(userId)];
+  const result = await createExamAttemptForUser(userId, {
+    difficulty,
+    sourceType,
+    sourceId,
+    questions: attemptCards.map((card, index) => ({
+      flashcardId: card.id,
+      prompt: card.frente,
+      expectedAnswer: card.verso,
+      options: [card.verso, `Wrong ${index + 1}`],
+    })),
+  }, createdAt);
+  assert.equal(result.success, true);
+  return { ...result, cards: attemptCards };
+}
+
+function finalizePayload(attempt, selectedOption = attempt.cards[0].verso, extra = {}) {
   return {
-    difficulty: "EASY",
-    sourceType: "GLOBAL",
+    attemptId: attempt.attemptId,
     timeSpentSeconds: 30,
-    answers: [{ flashcardId: cardId, isCorrect: true, timeTaken: 30 }],
+    answers: attempt.cards.map((card) => ({
+      flashcardId: card.id,
+      selectedOption,
+      timeTaken: 30,
+    })),
+    ...extra,
   };
 }
 
@@ -227,6 +259,158 @@ test("streak after a missed day resets to one and records the new study date wit
   assert.equal(await prisma.xPHistory.count({ where: { userId: userA, source: "STREAK" } }), 0);
 });
 
+test("exam score and XP are recomputed from the server attempt snapshot", async () => {
+  const attempt = await createAttempt({ difficulty: "EASY" });
+  const result = await finalizeExamForUser(userA, finalizePayload(attempt, "Wrong 1", {
+    difficulty: "IMPOSSIBLE",
+    sourceType: "DECK",
+    isCorrect: true,
+  }), now);
+
+  assert.equal(result.success, true);
+  assert.equal(result.correctAnswers, 0);
+  assert.equal(result.score, 0);
+  assert.equal(result.difficulty, "EASY");
+  assert.equal(result.sourceType, "GLOBAL");
+  assert.equal(result.xpGained, XP_VALUES.EXAM_COMPLETION);
+
+  const session = await prisma.examSession.findUniqueOrThrow({ where: { attemptId: attempt.attemptId } });
+  assert.equal(session.correctAnswers, 0);
+  assert.equal(session.difficulty, "EASY");
+  assert.equal(session.sourceType, "GLOBAL");
+});
+
+test("legacy isCorrect claims cannot turn a wrong selected option into a correct answer", async () => {
+  const attempt = await createAttempt();
+  const payload = finalizePayload(attempt, "Wrong 1");
+  payload.answers[0].isCorrect = true;
+  const result = await finalizeExamForUser(userA, payload, now);
+  assert.equal(result.success, true);
+  assert.equal(result.correctAnswers, 0);
+  assert.equal(result.score, 0);
+});
+
+test("sequential replay of an exam attempt creates one session and one XP grant", async () => {
+  const attempt = await createAttempt();
+  const payload = finalizePayload(attempt);
+  const first = await finalizeExamForUser(userA, payload, now);
+  const replay = await finalizeExamForUser(userA, payload, now);
+
+  assert.equal(first.success, true);
+  assert.equal(replay.success, false);
+  assert.equal(await prisma.examSession.count({ where: { attemptId: attempt.attemptId } }), 1);
+  assert.equal(await prisma.xPHistory.count({ where: { userId: userA, source: "EXAM" } }), 1);
+});
+
+test("concurrent replay of one exam attempt grants XP exactly once", async () => {
+  const attempt = await createAttempt();
+  const payload = finalizePayload(attempt);
+  const results = await Promise.all([
+    finalizeExamForUser(userA, payload, now),
+    finalizeExamForUser(userA, payload, now),
+  ]);
+
+  assert.equal(results.filter((result) => result.success).length, 1);
+  assert.equal(await prisma.examSession.count({ where: { attemptId: attempt.attemptId } }), 1);
+  assert.equal(await prisma.xPHistory.count({ where: { userId: userA, source: "EXAM" } }), 1);
+});
+
+test("expired exam attempt is rejected and cannot mutate XP or session state", async () => {
+  const createdAt = new Date(now.getTime() - (3 * 60 * 60 * 1000));
+  const attempt = await createAttempt({ createdAt });
+  const result = await finalizeExamForUser(userA, finalizePayload(attempt), now);
+
+  assert.equal(result.success, false);
+  const stored = await prisma.examAttempt.findUniqueOrThrow({ where: { id: attempt.attemptId } });
+  assert.equal(stored.status, "EXPIRED");
+  assert.equal(await prisma.examSession.count(), 0);
+  assert.equal(await prisma.xPHistory.count({ where: { source: "EXAM" } }), 0);
+});
+
+test("unknown and cross-user exam attempts are rejected without partial writes", async () => {
+  const unknown = await finalizeExamForUser(userA, {
+    attemptId: "unknown-attempt",
+    timeSpentSeconds: 1,
+    answers: [],
+  }, now);
+  assert.equal(unknown.success, false);
+
+  const foreignAttempt = await createAttempt({ userId: userB });
+  const crossUser = await finalizeExamForUser(userA, finalizePayload(foreignAttempt), now);
+  assert.equal(crossUser.success, false);
+  assert.equal(await prisma.examSession.count(), 0);
+  assert.equal(await prisma.xPHistory.count({ where: { userId: userA, source: "EXAM" } }), 0);
+});
+
+test("partial, duplicate, and forged-option answer sets are rejected while attempt stays reusable", async () => {
+  const card1 = await createDueCard(userA, { frente: "Q1", verso: "A1" });
+  const card2 = await createDueCard(userA, { frente: "Q2", verso: "A2" });
+  const attempt = await createAttempt({ cards: [card1, card2] });
+
+  const partial = await finalizeExamForUser(userA, {
+    attemptId: attempt.attemptId,
+    timeSpentSeconds: 10,
+    answers: [{ flashcardId: card1.id, selectedOption: "A1", timeTaken: 5 }],
+  }, now);
+  assert.equal(partial.success, false);
+
+  const duplicate = await finalizeExamForUser(userA, {
+    attemptId: attempt.attemptId,
+    timeSpentSeconds: 10,
+    answers: [
+      { flashcardId: card1.id, selectedOption: "A1", timeTaken: 5 },
+      { flashcardId: card1.id, selectedOption: "A1", timeTaken: 5 },
+    ],
+  }, now);
+  assert.equal(duplicate.success, false);
+
+  const forged = await finalizeExamForUser(userA, {
+    attemptId: attempt.attemptId,
+    timeSpentSeconds: 10,
+    answers: [
+      { flashcardId: card1.id, selectedOption: "not-an-option", timeTaken: 5 },
+      { flashcardId: card2.id, selectedOption: "A2", timeTaken: 5 },
+    ],
+  }, now);
+  assert.equal(forged.success, false);
+
+  const stored = await prisma.examAttempt.findUniqueOrThrow({ where: { id: attempt.attemptId } });
+  assert.equal(stored.status, "ACTIVE");
+  assert.equal(await prisma.examSession.count(), 0);
+  assert.equal(await prisma.xPHistory.count({ where: { source: "EXAM" } }), 0);
+});
+
+test("attempt creation rejects foreign flashcards and invalid source ownership", async () => {
+  const foreignCard = await createDueCard(userB);
+  const foreignCardResult = await createExamAttemptForUser(userA, {
+    difficulty: "EASY",
+    sourceType: "GLOBAL",
+    questions: [{
+      flashcardId: foreignCard.id,
+      prompt: foreignCard.frente,
+      expectedAnswer: foreignCard.verso,
+      options: [foreignCard.verso, "Wrong"],
+    }],
+  }, now);
+  assert.equal(foreignCardResult.success, false);
+
+  const foreignDeck = await prisma.deck.create({ data: { userId: userB, nome: "Foreign" } });
+  const ownCard = await createDueCard(userA);
+  const foreignSourceResult = await createExamAttemptForUser(userA, {
+    difficulty: "EASY",
+    sourceType: "DECK",
+    sourceId: foreignDeck.id,
+    questions: [{
+      flashcardId: ownCard.id,
+      prompt: ownCard.frente,
+      expectedAnswer: ownCard.verso,
+      options: [ownCard.verso, "Wrong"],
+    }],
+  }, now);
+  assert.equal(foreignSourceResult.success, false);
+  assert.equal(await prisma.examAttempt.count(), 0);
+});
+
 test("concurrent exam completions cannot exceed the daily XP-eligible session limit", async () => {
   const card = await createDueCard();
   await prisma.userProfile.create({ data: { userId: userA, xp: 0, weeklyXp: 0, lastStudyDate: now } });
@@ -235,9 +419,11 @@ test("concurrent exam completions cannot exceed the daily XP-eligible session li
       data: { userId: userA, sourceType: "GLOBAL", totalQuestions: 1, correctAnswers: 1, score: 1, timeSpentSeconds: 10, difficulty: "EASY", xpAwarded: 0, createdAt: now },
     });
   }
+  const attempt1 = await createAttempt({ cards: [card] });
+  const attempt2 = await createAttempt({ cards: [card] });
   const results = await Promise.all([
-    finalizeExamForUser(userA, examResult(card.id), now),
-    finalizeExamForUser(userA, examResult(card.id), now),
+    finalizeExamForUser(userA, finalizePayload(attempt1), now),
+    finalizeExamForUser(userA, finalizePayload(attempt2), now),
   ]);
   assert.equal(results.filter((result) => result.success).length, 2);
   assert.equal(results.filter((result) => result.xpGained > 0).length, 1);
@@ -247,12 +433,4 @@ test("concurrent exam completions cannot exceed the daily XP-eligible session li
   const profile = await prisma.userProfile.findUniqueOrThrow({ where: { userId: userA } });
   const expectedXp = XP_VALUES.EXAM_COMPLETION + XP_VALUES.EXAM_PER_CORRECT_EASY + XP_VALUES.EXAM_PERFECT_BONUS;
   assert.equal(profile.xp, expectedXp);
-});
-
-test("exam finalization rejects another user's flashcard without partial writes", async () => {
-  const foreignCard = await createDueCard(userB);
-  const result = await finalizeExamForUser(userA, examResult(foreignCard.id), now);
-  assert.equal(result.success, false);
-  assert.equal(await prisma.examSession.count({ where: { userId: userA } }), 0);
-  assert.equal(await prisma.xPHistory.count({ where: { userId: userA } }), 0);
 });

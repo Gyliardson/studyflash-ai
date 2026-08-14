@@ -5,16 +5,16 @@ import prisma from "@/lib/db";
 import { getAiApiHeaders, getAiApiUrl } from "@/lib/ai-api";
 import {
     completeTopicForUser,
+    createExamAttemptForUser,
     finalizeExamForUser,
     recordReviewForUser,
     saveFlashcardsForUser,
 } from "@/lib/gamification-transactions";
 
 type FlashcardInput = { frente: string; verso: string };
-
-type MutationResult<T extends object = object> =
-    | ({ success: true } & T)
-    | { success: false; error: string };
+type MutationResult<T extends object = object> = ({ success: true; error?: undefined } & T) | { success: false; error: string };
+type ExamStartCard = { id: string; frente: string; options: string[] };
+type ExamStartResult = MutationResult<{ attemptId: string; cards: ExamStartCard[] }>;
 
 const DECK_NAME_MAX_LENGTH = 80;
 const FLASHCARD_SIDE_MAX_LENGTH = 2000;
@@ -22,24 +22,17 @@ const FLASHCARD_SIDE_MAX_LENGTH = 2000;
 function normalizeDeckName(value: string): MutationResult<{ name: string }> {
     const name = typeof value === "string" ? value.trim() : "";
     if (!name) return { success: false, error: "Informe um nome para o baralho." };
-    if (name.length > DECK_NAME_MAX_LENGTH) {
-        return { success: false, error: `O nome do baralho deve ter no máximo ${DECK_NAME_MAX_LENGTH} caracteres.` };
-    }
+    if (name.length > DECK_NAME_MAX_LENGTH) return { success: false, error: `O nome do baralho deve ter no máximo ${DECK_NAME_MAX_LENGTH} caracteres.` };
     return { success: true, name };
 }
 
 function normalizeFlashcards(cards: FlashcardInput[]): MutationResult<{ cards: FlashcardInput[] }> {
-    if (!Array.isArray(cards) || cards.length === 0) {
-        return { success: false, error: "Nenhum flashcard para salvar." };
-    }
-
+    if (!Array.isArray(cards) || cards.length === 0) return { success: false, error: "Nenhum flashcard para salvar." };
     const normalized: FlashcardInput[] = [];
     for (const card of cards) {
         const frente = typeof card?.frente === "string" ? card.frente.trim() : "";
         const verso = typeof card?.verso === "string" ? card.verso.trim() : "";
-        if (!frente || !verso) {
-            return { success: false, error: "Frente e verso do flashcard são obrigatórios." };
-        }
+        if (!frente || !verso) return { success: false, error: "Frente e verso do flashcard são obrigatórios." };
         if (frente.length > FLASHCARD_SIDE_MAX_LENGTH || verso.length > FLASHCARD_SIDE_MAX_LENGTH) {
             return { success: false, error: `Cada lado do flashcard deve ter no máximo ${FLASHCARD_SIDE_MAX_LENGTH} caracteres.` };
         }
@@ -51,14 +44,10 @@ function normalizeFlashcards(cards: FlashcardInput[]): MutationResult<{ cards: F
 export async function criarBaralho(nome: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Logue para criar grupos." };
-
     const normalized = normalizeDeckName(nome);
     if (!normalized.success) return normalized;
-
     try {
-        const existente = await prisma.deck.findFirst({
-            where: { userId, nome: { equals: normalized.name, mode: "insensitive" } },
-        });
+        const existente = await prisma.deck.findFirst({ where: { userId, nome: { equals: normalized.name, mode: "insensitive" } } });
         if (existente) return { success: false, error: "Já existe um grupo com este nome!" };
         const deck = await prisma.deck.create({ data: { userId, nome: normalized.name } });
         return { success: true, deck };
@@ -72,11 +61,7 @@ export async function listarMeusBaralhos() {
     const { userId } = await auth();
     if (!userId) return [];
     try {
-        return await prisma.deck.findMany({
-            where: { userId },
-            orderBy: { createdAt: "desc" },
-            include: { _count: { select: { cards: true } } },
-        });
+        return await prisma.deck.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, include: { _count: { select: { cards: true } } } });
     } catch {
         return [];
     }
@@ -85,10 +70,8 @@ export async function listarMeusBaralhos() {
 export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string, newDeckName?: string) {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Login necessário." };
-
     const normalized = normalizeFlashcards(cards);
     if (!normalized.success) return normalized;
-
     let normalizedDeckName: string | undefined;
     if (newDeckName !== undefined) {
         if (deckId) return { success: false, error: "Destino de flashcards inválido." };
@@ -96,7 +79,6 @@ export async function salvarFlashcards(cards: FlashcardInput[], deckId?: string,
         if (!deckNameResult.success) return deckNameResult;
         normalizedDeckName = deckNameResult.name;
     }
-
     try {
         return await saveFlashcardsForUser(userId, normalized.cards, deckId, undefined, normalizedDeckName);
     } catch (error) {
@@ -221,10 +203,7 @@ export async function listarMeusPlanos() {
 export async function buscarPlanoPorId(id: string) {
     const { userId } = await auth();
     if (!userId) return null;
-    return prisma.studyPlan.findUnique({
-        where: { id, userId },
-        include: { topics: { orderBy: { order: "asc" }, include: { _count: { select: { cards: true } } } } },
-    });
+    return prisma.studyPlan.findUnique({ where: { id, userId }, include: { topics: { orderBy: { order: "asc" }, include: { _count: { select: { cards: true } } } } } });
 }
 
 export async function gerarCardsParaTopico(planTitle: string, topicId: string, topicTitle: string) {
@@ -285,9 +264,15 @@ export async function concluirTopico(topicId: string) {
     }
 }
 
-export async function iniciarSimulado(mode: "DECK" | "TOPIC" | "PLAN" | "GLOBAL", sourceId: string | undefined, quantity: number) {
+export async function iniciarSimulado(
+    mode: "DECK" | "TOPIC" | "PLAN" | "GLOBAL",
+    sourceId: string | undefined,
+    quantity: number,
+    difficulty: "EASY" | "MEDIUM" | "HARD" | "IMPOSSIBLE",
+): Promise<ExamStartResult> {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Login necessário." };
+    if (mode !== "GLOBAL" && !sourceId) return { success: false, error: "Fonte de prova inválida." };
     try {
         const whereCondition: Record<string, unknown> = { userId };
         if (mode === "DECK" && sourceId) whereCondition.deckId = sourceId;
@@ -312,14 +297,27 @@ export async function iniciarSimulado(mode: "DECK" | "TOPIC" | "PLAN" | "GLOBAL"
         }
         const finalExam = selectedCards.map((card) => {
             const aiData = questoesIA.find((question) => question.card_id === card.id);
-            let options = aiData?.alternativas && aiData.alternativas.length >= 2 ? [...aiData.alternativas] : null;
+            let options = aiData?.alternativas && aiData.alternativas.length >= 2 && aiData.alternativas.includes(card.verso) ? [...aiData.alternativas] : null;
             if (!options) {
                 const wrongAnswers = allCards.filter((candidate) => candidate.id !== card.id).sort(() => 0.5 - Math.random()).slice(0, 3).map((candidate) => candidate.verso);
                 options = [card.verso, ...wrongAnswers];
             }
             return { ...card, options: options.sort(() => 0.5 - Math.random()) };
         });
-        return { success: true, cards: finalExam };
+        const attempt = await createExamAttemptForUser(userId, {
+            sourceType: mode,
+            sourceId,
+            difficulty,
+            questions: finalExam.map((card) => ({ flashcardId: card.id, prompt: card.frente, expectedAnswer: card.verso, options: card.options })),
+        });
+        if (!attempt.success || !attempt.attemptId) {
+            return { success: false, error: attempt.error || "Falha ao registrar a tentativa da prova." };
+        }
+        return {
+            success: true,
+            attemptId: attempt.attemptId,
+            cards: finalExam.map((card) => ({ id: card.id, frente: card.frente, options: card.options })),
+        };
     } catch (error) {
         console.error("Erro crítico ao iniciar simulado:", error);
         return { success: false, error: "Falha ao gerar a prova." };
@@ -327,13 +325,9 @@ export async function iniciarSimulado(mode: "DECK" | "TOPIC" | "PLAN" | "GLOBAL"
 }
 
 export async function finalizarSimulado(resultado: {
-    totalQuestions: number;
-    correctAnswers: number;
+    attemptId: string;
     timeSpentSeconds: number;
-    difficulty: "EASY" | "MEDIUM" | "HARD" | "IMPOSSIBLE";
-    sourceType: string;
-    sourceId?: string;
-    answers: { flashcardId: string; isCorrect: boolean; timeTaken: number }[];
+    answers: { flashcardId: string; selectedOption: string | null; timeTaken: number }[];
 }) {
     const { userId } = await auth();
     if (!userId) return { success: false };
@@ -341,6 +335,6 @@ export async function finalizarSimulado(resultado: {
         return await finalizeExamForUser(userId, resultado);
     } catch (error) {
         console.error("Erro ao salvar simulado:", error);
-        return { success: false };
+        return { success: false, error: "Falha ao finalizar a prova." };
     }
 }
