@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookOpenCheck, BrainCircuit, Library, LoaderCircle, Map, Plus, Trash2 } from "lucide-react";
-import { criarBaralho, excluirBaralho, excluirPlano, listarMeusBaralhos, listarMeusPlanos } from "@/app/actions";
+import { excluirBaralho, excluirPlano, listarMeusBaralhos, listarMeusPlanos } from "@/app/actions";
+import { criarBaralhoIdempotente } from "@/app/idempotent-actions";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 
 type Deck = {
@@ -36,6 +37,7 @@ export default function ColecaoPage() {
     const [mutationSuccess, setMutationSuccess] = useState<string | null>(null);
     const [pendingDeletion, setPendingDeletion] = useState<PendingDeletion>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const createDeckKeyRef = useRef<string | null>(null);
 
     useEffect(() => {
         void carregarDados();
@@ -63,19 +65,25 @@ export default function ColecaoPage() {
             return;
         }
 
+        const requestKey = createDeckKeyRef.current ?? crypto.randomUUID();
+        createDeckKeyRef.current = requestKey;
         setMutationError(null);
         setMutationSuccess(null);
         setIsCreating(true);
         try {
-            const result = await criarBaralho(name);
+            const result = await criarBaralhoIdempotente(name, requestKey);
             if (!result.success) {
                 setMutationError(result.error || "Erro ao criar baralho.");
                 return;
             }
 
+            createDeckKeyRef.current = null;
             setNewDeckName("");
             setMutationSuccess(`Baralho “${name}” criado.`);
             await carregarDados();
+        } catch (error) {
+            console.error("Erro ao confirmar criação do baralho:", error);
+            setMutationError("Não foi possível confirmar a criação. Tente novamente; o mesmo pedido será recuperado sem duplicar o baralho.");
         } finally {
             setIsCreating(false);
         }
@@ -131,6 +139,7 @@ export default function ColecaoPage() {
                                 value={newDeckName}
                                 onChange={(event) => {
                                     setNewDeckName(event.target.value);
+                                    createDeckKeyRef.current = null;
                                     setMutationError(null);
                                     setMutationSuccess(null);
                                 }}
@@ -178,34 +187,16 @@ export default function ColecaoPage() {
                                 <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Escolha uma fonte, dificuldade e duração. Pontuação e XP são calculados pelo servidor a partir da tentativa registrada.</p>
                             </div>
                         </div>
-                        <Link href="/simulado" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            Configurar simulado
-                        </Link>
+                        <Link href="/simulado" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Configurar simulado</Link>
                     </div>
                 </section>
 
                 <div className="mb-6 flex gap-2 rounded-2xl bg-muted p-1.5" role="tablist" aria-label="Conteúdo da biblioteca">
-                    <button
-                        type="button"
-                        role="tab"
-                        aria-selected={activeTab === "DECKS"}
-                        aria-controls="library-decks"
-                        onClick={() => setActiveTab("DECKS")}
-                        className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "DECKS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                        <Library className="h-4 w-4" aria-hidden="true" />
-                        Baralhos
+                    <button type="button" role="tab" aria-selected={activeTab === "DECKS"} aria-controls="library-decks" onClick={() => setActiveTab("DECKS")} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "DECKS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                        <Library className="h-4 w-4" aria-hidden="true" />Baralhos
                     </button>
-                    <button
-                        type="button"
-                        role="tab"
-                        aria-selected={activeTab === "PLANOS"}
-                        aria-controls="library-plans"
-                        onClick={() => setActiveTab("PLANOS")}
-                        className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "PLANOS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                        <Map className="h-4 w-4" aria-hidden="true" />
-                        Planos
+                    <button type="button" role="tab" aria-selected={activeTab === "PLANOS"} aria-controls="library-plans" onClick={() => setActiveTab("PLANOS")} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "PLANOS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                        <Map className="h-4 w-4" aria-hidden="true" />Planos
                     </button>
                 </div>
 
@@ -228,12 +219,7 @@ export default function ColecaoPage() {
                                     <article key={deck.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                                         <div className="flex items-start justify-between gap-4">
                                             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Library className="h-5 w-5" aria-hidden="true" /></span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setPendingDeletion({ kind: "deck", id: deck.id, name: deck.nome })}
-                                                aria-label={`Excluir baralho ${deck.nome}`}
-                                                className="rounded-lg p-2 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                            ><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+                                            <button type="button" onClick={() => setPendingDeletion({ kind: "deck", id: deck.id, name: deck.nome })} aria-label={`Excluir baralho ${deck.nome}`} className="rounded-lg p-2 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
                                         </div>
                                         <h2 className="mt-5 truncate text-xl font-bold text-card-foreground">{deck.nome}</h2>
                                         <p className="mt-1 text-sm text-muted-foreground">{deck._count?.cards || 0} flashcards</p>
@@ -266,12 +252,7 @@ export default function ColecaoPage() {
                                                 <span className="mt-1 block text-sm text-muted-foreground">{plano.difficulty} · {plano.topics?.length || 0} módulos</span>
                                             </span>
                                         </Link>
-                                        <button
-                                            type="button"
-                                            onClick={() => setPendingDeletion({ kind: "plan", id: plano.id, name: plano.title })}
-                                            aria-label={`Excluir plano ${plano.title}`}
-                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-bold text-muted-foreground transition hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                        ><Trash2 className="h-4 w-4" aria-hidden="true" />Excluir</button>
+                                        <button type="button" onClick={() => setPendingDeletion({ kind: "plan", id: plano.id, name: plano.title })} aria-label={`Excluir plano ${plano.title}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-bold text-muted-foreground transition hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="h-4 w-4" aria-hidden="true" />Excluir</button>
                                     </article>
                                 ))}
                             </div>
@@ -287,14 +268,7 @@ export default function ColecaoPage() {
                 )}
             </div>
 
-            <ConfirmDialog
-                open={pendingDeletion !== null}
-                title={deletionTitle}
-                description={deletionDescription}
-                pending={isDeleting}
-                onCancel={() => setPendingDeletion(null)}
-                onConfirm={() => void confirmDeletion()}
-            />
+            <ConfirmDialog open={pendingDeletion !== null} title={deletionTitle} description={deletionDescription} pending={isDeleting} onCancel={() => setPendingDeletion(null)} onConfirm={() => void confirmDeletion()} />
         </main>
     );
 }
