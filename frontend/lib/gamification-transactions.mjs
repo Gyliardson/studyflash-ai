@@ -241,11 +241,32 @@ function calculateExamXp(difficulty, correctAnswers, score) {
   return amount;
 }
 
+function canonicalExamResult(session) {
+  return {
+    success: true,
+    sessionId: session.id,
+    xpGained: session.xpAwarded,
+    score: session.score,
+    correctAnswers: session.correctAnswers,
+    totalQuestions: session.totalQuestions,
+    difficulty: session.difficulty,
+    sourceType: session.sourceType,
+    sourceId: session.sourceDeckId ?? session.sourceTopicId ?? session.sourcePlanId ?? undefined,
+    limitReached: session.xpAwarded === 0,
+  };
+}
+
 export function finalizeExamForUser(userId, result, now = new Date()) {
   return runSerializable(async (tx) => {
     if (typeof result.attemptId !== "string" || !result.attemptId) return { success: false, error: "Invalid exam attempt." };
     const attempt = await tx.examAttempt.findFirst({ where: { id: result.attemptId, userId }, include: { questions: { orderBy: { order: "asc" } } } });
     if (!attempt) return { success: false, error: "Invalid exam attempt." };
+    if (attempt.status === "COMPLETED") {
+      const persisted = await tx.examSession.findFirst({ where: { attemptId: attempt.id, userId } });
+      if (!persisted) return { success: false, error: "Persisted exam result unavailable." };
+      return canonicalExamResult(persisted);
+    }
+    if (attempt.status === "EXPIRED") return { success: false, error: "Exam attempt expired." };
     if (attempt.status !== "ACTIVE") return { success: false, error: "Exam attempt already finalized." };
     if (attempt.expiresAt <= now) {
       await tx.examAttempt.updateMany({ where: { id: attempt.id, userId, status: "ACTIVE" }, data: { status: "EXPIRED" } });
@@ -253,7 +274,11 @@ export function finalizeExamForUser(userId, result, now = new Date()) {
     }
     if (!validateAttemptAnswers(attempt.questions, result.answers)) return { success: false, error: "Invalid exam answers." };
     const claimed = await tx.examAttempt.updateMany({ where: { id: attempt.id, userId, status: "ACTIVE" }, data: { status: "COMPLETED", finalizedAt: now } });
-    if (claimed.count !== 1) return { success: false, error: "Exam attempt already finalized." };
+    if (claimed.count !== 1) {
+      const persisted = await tx.examSession.findFirst({ where: { attemptId: attempt.id, userId } });
+      if (persisted) return canonicalExamResult(persisted);
+      return { success: false, error: "Exam attempt already finalized." };
+    }
     const answerByCard = new Map(result.answers.map((answer) => [answer.flashcardId, answer]));
     const evaluated = attempt.questions.map((question) => {
       const answer = answerByCard.get(question.flashcardId);
@@ -286,17 +311,6 @@ export function finalizeExamForUser(userId, result, now = new Date()) {
     });
     await grantXp(tx, userId, xpGained, "EXAM", now);
     if (!limitReached) await processStreak(tx, userId, now);
-    return {
-      success: true,
-      sessionId: session.id,
-      xpGained,
-      score,
-      correctAnswers,
-      totalQuestions,
-      difficulty: attempt.difficulty,
-      sourceType: attempt.sourceType,
-      sourceId: attempt.sourceDeckId ?? attempt.sourceTopicId ?? attempt.sourcePlanId ?? undefined,
-      limitReached,
-    };
+    return canonicalExamResult(session);
   });
 }
