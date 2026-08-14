@@ -2,7 +2,13 @@
 
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/db";
-import { getAiApiHeaders, getAiApiUrl } from "@/lib/ai-api";
+import { getAiAbortSignal, getAiApiHeaders, getAiApiUrl } from "@/lib/ai-api";
+import {
+    AI_EXAM_FALLBACK_TIMEOUT_MS,
+    isAbortTimeout,
+    safeAiUserMessage,
+    shouldUseLocalExamFallback,
+} from "@/lib/ai-failure-policy";
 import {
     completeTopicForUser,
     createExamAttemptForUser,
@@ -170,8 +176,9 @@ export async function gerarSalvarPlano(tema: string, dificuldade: string) {
             headers: getAiApiHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ tema, dificuldade }),
             cache: "no-store",
+            signal: getAiAbortSignal(),
         });
-        if (!response.ok) throw new Error("Erro ao comunicar com o Tutor IA.");
+        if (!response.ok) return { success: false, error: safeAiUserMessage(response.status) };
         const planoIA = await response.json();
         const novoPlano = await prisma.studyPlan.create({
             data: {
@@ -185,8 +192,8 @@ export async function gerarSalvarPlano(tema: string, dificuldade: string) {
         });
         return { success: true, planoId: novoPlano.id };
     } catch (error) {
-        console.error("Erro ao gerar plano:", error);
-        return { success: false, error: "Falha ao criar o plano de estudos." };
+        console.error("Erro ao gerar plano:", error instanceof Error ? error.name : "UnknownError");
+        return { success: false, error: isAbortTimeout(error) ? safeAiUserMessage(504) : "Falha ao criar o plano de estudos." };
     }
 }
 
@@ -217,14 +224,15 @@ export async function gerarCardsParaTopico(planTitle: string, topicId: string, t
             headers: getAiApiHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ tema_plano: planTitle, titulo_topico: topicTitle }),
             cache: "no-store",
+            signal: getAiAbortSignal(),
         });
-        if (!response.ok) throw new Error("Falha na IA");
+        if (!response.ok) return { success: false, error: safeAiUserMessage(response.status) };
         const data = await response.json();
         await prisma.flashcard.createMany({ data: data.cartoes.map((card: FlashcardInput) => ({ userId, frente: card.frente, verso: card.verso, topicId })) });
         return { success: true };
     } catch (error) {
-        console.error("Erro ao gerar cards do tópico:", error);
-        return { success: false, error: "Erro ao gerar conteúdo." };
+        console.error("Erro ao gerar cards do tópico:", error instanceof Error ? error.name : "UnknownError");
+        return { success: false, error: isAbortTimeout(error) ? safeAiUserMessage(504) : "Erro ao gerar conteúdo." };
     }
 }
 
@@ -289,11 +297,23 @@ export async function iniciarSimulado(
                 headers: getAiApiHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ cartoes: selectedCards.map((card) => ({ id: card.id, frente: card.frente, verso: card.verso })) }),
                 cache: "no-store",
-                signal: AbortSignal.timeout(8000),
+                signal: getAiAbortSignal(AI_EXAM_FALLBACK_TIMEOUT_MS),
             });
-            if (aiResponse.ok) questoesIA = await aiResponse.json();
-        } catch {
-            console.log("IA indisponível ou lenta, usando gerador local.");
+            if (aiResponse.ok) {
+                questoesIA = await aiResponse.json();
+            } else if (shouldUseLocalExamFallback(aiResponse.status)) {
+                console.log(`AI exam fallback activated: status=${aiResponse.status}`);
+            } else {
+                throw new Error("AI_EXAM_REQUEST_REJECTED");
+            }
+        } catch (error) {
+            if (isAbortTimeout(error)) {
+                console.log("AI exam fallback activated: timeout");
+            } else if (error instanceof Error && error.message === "AI_EXAM_REQUEST_REJECTED") {
+                throw error;
+            } else {
+                console.log("AI exam fallback activated: unavailable");
+            }
         }
         const finalExam = selectedCards.map((card) => {
             const aiData = questoesIA.find((question) => question.card_id === card.id);
@@ -319,7 +339,7 @@ export async function iniciarSimulado(
             cards: finalExam.map((card) => ({ id: card.id, frente: card.frente, options: card.options })),
         };
     } catch (error) {
-        console.error("Erro crítico ao iniciar simulado:", error);
+        console.error("Erro crítico ao iniciar simulado:", error instanceof Error ? error.name : "UnknownError");
         return { success: false, error: "Falha ao gerar a prova." };
     }
 }
