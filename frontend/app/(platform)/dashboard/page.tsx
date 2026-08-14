@@ -114,7 +114,7 @@ export default function Home() {
                             </div>
                         ) : (
                             <>
-                                <label htmlFor="study-material" className="mb-2 block text-sm font-bold text-foreground">Texto de estudo</label>
+                                <label htmlFor="study-material" className="mb-2 block text-sm font-bold text-foreground">Conteúdo para gerar flashcards</label>
                                 <textarea
                                     id="study-material"
                                     className="min-h-48 w-full resize-y rounded-2xl border border-input bg-background p-4 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
