@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { clerk } from "@clerk/testing/playwright";
@@ -93,8 +94,9 @@ test("collection UI follows authoritative create, validation and delete results"
 });
 
 test("collection mutation server predicates are owner-scoped and repeated deletes fail closed", async () => {
-  const actionsSource = await readFile(new URL("../../app/actions.ts", import.meta.url), "utf8");
-  const saveModalSource = await readFile(new URL("../../app/components/SaveModal.tsx", import.meta.url), "utf8");
+  const frontendRoot = resolve(process.cwd(), "..");
+  const actionsSource = await readFile(resolve(frontendRoot, "app/actions.ts"), "utf8");
+  const saveModalSource = await readFile(resolve(frontendRoot, "app/components/SaveModal.tsx"), "utf8");
   expect(actionsSource).toContain("const normalized = normalizeDeckName(nome);");
   expect(actionsSource).toContain("const normalized = normalizeFlashcards(cards);");
   expect(actionsSource).toContain("saveFlashcardsForUser(userId, normalized.cards, deckId, undefined, normalizedDeckName)");
