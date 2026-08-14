@@ -13,6 +13,8 @@ import {
 
 type FlashcardInput = { frente: string; verso: string };
 type MutationResult<T extends object = object> = ({ success: true } & T) | { success: false; error: string };
+type ExamStartCard = { id: string; frente: string; options: string[] };
+type ExamStartResult = MutationResult<{ attemptId: string; cards: ExamStartCard[] }>;
 
 const DECK_NAME_MAX_LENGTH = 80;
 const FLASHCARD_SIDE_MAX_LENGTH = 2000;
@@ -267,7 +269,7 @@ export async function iniciarSimulado(
     sourceId: string | undefined,
     quantity: number,
     difficulty: "EASY" | "MEDIUM" | "HARD" | "IMPOSSIBLE",
-) {
+): Promise<ExamStartResult> {
     const { userId } = await auth();
     if (!userId) return { success: false, error: "Login necessário." };
     if (mode !== "GLOBAL" && !sourceId) return { success: false, error: "Fonte de prova inválida." };
@@ -308,11 +310,12 @@ export async function iniciarSimulado(
             difficulty,
             questions: finalExam.map((card) => ({ flashcardId: card.id, prompt: card.frente, expectedAnswer: card.verso, options: card.options })),
         });
-        if (!attempt.success) return attempt;
+        if (!attempt.success || !attempt.attemptId) {
+            return { success: false, error: attempt.error || "Falha ao registrar a tentativa da prova." };
+        }
         return {
             success: true,
             attemptId: attempt.attemptId,
-            expiresAt: attempt.expiresAt,
             cards: finalExam.map((card) => ({ id: card.id, frente: card.frente, options: card.options })),
         };
     } catch (error) {
