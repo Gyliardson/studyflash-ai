@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { listarMeusBaralhos, salvarFlashcards } from "../actions";
+import { listarMeusBaralhos } from "../actions";
+import { salvarFlashcardsIdempotente } from "../idempotent-actions";
 import { triggerHudRefresh } from "./UserHUD";
 
 interface SaveModalProps {
@@ -26,6 +27,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
     const [mutationError, setMutationError] = useState<string | null>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
+    const requestKeyRef = useRef<string | null>(null);
 
     useEffect(() => {
         listarMeusBaralhos().then((data) => {
@@ -62,7 +64,19 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
         return () => document.removeEventListener("keydown", handleKeyDown);
     }, [onClose, saving]);
 
+    function resetIntent() {
+        requestKeyRef.current = null;
+        setMutationError(null);
+    }
+
+    function currentRequestKey() {
+        const requestKey = requestKeyRef.current ?? crypto.randomUUID();
+        requestKeyRef.current = requestKey;
+        return requestKey;
+    }
+
     function completeSuccessfulSave() {
+        requestKeyRef.current = null;
         setMutationError(null);
         triggerHudRefresh();
         onSuccess();
@@ -78,13 +92,16 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
         setMutationError(null);
         setSaving(true);
         try {
-            const result = await salvarFlashcards(cards, undefined, name);
+            const result = await salvarFlashcardsIdempotente(cards, undefined, name, currentRequestKey());
             if (!result.success) {
                 setMutationError(result.error || "Falha ao criar o grupo e salvar os flashcards. Nenhuma alteração foi mantida.");
                 return;
             }
 
             completeSuccessfulSave();
+        } catch (error) {
+            console.error("Erro ao confirmar salvamento:", error);
+            setMutationError("Não foi possível confirmar o salvamento. Tente novamente; o mesmo pedido será recuperado sem duplicar cards ou XP.");
         } finally {
             setSaving(false);
         }
@@ -99,13 +116,16 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
         setMutationError(null);
         setSaving(true);
         try {
-            const result = await salvarFlashcards(cards, selectedDeck);
+            const result = await salvarFlashcardsIdempotente(cards, selectedDeck, undefined, currentRequestKey());
             if (!result.success) {
                 setMutationError(result.error || "Falha ao salvar os flashcards. Tente novamente.");
                 return;
             }
 
             completeSuccessfulSave();
+        } catch (error) {
+            console.error("Erro ao confirmar salvamento:", error);
+            setMutationError("Não foi possível confirmar o salvamento. Tente novamente; o mesmo pedido será recuperado sem duplicar cards ou XP.");
         } finally {
             setSaving(false);
         }
@@ -156,7 +176,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                         value={selectedDeck}
                                         onChange={(event) => {
                                             setSelectedDeck(event.target.value);
-                                            setMutationError(null);
+                                            resetIntent();
                                         }}
                                     >
                                         {decks.map((deck) => (
@@ -180,7 +200,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                     type="button"
                                     onClick={() => {
                                         setCreating(true);
-                                        setMutationError(null);
+                                        resetIntent();
                                     }}
                                     className="w-full py-3 border-2 border-dashed border-primary/30 text-primary font-bold rounded-xl hover:bg-primary/10 hover:border-primary transition-all flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                 >
@@ -202,7 +222,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                     value={newDeckName}
                                     onChange={(event) => {
                                         setNewDeckName(event.target.value);
-                                        setMutationError(null);
+                                        resetIntent();
                                     }}
                                     autoFocus
                                 />
@@ -212,7 +232,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                                         type="button"
                                         onClick={() => {
                                             setCreating(false);
-                                            setMutationError(null);
+                                            resetIntent();
                                         }}
                                         className="w-full mt-3 py-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-semibold rounded-xl border border-border transition-all flex items-center justify-center gap-2 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                     >
