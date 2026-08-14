@@ -3,6 +3,7 @@ import { clerk } from "@clerk/testing/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 const TEST_USER_EMAIL = process.env.E2E_CLERK_TEST_EMAIL ?? "studyflash.e2e+clerk_test@example.com";
+const E2E_DECK_NAME = "StudyFlash E2E Exam Fixture";
 
 async function signIn(page: Page) {
   await page.goto("/");
@@ -56,10 +57,20 @@ test("dashboard exposes named generation controls and keyboard-safe save dialog"
   await expectNoBlockingAxeViolations(page);
 });
 
-test("collection and profile representative routes pass blocking Axe checks", async ({ page }) => {
+test("collection, deck detail and profile representative routes pass blocking Axe checks", async ({ page }) => {
   await page.goto("/colecao");
   await expect(page).toHaveURL(/\/colecao(?:[/?#]|$)/);
   await expect(page.getByRole("heading").first()).toBeVisible();
+  await expectNoBlockingAxeViolations(page);
+
+  const fixtureHeading = page.getByRole("heading", { name: E2E_DECK_NAME });
+  await expect(fixtureHeading).toBeVisible();
+  const fixtureCard = fixtureHeading.locator("..");
+  const editLink = fixtureCard.getByRole("link", { name: "Editar" });
+  await editLink.focus();
+  await expect(editLink).toBeFocused();
+  await editLink.click();
+  await expect(page).toHaveURL(/\/colecao\/[^/?#]+(?:[/?#]|$)/);
   await expectNoBlockingAxeViolations(page);
 
   await page.goto("/perfil");
@@ -94,6 +105,32 @@ test("exam configuration uses native keyboard-operable selectors and valid toggl
   await page.keyboard.press("ArrowRight");
   await expect(volume).toHaveValue("15");
 
+  await expectNoBlockingAxeViolations(page);
+});
+
+test("exam runtime and result states remain accessible on desktop and mobile", async ({ page }) => {
+  await page.goto("/simulado");
+  const practice = page.getByRole("button", { name: /Prática/i });
+  await practice.click();
+  const volume = page.getByLabel("3. Volume");
+  await volume.fill("5");
+  await expect(volume).toHaveValue("5");
+  await page.getByRole("button", { name: /Iniciar Simulado/i }).click();
+
+  await expect(page.getByText(/1\s*\/\s*5/)).toBeVisible({ timeout: 20_000 });
+  await expectNoBlockingAxeViolations(page);
+
+  for (let question = 1; question <= 5; question += 1) {
+    const answers = page.getByRole("group", { name: "Alternativas da questão" }).getByRole("button");
+    await expect(answers.first()).toBeVisible();
+    await answers.first().click();
+    if (question < 5) {
+      await expect(page.getByText(new RegExp(`${question + 1}\\s*\\/\\s*5`))).toBeVisible();
+    }
+  }
+
+  await expect(page.getByRole("heading", { name: "Simulado Concluído!" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("link", { name: "Voltar para Coleção" })).toBeVisible();
   await expectNoBlockingAxeViolations(page);
 });
 
