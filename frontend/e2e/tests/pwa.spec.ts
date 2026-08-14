@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { clerk } from "@clerk/testing/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 const TEST_USER_EMAIL = process.env.E2E_CLERK_TEST_EMAIL ?? "studyflash.e2e+clerk_test@example.com";
 
@@ -22,6 +22,24 @@ async function ensureServiceWorkerControl(page: Page) {
     await page.reload({ waitUntil: "domcontentloaded" });
   }
   await waitForStableServiceWorkerControl(page);
+}
+
+async function openFreshOfflineNavigation(context: BrowserContext, path: string) {
+  // A failed network navigation can legitimately leave the previous committed
+  // document visible while the service worker fallback response is being handled.
+  // Probe in a fresh page in the same context instead: the installed worker and
+  // authenticated cookies are preserved, but there is no previous application
+  // document whose commit state can mask the fallback result.
+  await context.setOffline(true);
+  const offlinePage = await context.newPage();
+  try {
+    await offlinePage.goto(path, { waitUntil: "domcontentloaded" });
+    return offlinePage;
+  } catch (error) {
+    await offlinePage.close();
+    await context.setOffline(false);
+    throw error;
+  }
 }
 
 async function cachedSameOriginURLs(page: Page) {
@@ -74,12 +92,12 @@ test("production worker controls the app, Chromium accepts installability, and u
   await expect.poll(() => page.evaluate(async () => (await caches.keys()).filter((name) => name.startsWith("studyflash-") && name.endsWith("-v0")))).toEqual([]);
   await waitForStableServiceWorkerControl(page);
 
-  await context.setOffline(true);
+  const offlinePage = await openFreshOfflineNavigation(context, `/privacidade?offline-probe=${randomUUID()}`);
   try {
-    await page.goto(`/privacidade?offline-probe=${randomUUID()}`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Você está sem conexão" })).toBeVisible();
-    await expect(page.getByText(/não mantém conteúdos da sua conta em cache offline/i)).toBeVisible();
+    await expect(offlinePage.getByRole("heading", { name: "Você está sem conexão" })).toBeVisible();
+    await expect(offlinePage.getByText(/não mantém conteúdos da sua conta em cache offline/i)).toBeVisible();
   } finally {
+    await offlinePage.close();
     await context.setOffline(false);
   }
 });
@@ -100,12 +118,12 @@ test("authenticated HTML and data are not retained in runtime caches and offline
   );
   expect(sensitiveRuntimeEntries, `Sensitive cache entries: ${sensitiveRuntimeEntries.join(", ")}`).toEqual([]);
 
-  await context.setOffline(true);
+  const offlinePage = await openFreshOfflineNavigation(context, `/dashboard?offline-probe=${randomUUID()}`);
   try {
-    await page.goto(`/dashboard?offline-probe=${randomUUID()}`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Você está sem conexão" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Gerar Flashcards/i })).toHaveCount(0);
+    await expect(offlinePage.getByRole("heading", { name: "Você está sem conexão" })).toBeVisible();
+    await expect(offlinePage.getByRole("button", { name: /Gerar Flashcards/i })).toHaveCount(0);
   } finally {
+    await offlinePage.close();
     await context.setOffline(false);
   }
 });
