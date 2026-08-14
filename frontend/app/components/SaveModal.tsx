@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { criarBaralho, listarMeusBaralhos, salvarFlashcards } from "../actions";
+import { criarBaralho, excluirBaralho, listarMeusBaralhos, salvarFlashcards } from "../actions";
 import { triggerHudRefresh } from "./UserHUD";
 
 interface SaveModalProps {
@@ -57,6 +57,12 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
 
             const saveResult = await salvarFlashcards(cards, deckResult.deck.id);
             if (!saveResult.success) {
+                const cleanupResult = await excluirBaralho(deckResult.deck.id);
+                if (cleanupResult.success) {
+                    setMutationError(`${saveResult.error || "Falha ao salvar os flashcards."} Nenhuma alteração foi mantida; tente novamente.`);
+                    return;
+                }
+
                 setDecks((current) => [
                     { id: deckResult.deck.id, nome: deckResult.deck.nome, _count: { cards: 0 } },
                     ...current.filter((deck) => deck.id !== deckResult.deck.id),
@@ -64,7 +70,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
                 setSelectedDeck(deckResult.deck.id);
                 setCreating(false);
                 setNewDeckName("");
-                setMutationError(`${saveResult.error || "Falha ao salvar os flashcards."} O grupo criado foi mantido para você tentar novamente.`);
+                setMutationError(`${saveResult.error || "Falha ao salvar os flashcards."} Também não foi possível remover automaticamente o grupo vazio criado; ele foi mantido para reconciliação e nova tentativa.`);
                 return;
             }
 
@@ -105,7 +111,7 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
             >
                 <div className="flex justify-between items-center mb-6">
                     <h2 id="save-modal-title" className="text-xl font-bold text-popover-foreground">Onde vamos guardar? 🗂️</h2>
-                    <button type="button" onClick={onClose} aria-label="Fechar" className="text-muted-foreground hover:text-foreground transition">
+                    <button type="button" onClick={onClose} disabled={saving} aria-label="Fechar" className="text-muted-foreground hover:text-foreground transition disabled:opacity-50 disabled:cursor-not-allowed">
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
                 </div>
