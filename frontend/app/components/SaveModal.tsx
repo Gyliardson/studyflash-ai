@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { criarBaralho, excluirBaralho, listarMeusBaralhos, salvarFlashcards } from "../actions";
+import { listarMeusBaralhos, salvarFlashcards } from "../actions";
 import { triggerHudRefresh } from "./UserHUD";
 
 interface SaveModalProps {
@@ -49,28 +49,9 @@ export default function SaveModal({ cards, onClose, onSuccess }: SaveModalProps)
         setMutationError(null);
         setSaving(true);
         try {
-            const deckResult = await criarBaralho(name);
-            if (!deckResult.success || !deckResult.deck) {
-                setMutationError(deckResult.error || "Erro ao criar grupo.");
-                return;
-            }
-
-            const saveResult = await salvarFlashcards(cards, deckResult.deck.id);
-            if (!saveResult.success) {
-                const cleanupResult = await excluirBaralho(deckResult.deck.id);
-                if (cleanupResult.success) {
-                    setMutationError(`${saveResult.error || "Falha ao salvar os flashcards."} Nenhuma alteração foi mantida; tente novamente.`);
-                    return;
-                }
-
-                setDecks((current) => [
-                    { id: deckResult.deck.id, nome: deckResult.deck.nome, _count: { cards: 0 } },
-                    ...current.filter((deck) => deck.id !== deckResult.deck.id),
-                ]);
-                setSelectedDeck(deckResult.deck.id);
-                setCreating(false);
-                setNewDeckName("");
-                setMutationError(`${saveResult.error || "Falha ao salvar os flashcards."} Também não foi possível remover automaticamente o grupo vazio criado; ele foi mantido para reconciliação e nova tentativa.`);
+            const result = await salvarFlashcards(cards, undefined, name);
+            if (!result.success) {
+                setMutationError(result.error || "Falha ao criar o grupo e salvar os flashcards. Nenhuma alteração foi mantida.");
                 return;
             }
 
