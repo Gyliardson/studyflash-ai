@@ -13,6 +13,10 @@ const withPWA = withPWAInit({
   workboxOptions: {
     disableDevLogs: true,
     cleanupOutdatedCaches: true,
+    // Precache only the generic offline boundary so PrecacheFallbackPlugin can
+    // resolve it while account-owned documents remain network-authoritative.
+    // Bump this revision whenever the offline document meaningfully changes.
+    additionalManifestEntries: [{ url: "/offline", revision: "studyflash-offline-v1" }],
     runtimeCaching: [
       {
         urlPattern: ({ request }) => request.mode === "navigate",
