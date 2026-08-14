@@ -40,7 +40,8 @@ test("dashboard exposes named generation controls and keyboard-safe save dialog"
   await studyMaterial.fill("Conteúdo suficientemente longo para validar os controles acessíveis do dashboard sem chamar um provedor remoto de IA.");
   await page.getByRole("button", { name: /Gerar Flashcards/i }).click();
   await expect(page.getByText("Accessibility front", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Salvar na minha Coleção" }).click();
+  const saveButton = page.getByRole("button", { name: "Salvar na minha Coleção" });
+  await saveButton.click();
 
   const dialog = page.getByRole("dialog", { name: "Onde vamos guardar? 🗂️" });
   await expect(dialog).toBeVisible();
@@ -50,6 +51,7 @@ test("dashboard exposes named generation controls and keyboard-safe save dialog"
   expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
+  await expect(saveButton).toBeFocused();
 
   await expectNoBlockingAxeViolations(page);
 });
