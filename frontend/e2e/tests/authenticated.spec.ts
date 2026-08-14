@@ -85,8 +85,14 @@ test("collection UI follows authoritative create, validation and destructive con
 
     await page.goto(`/colecao/${deck.id}`);
     await expect(page.getByText(cardFront, { exact: true })).toBeVisible();
-    await expect(page.getByRole("status", { name: /Carregando cartões do baralho/i })).toHaveCount(0);
-    await page.getByTitle("Excluir Flashcard").click();
+    const flipButton = page.getByRole("button", { name: "Cartão 1: mostrar resposta" });
+    await flipButton.focus();
+    await expect(flipButton).toBeFocused();
+    await flipButton.press("Enter");
+    await expect(page.getByRole("button", { name: "Cartão 1: mostrar pergunta" })).toHaveAttribute("aria-pressed", "true");
+    await expectNoBlockingAxeViolations(page);
+
+    await page.getByRole("button", { name: "Excluir cartão 1" }).click();
     const cardDialog = page.getByRole("alertdialog", { name: "Excluir cartão?" });
     await expect(cardDialog).toBeVisible();
     await expect(page.getByText(cardFront, { exact: true })).toBeVisible();
