@@ -39,8 +39,9 @@ async function cachedSameOriginURLs(page: Page) {
 }
 
 test("production worker controls the app, Chromium accepts installability, and uncached navigation has a deterministic offline fallback", async ({ page, context }) => {
-  const offlineDocumentResponse = await page.request.get("/offline");
-  expect(offlineDocumentResponse.ok(), "The generic offline document must stay publicly fetchable so Workbox can precache it").toBe(true);
+  const offlineDocumentResponse = await page.request.get("/offline-fallback.html");
+  expect(offlineDocumentResponse.ok(), "The dependency-free offline document must stay publicly fetchable so Workbox can precache it").toBe(true);
+  expect(await offlineDocumentResponse.text()).toContain("Você está sem conexão");
 
   await ensureServiceWorkerControl(page);
 
@@ -71,18 +72,13 @@ test("production worker controls the app, Chromium accepts installability, and u
   });
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect.poll(() => page.evaluate(async () => (await caches.keys()).filter((name) => name.startsWith("studyflash-") && name.endsWith("-v0")))).toEqual([]);
-  // The reload above is part of the cache-cleanup lifecycle probe. Before taking
-  // Chromium offline, require the post-reload page to be controlled by an
-  // activated worker again; otherwise an offline navigation can race a
-  // controller transition and leave the previous document committed even when
-  // Workbox already produced the correct fallback response.
   await waitForStableServiceWorkerControl(page);
 
   await context.setOffline(true);
   try {
     await page.goto(`/privacidade?offline-probe=${randomUUID()}`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Você está sem conexão" })).toBeVisible();
-    await expect(page.getByText(/conteúdos da sua conta/i)).toBeVisible();
+    await expect(page.getByText(/não mantém conteúdos da sua conta em cache offline/i)).toBeVisible();
   } finally {
     await context.setOffline(false);
   }
