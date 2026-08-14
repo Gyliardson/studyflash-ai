@@ -2,19 +2,32 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-// FIX: Importação corrigida para 'excluirBaralho'
-import { listarMeusBaralhos, listarMeusPlanos, criarBaralho, excluirBaralho, excluirPlano } from "@/app/actions";
+import { criarBaralho, excluirBaralho, excluirPlano, listarMeusBaralhos, listarMeusPlanos } from "@/app/actions";
+
+type Deck = {
+    id: string;
+    nome: string;
+    _count?: { cards: number };
+};
+
+type StudyPlan = {
+    id: string;
+    title: string;
+    difficulty: string;
+    topics?: unknown[];
+};
 
 export default function ColecaoPage() {
-    const [decks, setDecks] = useState<any[]>([]);
-    const [planos, setPlanos] = useState<any[]>([]);
+    const [decks, setDecks] = useState<Deck[]>([]);
+    const [planos, setPlanos] = useState<StudyPlan[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'DECKS' | 'PLANOS'>('DECKS');
+    const [activeTab, setActiveTab] = useState<"DECKS" | "PLANOS">("DECKS");
     const [isCreating, setIsCreating] = useState(false);
     const [newDeckName, setNewDeckName] = useState("");
+    const [mutationError, setMutationError] = useState<string | null>(null);
 
     useEffect(() => {
-        carregarDados();
+        void carregarDados();
     }, []);
 
     async function carregarDados() {
@@ -31,158 +44,163 @@ export default function ColecaoPage() {
     }
 
     async function handleCreateDeck() {
-        if (!newDeckName.trim()) return;
+        const name = newDeckName.trim();
+        if (!name) {
+            setMutationError("Informe um nome para o baralho.");
+            return;
+        }
+
+        setMutationError(null);
         setIsCreating(true);
-        const res = await criarBaralho(newDeckName);
-        if (res.success) {
+        try {
+            const result = await criarBaralho(name);
+            if (!result.success) {
+                setMutationError(result.error || "Erro ao criar baralho.");
+                return;
+            }
+
             setNewDeckName("");
             await carregarDados();
-        } else {
-            alert("Erro ao criar baralho");
+        } finally {
+            setIsCreating(false);
         }
-        setIsCreating(false);
     }
 
     async function handleDeleteDeck(id: string) {
         if (!confirm("Tem certeza que deseja excluir este baralho e todos os seus cards?")) return;
-        await excluirBaralho(id);
+        setMutationError(null);
+        const result = await excluirBaralho(id);
+        if (!result.success) {
+            setMutationError(result.error || "Erro ao excluir baralho.");
+            return;
+        }
         await carregarDados();
     }
 
     async function handleDeletePlan(id: string) {
         if (!confirm("Tem certeza que deseja excluir esta trilha de estudos?")) return;
-        await excluirPlano(id);
+        setMutationError(null);
+        const result = await excluirPlano(id);
+        if (!result.success) {
+            setMutationError(result.error || "Erro ao excluir plano.");
+            return;
+        }
         await carregarDados();
     }
 
     return (
         <div className="min-h-screen bg-background pb-20 transition-colors duration-300">
-
             <div className="max-w-5xl mx-auto px-4 md:px-6 mt-8">
-                
-                {/* === HEADER DA PÁGINA === */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-extrabold text-foreground tracking-tight mb-2">Minha Biblioteca</h1>
                         <p className="text-muted-foreground">Gerencie seus materiais de estudo e acompanhe seu progresso.</p>
                     </div>
 
-                    {/* Botão Novo (Contextual) */}
-                    {activeTab === 'DECKS' ? (
+                    {activeTab === "DECKS" ? (
                         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                            <input 
-                                type="text" 
-                                placeholder="Nome do novo baralho..." 
+                            <label htmlFor="new-deck-name" className="sr-only">Nome do novo baralho</label>
+                            <input
+                                id="new-deck-name"
+                                type="text"
+                                placeholder="Nome do novo baralho..."
                                 className="flex-1 w-full md:w-64 px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary outline-none shadow-sm"
                                 value={newDeckName}
-                                onChange={(e) => setNewDeckName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleCreateDeck()}
+                                onChange={(event) => {
+                                    setNewDeckName(event.target.value);
+                                    setMutationError(null);
+                                }}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter") void handleCreateDeck();
+                                }}
                             />
-                            <button 
-                                onClick={handleCreateDeck}
+                            <button
+                                type="button"
+                                onClick={() => void handleCreateDeck()}
                                 disabled={isCreating || !newDeckName.trim()}
                                 className="w-full sm:w-auto bg-primary text-primary-foreground px-4 py-3 rounded-xl font-bold hover:bg-primary/90 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
                             >
                                 {isCreating ? (
-                                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                 ) : (
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                                 )}
                                 <span>Criar</span>
                             </button>
                         </div>
                     ) : (
-                        <Link href="/planos/novo" className="w-full md:w-auto">
-                            <button className="w-full bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                                <span>Gerar Novo Plano</span>
-                            </button>
+                        <Link href="/planos/novo" className="w-full md:w-auto bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            <span>Gerar Novo Plano</span>
                         </Link>
                     )}
                 </div>
 
-                {/* === BANNER DESTAQUE: SIMULADO === */}
+                {mutationError && (
+                    <div role="alert" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                        <p>{mutationError}</p>
+                        <button type="button" onClick={() => setMutationError(null)} className="font-semibold underline underline-offset-2">Fechar</button>
+                    </div>
+                )}
+
                 <div className="mb-10 relative overflow-hidden rounded-2xl bg-card border border-border shadow-xl shadow-primary/5 group hover:shadow-primary/10 transition-all">
                     <div className="absolute top-0 left-0 w-1 h-full bg-linear-to-b from-primary to-info-solid"></div>
                     <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex items-center gap-5">
                             <div className="w-16 h-16 flex items-center justify-center bg-primary/10 text-primary rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             </div>
                             <div>
                                 <div className="flex items-center gap-2 mb-1">
                                     <h2 className="text-2xl font-bold text-foreground">Modo Simulado</h2>
                                     <span className="px-2 py-0.5 bg-warning-bg text-warning-fg border border-warning-border text-[10px] font-bold uppercase tracking-wider rounded-md">Novo</span>
                                 </div>
-                                <p className="text-muted-foreground max-w-md text-sm md:text-base">
-                                    Teste seus conhecimentos sob pressão. Escolha a dificuldade, o tempo e ganhe <span className="font-bold text-primary">muito mais XP</span>.
-                                </p>
+                                <p className="text-muted-foreground max-w-md text-sm md:text-base">Teste seus conhecimentos sob pressão. Escolha a dificuldade, o tempo e ganhe <span className="font-bold text-primary">muito mais XP</span>.</p>
                             </div>
                         </div>
-                        <Link href="/simulado" className="w-full md:w-auto">
-                            <button className="w-full md:w-auto px-8 py-4 bg-foreground text-background font-bold rounded-xl shadow-lg hover:opacity-90 transition transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3">
-                                <span>Começar Prova</span>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-                            </button>
+                        <Link href="/simulado" className="w-full md:w-auto px-8 py-4 bg-foreground text-background font-bold rounded-xl shadow-lg hover:opacity-90 transition transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3">
+                            <span>Começar Prova</span>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
                         </Link>
                     </div>
                 </div>
 
-                {/* === NAVEGAÇÃO POR ABAS === */}
-                <div className="flex gap-6 border-b border-border mb-8 overflow-x-auto">
-                    <button 
-                        onClick={() => setActiveTab('DECKS')}
-                        className={`pb-4 px-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all relative whitespace-nowrap ${activeTab === 'DECKS' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                <div className="flex gap-6 border-b border-border mb-8 overflow-x-auto" role="tablist" aria-label="Conteúdo da biblioteca">
+                    <button type="button" role="tab" aria-selected={activeTab === "DECKS"} onClick={() => setActiveTab("DECKS")} className={`pb-4 px-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all relative whitespace-nowrap ${activeTab === "DECKS" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                         Baralhos
-                        {activeTab === 'DECKS' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full"></div>}
+                        {activeTab === "DECKS" && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full" aria-hidden="true"></span>}
                     </button>
-                    <button 
-                        onClick={() => setActiveTab('PLANOS')}
-                        className={`pb-4 px-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all relative whitespace-nowrap ${activeTab === 'PLANOS' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
+                    <button type="button" role="tab" aria-selected={activeTab === "PLANOS"} onClick={() => setActiveTab("PLANOS")} className={`pb-4 px-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all relative whitespace-nowrap ${activeTab === "PLANOS" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
                         Trilhas de Estudo
-                        {activeTab === 'PLANOS' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full"></div>}
+                        {activeTab === "PLANOS" && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full" aria-hidden="true"></span>}
                     </button>
                 </div>
 
-                {/* === CONTEÚDO: BARALHOS === */}
-                {!loading && activeTab === 'DECKS' && (
+                {!loading && activeTab === "DECKS" && (
                     decks.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {decks.map((deck) => (
                                 <div key={deck.id} className="group bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300 relative">
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="p-3 bg-primary/10 text-primary rounded-xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                                         </div>
-                                        {/* LIXEIRA DOS DECKS (Invisível até Hover, sempre visível em mobile) */}
-                                        <button 
-                                            onClick={() => handleDeleteDeck(deck.id)}
-                                            className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-destructive/10 transition opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                                            title="Excluir Baralho"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        <button type="button" onClick={() => void handleDeleteDeck(deck.id)} aria-label={`Excluir baralho ${deck.nome}`} className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-destructive/10 transition opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </div>
-                                    
                                     <h3 className="text-xl font-bold text-card-foreground mb-1 group-hover:text-primary transition-colors truncate">{deck.nome}</h3>
                                     <p className="text-sm text-muted-foreground mb-6">{deck._count?.cards || 0} flashcards</p>
-                                    
                                     <div className="flex gap-2">
-                                        <Link href={`/colecao/${deck.id}`} className="flex-1">
-                                            <button className="w-full py-2 bg-background border border-border text-foreground font-bold rounded-lg hover:bg-muted hover:border-border/80 transition text-sm flex items-center justify-center gap-2">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                                Editar
-                                            </button>
+                                        <Link href={`/colecao/${deck.id}`} className="flex-1 py-2 bg-background border border-border text-foreground font-bold rounded-lg hover:bg-muted hover:border-border/80 transition text-sm flex items-center justify-center gap-2">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                            Editar
                                         </Link>
-                                        <Link href={`/estudar?deckId=${deck.id}`} className="flex-1">
-                                            <button className="w-full py-2 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition text-sm flex items-center justify-center gap-2 shadow-md shadow-primary/20">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                                Estudar
-                                            </button>
+                                        <Link href={`/estudar?deckId=${deck.id}`} className="flex-1 py-2 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition text-sm flex items-center justify-center gap-2 shadow-md shadow-primary/20">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                            Estudar
                                         </Link>
                                     </div>
                                 </div>
@@ -190,66 +208,40 @@ export default function ColecaoPage() {
                         </div>
                     ) : (
                         <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-border">
-                            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground">
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                            </div>
+                            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground" aria-hidden="true">📚</div>
                             <h3 className="text-lg font-bold text-card-foreground">Nenhum baralho criado</h3>
                             <p className="text-muted-foreground mb-6">Crie seu primeiro deck para começar.</p>
                         </div>
                     )
                 )}
 
-                {/* === CONTEÚDO: PLANOS === */}
-                {!loading && activeTab === 'PLANOS' && (
+                {!loading && activeTab === "PLANOS" && (
                     planos.length > 0 ? (
                         <div className="grid grid-cols-1 gap-4">
                             {planos.map((plano) => (
                                 <div key={plano.id} className="group bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-xl hover:border-primary/20 transition-all relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                     <Link href={`/planos/${plano.id}`} className="flex-1 flex items-center gap-4 w-full">
-                                        <div className="p-4 bg-info-bg text-info-fg border border-info-border rounded-xl group-hover:bg-info-solid group-hover:text-white transition-colors shrink-0">
-                                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
-                                        </div>
+                                        <div className="p-4 bg-info-bg text-info-fg border border-info-border rounded-xl group-hover:bg-info-solid group-hover:text-white transition-colors shrink-0" aria-hidden="true">🎓</div>
                                         <div>
                                             <h3 className="text-xl font-bold text-card-foreground group-hover:text-primary transition-colors">{plano.title}</h3>
                                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${plano.difficulty === 'Iniciante' ? 'bg-success-bg text-success-fg border-success-border' : 'bg-warning-bg text-warning-fg border-warning-border'}`}>
-                                                    {plano.difficulty}
-                                                </span>
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${plano.difficulty === "Iniciante" ? "bg-success-bg text-success-fg border-success-border" : "bg-warning-bg text-warning-fg border-warning-border"}`}>{plano.difficulty}</span>
                                                 <span>• {plano.topics?.length || 0} módulos</span>
                                             </div>
                                         </div>
                                     </Link>
-                                    
-                                    <div className="flex items-center gap-4 w-full md:w-auto justify-end">
-                                         {/* LIXEIRA DOS PLANOS (Invisível até Hover) */}
-                                        <button 
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleDeletePlan(plano.id);
-                                            }}
-                                            className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-destructive/10 transition opacity-100 md:opacity-0 md:group-hover:opacity-100 z-10"
-                                            title="Excluir Plano"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-
-                                        <div className="hidden md:block text-muted-foreground group-hover:translate-x-1 transition-transform pointer-events-none">
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-                                        </div>
-                                    </div>
+                                    <button type="button" onClick={() => void handleDeletePlan(plano.id)} aria-label={`Excluir plano ${plano.title}`} className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-destructive/10 transition opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     ) : (
                         <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-border">
-                            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground">
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
-                            </div>
+                            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground" aria-hidden="true">🧭</div>
                             <h3 className="text-lg font-bold text-card-foreground">Nenhum plano de estudo</h3>
                             <p className="text-muted-foreground mb-6">Peça para a IA gerar um roteiro completo para você.</p>
-                            <Link href="/planos/novo">
-                                <button className="text-primary font-bold hover:underline">Gerar agora &rarr;</button>
-                            </Link>
+                            <Link href="/planos/novo" className="text-primary font-bold hover:underline">Gerar agora &rarr;</Link>
                         </div>
                     )
                 )}

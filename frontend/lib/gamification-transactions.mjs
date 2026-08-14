@@ -105,21 +105,37 @@ export function grantCreationXpForUser(userId, requestedXp, now = new Date()) {
   return runSerializable((tx) => grantCreationXp(tx, userId, requestedXp, now));
 }
 
-export function saveFlashcardsForUser(userId, cards, deckId, now = new Date()) {
+export function saveFlashcardsForUser(userId, cards, deckId, now = new Date(), newDeckName) {
   if (!Array.isArray(cards) || cards.length === 0) return Promise.resolve({ success: false, error: "Nenhum flashcard para salvar." });
+  if (deckId && newDeckName) return Promise.resolve({ success: false, error: "Destino de flashcards inválido." });
+
   return runSerializable(async (tx) => {
+    let persistedDeckId = deckId;
+
     if (deckId) {
       const ownedDeck = await tx.deck.findFirst({ where: { id: deckId, userId }, select: { id: true } });
       if (!ownedDeck) return { success: false, error: "Grupo não encontrado." };
       await tx.flashcard.createMany({ data: cards.map((card) => ({ userId, frente: card.frente, verso: card.verso, deckId })) });
     } else {
-      const deckName = `Gerado em ${now.toLocaleDateString("pt-BR")} às ${now.getHours()}:${now.getMinutes()}`;
-      await tx.deck.create({
+      const deckName = newDeckName ?? `Gerado em ${now.toLocaleDateString("pt-BR")} às ${now.getHours()}:${now.getMinutes()}`;
+      if (newDeckName) {
+        const existing = await tx.deck.findFirst({
+          where: { userId, nome: { equals: deckName, mode: "insensitive" } },
+          select: { id: true },
+        });
+        if (existing) return { success: false, error: "Já existe um grupo com este nome!" };
+      }
+
+      const createdDeck = await tx.deck.create({
         data: { userId, nome: deckName, cards: { create: cards.map((card) => ({ userId, frente: card.frente, verso: card.verso })) } },
+        select: { id: true },
       });
+      persistedDeckId = createdDeck.id;
     }
+
     const requestedXp = Math.min(cards.length * XP_VALUES.CREATE_CARD, DAILY_LIMITS.MAX_XP_FROM_CREATION);
-    return { success: true, xpGained: await grantCreationXp(tx, userId, requestedXp, now) };
+    const xpGained = await grantCreationXp(tx, userId, requestedXp, now);
+    return { success: true, xpGained, deckId: persistedDeckId };
   });
 }
 
