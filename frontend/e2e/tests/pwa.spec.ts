@@ -31,6 +31,9 @@ async function cachedSameOriginURLs(page: Page) {
 }
 
 test("production worker controls the app, Chromium accepts installability, and uncached navigation has a deterministic offline fallback", async ({ page, context }) => {
+  const offlineDocumentResponse = await page.request.get("/offline");
+  expect(offlineDocumentResponse.ok(), "The generic offline document must stay publicly fetchable so Workbox can precache it").toBe(true);
+
   await ensureServiceWorkerControl(page);
 
   const manifestResponse = await page.request.get("/manifest.webmanifest");
