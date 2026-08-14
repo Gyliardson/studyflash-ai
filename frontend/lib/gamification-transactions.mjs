@@ -102,21 +102,31 @@ export function grantCreationXpForUser(userId, requestedXp, now = new Date()) {
   return runSerializable((tx) => grantCreationXp(tx, userId, requestedXp, now));
 }
 
-export function saveFlashcardsForUser(userId, cards, deckId, now = new Date()) {
+export function saveFlashcardsForUser(userId, cards, deckId, now = new Date(), newDeckName) {
   if (!Array.isArray(cards) || cards.length === 0) return Promise.resolve({ success: false, error: "Nenhum flashcard para salvar." });
+  if (deckId && newDeckName) return Promise.resolve({ success: false, error: "Destino de flashcards inválido." });
+
   return runSerializable(async (tx) => {
+    let persistedDeckId = deckId;
     if (deckId) {
       const ownedDeck = await tx.deck.findFirst({ where: { id: deckId, userId }, select: { id: true } });
       if (!ownedDeck) return { success: false, error: "Grupo não encontrado." };
       await tx.flashcard.createMany({ data: cards.map((card) => ({ userId, frente: card.frente, verso: card.verso, deckId })) });
     } else {
-      const deckName = `Gerado em ${now.toLocaleDateString("pt-BR")} às ${now.getHours()}:${now.getMinutes()}`;
-      await tx.deck.create({
+      const deckName = newDeckName ?? `Gerado em ${now.toLocaleDateString("pt-BR")} às ${now.getHours()}:${now.getMinutes()}`;
+      if (newDeckName) {
+        const existing = await tx.deck.findFirst({ where: { userId, nome: { equals: deckName, mode: "insensitive" } }, select: { id: true } });
+        if (existing) return { success: false, error: "Já existe um grupo com este nome!" };
+      }
+      const createdDeck = await tx.deck.create({
         data: { userId, nome: deckName, cards: { create: cards.map((card) => ({ userId, frente: card.frente, verso: card.verso })) } },
+        select: { id: true },
       });
+      persistedDeckId = createdDeck.id;
     }
     const requestedXp = Math.min(cards.length * XP_VALUES.CREATE_CARD, DAILY_LIMITS.MAX_XP_FROM_CREATION);
-    return { success: true, xpGained: await grantCreationXp(tx, userId, requestedXp, now) };
+    const xpGained = await grantCreationXp(tx, userId, requestedXp, now);
+    return { success: true, xpGained, deckId: persistedDeckId };
   });
 }
 
@@ -191,11 +201,9 @@ export function createExamAttemptForUser(userId, input, now = new Date()) {
     if (!EXAM_DIFFICULTIES.has(input.difficulty)) return { success: false, error: "Invalid exam difficulty." };
     if (!await assertOwnedExamSource(tx, userId, input.sourceType, input.sourceId)) return { success: false, error: "Invalid exam source." };
     if (!validateAttemptQuestions(input.questions)) return { success: false, error: "Invalid exam questions." };
-
     const ids = input.questions.map((question) => question.flashcardId);
     const ownedCount = await tx.flashcard.count({ where: { userId, id: { in: ids } } });
     if (ownedCount !== ids.length) return { success: false, error: "Invalid exam questions." };
-
     const expiresAt = new Date(now.getTime() + EXAM_ATTEMPT_TTL_MS);
     const attempt = await tx.examAttempt.create({
       data: {
@@ -207,15 +215,7 @@ export function createExamAttemptForUser(userId, input, now = new Date()) {
         difficulty: input.difficulty,
         expiresAt,
         createdAt: now,
-        questions: {
-          create: input.questions.map((question, order) => ({
-            flashcardId: question.flashcardId,
-            prompt: question.prompt,
-            expectedAnswer: question.expectedAnswer,
-            options: question.options,
-            order,
-          })),
-        },
+        questions: { create: input.questions.map((question, order) => ({ flashcardId: question.flashcardId, prompt: question.prompt, expectedAnswer: question.expectedAnswer, options: question.options, order })) },
       },
     });
     return { success: true, attemptId: attempt.id, expiresAt };
@@ -227,7 +227,6 @@ function validateAttemptAnswers(questions, answers) {
   const ids = answers.map((answer) => answer?.flashcardId);
   if (ids.some((id) => typeof id !== "string" || !id)) return false;
   if (new Set(ids).size !== ids.length) return false;
-
   const questionByCard = new Map(questions.map((question) => [question.flashcardId, question]));
   return answers.every((answer) => {
     const question = questionByCard.get(answer.flashcardId);
@@ -252,42 +251,21 @@ function calculateExamXp(difficulty, correctAnswers, score) {
 
 export function finalizeExamForUser(userId, result, now = new Date()) {
   return runSerializable(async (tx) => {
-    if (typeof result.attemptId !== "string" || !result.attemptId) {
-      return { success: false, error: "Invalid exam attempt." };
-    }
-
-    const attempt = await tx.examAttempt.findFirst({
-      where: { id: result.attemptId, userId },
-      include: { questions: { orderBy: { order: "asc" } } },
-    });
+    if (typeof result.attemptId !== "string" || !result.attemptId) return { success: false, error: "Invalid exam attempt." };
+    const attempt = await tx.examAttempt.findFirst({ where: { id: result.attemptId, userId }, include: { questions: { orderBy: { order: "asc" } } } });
     if (!attempt) return { success: false, error: "Invalid exam attempt." };
     if (attempt.status !== "ACTIVE") return { success: false, error: "Exam attempt already finalized." };
     if (attempt.expiresAt <= now) {
-      await tx.examAttempt.updateMany({
-        where: { id: attempt.id, userId, status: "ACTIVE" },
-        data: { status: "EXPIRED" },
-      });
+      await tx.examAttempt.updateMany({ where: { id: attempt.id, userId, status: "ACTIVE" }, data: { status: "EXPIRED" } });
       return { success: false, error: "Exam attempt expired." };
     }
-    if (!validateAttemptAnswers(attempt.questions, result.answers)) {
-      return { success: false, error: "Invalid exam answers." };
-    }
-
-    const claimed = await tx.examAttempt.updateMany({
-      where: { id: attempt.id, userId, status: "ACTIVE" },
-      data: { status: "COMPLETED", finalizedAt: now },
-    });
+    if (!validateAttemptAnswers(attempt.questions, result.answers)) return { success: false, error: "Invalid exam answers." };
+    const claimed = await tx.examAttempt.updateMany({ where: { id: attempt.id, userId, status: "ACTIVE" }, data: { status: "COMPLETED", finalizedAt: now } });
     if (claimed.count !== 1) return { success: false, error: "Exam attempt already finalized." };
-
     const answerByCard = new Map(result.answers.map((answer) => [answer.flashcardId, answer]));
     const evaluated = attempt.questions.map((question) => {
       const answer = answerByCard.get(question.flashcardId);
-      const isCorrect = answer?.selectedOption === question.expectedAnswer;
-      return {
-        flashcardId: question.flashcardId,
-        isCorrect,
-        timeTakenSeconds: Math.max(0, answer?.timeTaken ?? 0),
-      };
+      return { flashcardId: question.flashcardId, isCorrect: answer?.selectedOption === question.expectedAnswer, timeTakenSeconds: Math.max(0, answer?.timeTaken ?? 0) };
     });
     const totalQuestions = attempt.questions.length;
     const correctAnswers = evaluated.filter((answer) => answer.isCorrect).length;
