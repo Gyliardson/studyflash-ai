@@ -8,11 +8,15 @@ const TEST_USER_EMAIL =
 const VALIDATION_MESSAGE =
   "Por favor, cole um texto ou anexe um PDF para começar.";
 
+async function signIn(page: Parameters<typeof clerk.signIn>[0]["page"]) {
+  await page.goto("/");
+  await clerk.signIn({ page, emailAddress: TEST_USER_EMAIL });
+}
+
 test("authenticated StudyFlash validation flow uses real Clerk development auth", async ({
   page,
 }) => {
-  await page.goto("/");
-  await clerk.signIn({ page, emailAddress: TEST_USER_EMAIL });
+  await signIn(page);
 
   const aiRequests: string[] = [];
   page.on("request", (request) => {
@@ -42,4 +46,27 @@ test("authenticated StudyFlash validation flow uses real Clerk development auth"
       .map((violation) => `${violation.id}: ${violation.help}`)
       .join("\n"),
   ).toEqual([]);
+});
+
+test("collection UI follows authoritative create and delete results", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/colecao");
+  await expect(page).toHaveURL(/\/colecao(?:[/?#]|$)/);
+
+  const name = "E2E Mutation Deck";
+  const input = page.getByLabel("Nome do novo baralho");
+  const createButton = page.getByRole("button", { name: "Criar" });
+
+  await input.fill(name);
+  await createButton.click();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+
+  await input.fill(name);
+  await createButton.click();
+  await expect(page.getByRole("alert")).toContainText("Já existe um grupo com este nome!");
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: `Excluir baralho ${name}` }).click();
+  await expect(page.getByText(name, { exact: true })).toHaveCount(0);
 });
