@@ -1,15 +1,11 @@
 import Link from "next/link";
-import { SignInButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
 import CookieBanner from "@/app/components/CookieBanner";
 
-export default async function SiteLayout({
+export default function SiteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await auth();
-
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Navbar */}
@@ -26,20 +22,13 @@ export default async function SiteLayout({
             <div className="w-full flex-1 md:w-auto md:flex-none">
               {/* Add navigation links here if needed */}
             </div>
-            <nav className="flex items-center">
-              {userId ? (
-                <Link href="/dashboard">
-                  <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2">
-                    Ir para o App
-                  </button>
-                </Link>
-              ) : (
-                <SignInButton mode="modal">
-                  <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2">
-                    Entrar
-                  </button>
-                </SignInButton>
-              )}
+            <nav className="flex items-center" aria-label="Navegação principal">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
+              >
+                Abrir StudyFlash
+              </Link>
             </nav>
           </div>
         </div>
@@ -53,7 +42,7 @@ export default async function SiteLayout({
       <footer className="py-6 md:px-8 md:py-0">
         <div className="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
           <p className="mb-4">
-            © {new Date().getFullYear()} StudyFlash AI • Desenvolvido por <span className="font-semibold text-slate-700 dark:text-slate-300">Gyliardson Keitison</span>
+            © {new Date().getFullYear()} StudyFlash • Desenvolvido por <span className="font-semibold text-slate-700 dark:text-slate-300">Gyliardson Keitison</span>
           </p>
           <div className="flex gap-4 items-center">
              <Link href="/termos" className="text-sm font-medium hover:underline underline-offset-4 text-muted-foreground">
