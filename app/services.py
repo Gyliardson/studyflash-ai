@@ -4,8 +4,9 @@ import re
 
 import fitz
 
+from .ai_errors import AIInvalidInputError, AIInvalidOutputError
 from .ai_provider import AIProvider, get_ai_provider
-from .models import ConjuntoFlashcards, ItemSimuladoInput, PlanoEstudo, QuestaoProva
+from .models import ConjuntoFlashcards, ItemSimuladoInput, PlanoEstudo, QuestaoProva, QuestaoProvaGeracao
 
 MAX_TEXT_CHARS = 25_000
 
@@ -33,49 +34,55 @@ def _resolve(provider: AIProvider | None) -> AIProvider:
 
 
 def _validate_cards(result: ConjuntoFlashcards, expected: int | None = None) -> ConjuntoFlashcards:
+    if not isinstance(result, ConjuntoFlashcards):
+        raise AIInvalidOutputError("Generated flashcard payload has an invalid shape.")
     count = len(result.cartoes)
     if count == 0 or count > 5:
-        raise ValueError("Invalid generated flashcard count.")
+        raise AIInvalidOutputError("Generated flashcard count violates the StudyFlash contract.")
     if expected is not None and count != expected:
-        raise ValueError("Unexpected generated flashcard count.")
+        raise AIInvalidOutputError("Generated flashcard count does not match the requested contract.")
     if any(not card.frente.strip() or not card.verso.strip() for card in result.cartoes):
-        raise ValueError("Generated flashcard is incomplete.")
+        raise AIInvalidOutputError("Generated flashcard is incomplete.")
     return result
 
 
 def gerar_flashcards_service(texto: str, provider: AIProvider | None = None) -> ConjuntoFlashcards:
     if len(texto.strip()) < 50:
-        raise ValueError("O texto fornecido é muito curto.")
+        raise AIInvalidInputError("O texto fornecido é muito curto.")
     result = _resolve(provider).generate_flashcards(texto[:MAX_TEXT_CHARS])
     return _validate_cards(result)
 
 
 def gerar_plano_service(tema: str, dificuldade: str, provider: AIProvider | None = None) -> PlanoEstudo:
     if len(tema.strip()) < 2:
-        raise ValueError("O tema é muito curto.")
+        raise AIInvalidInputError("O tema é muito curto.")
     result = _resolve(provider).generate_study_plan(tema.strip(), dificuldade)
+    if not isinstance(result, PlanoEstudo):
+        raise AIInvalidOutputError("Generated study-plan payload has an invalid shape.")
     if not result.titulo.strip() or not result.descricao.strip() or not 5 <= len(result.topicos) <= 10:
-        raise ValueError("Invalid generated study plan.")
+        raise AIInvalidOutputError("Generated study plan violates the StudyFlash contract.")
     if any(not topic.titulo.strip() for topic in result.topicos):
-        raise ValueError("Generated study-plan topic is empty.")
+        raise AIInvalidOutputError("Generated study-plan topic is empty.")
     return result
 
 
 def gerar_conteudo_topico_service(curso: str, topico: str, provider: AIProvider | None = None) -> ConjuntoFlashcards:
     if not curso.strip() or not topico.strip():
-        raise ValueError("Curso e tópico são obrigatórios.")
+        raise AIInvalidInputError("Curso e tópico são obrigatórios.")
     return _validate_cards(
         _resolve(provider).generate_topic_cards(curso.strip(), topico.strip()),
         expected=3,
     )
 
 
-def _validate_options(options: list[str], correct_answer: str) -> list[str]:
-    normalized = [option.strip() for option in options if option.strip()]
+def _validate_options(result: QuestaoProvaGeracao, correct_answer: str) -> list[str]:
+    if not isinstance(result, QuestaoProvaGeracao):
+        raise AIInvalidOutputError("Generated exam payload has an invalid shape.")
+    normalized = [option.strip() for option in result.alternativas if option.strip()]
     if len(normalized) != 4 or len(set(normalized)) != 4:
-        raise ValueError("Generated exam alternatives are invalid.")
+        raise AIInvalidOutputError("Generated exam alternatives are invalid.")
     if correct_answer.strip() not in normalized:
-        raise ValueError("Correct answer is missing from generated alternatives.")
+        raise AIInvalidOutputError("Correct answer is missing from generated alternatives.")
     return normalized
 
 
@@ -90,7 +97,7 @@ async def gerar_distratores_batch(
         questions.append(
             QuestaoProva(
                 card_id=card.id,
-                alternativas=_validate_options(result.alternativas, card.verso),
+                alternativas=_validate_options(result, card.verso),
             )
         )
     return questions

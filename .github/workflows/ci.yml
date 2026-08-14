@@ -48,7 +48,7 @@ jobs:
         run: npx prisma generate
 
       - name: Lint security and transaction boundaries
-        run: npx eslint lib/db.ts lib/ai-api.ts app/api/ai/gerar/route.ts lib/gamification-transactions.mjs lib/study-session-transactions.mjs lib/study-calendar.mjs
+        run: npx eslint lib/db.ts lib/ai-api.ts lib/ai-failure-policy.ts app/api/ai/gerar/route.ts lib/gamification-transactions.mjs lib/study-session-transactions.mjs lib/study-calendar.mjs
 
       - name: Gate server-only AI boundary
         shell: bash
@@ -63,10 +63,19 @@ jobs:
           grep -q 'getAiApiUrl()}/api/gerar-cards-topico' app/actions.ts
           grep -q 'getAiApiUrl()}/api/gerar-prova' app/actions.ts
           test "$(grep -o 'getAiApiHeaders(' app/actions.ts | wc -l)" -ge 3
+          test "$(grep -o 'getAiAbortSignal(' app/actions.ts | wc -l)" -ge 3
+          grep -q 'getAiAbortSignal(AI_PDF_PROXY_TIMEOUT_MS)' app/api/ai/gerar/route.ts
           grep -q 'fetch("/api/ai/gerar"' "$dashboard_path"
           grep -q 'import "server-only"' lib/ai-api.ts
           grep -q 'STUDYFLASH_INTERNAL_API_KEY' lib/ai-api.ts
           grep -q 'X-StudyFlash-Internal-Key' lib/ai-api.ts
+          grep -q 'AI_PROVIDER_TIMEOUT_SECONDS = 8' lib/ai-failure-policy.ts
+          grep -q 'AI_EXAM_FALLBACK_TIMEOUT_MS = 10_000' lib/ai-failure-policy.ts
+          grep -q 'AI_ACTION_TIMEOUT_MS = 12_000' lib/ai-failure-policy.ts
+          grep -q 'AI_PDF_PROXY_TIMEOUT_MS = 15_000' lib/ai-failure-policy.ts
+
+      - name: Run deterministic frontend AI failure policy tests
+        run: node --test --experimental-strip-types tests/ai-failure-policy.test.mjs
 
       - name: Gate production gamification wiring
         shell: bash

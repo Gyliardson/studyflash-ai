@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-import { getAiApiHeaders, getAiApiUrl } from "@/lib/ai-api";
+import { getAiAbortSignal, getAiApiHeaders, getAiApiUrl } from "@/lib/ai-api";
+import { AI_PDF_PROXY_TIMEOUT_MS, isAbortTimeout } from "@/lib/ai-failure-policy";
 
 export const runtime = "nodejs";
 
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
       headers: getAiApiHeaders({ "Content-Type": contentType }),
       body: requestBody,
       cache: "no-store",
-      signal: AbortSignal.timeout(90_000),
+      signal: getAiAbortSignal(AI_PDF_PROXY_TIMEOUT_MS),
     });
 
     const responseContentType = response.headers.get("content-type") || "application/json";
@@ -85,10 +86,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ detail: "Requisição excede o tamanho máximo permitido." }, { status: 413 });
     }
 
-    const isTimeout = error instanceof Error && error.name === "TimeoutError";
+    const timedOut = isAbortTimeout(error);
     return NextResponse.json(
-      { detail: isTimeout ? "O servidor demorou muito para responder." : "Falha ao processar solicitação." },
-      { status: isTimeout ? 504 : 502 },
+      { detail: timedOut ? "O serviço de IA excedeu o tempo limite de resposta." : "Falha ao processar solicitação." },
+      { status: timedOut ? 504 : 502 },
     );
   }
 }
