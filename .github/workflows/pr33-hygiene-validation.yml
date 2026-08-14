@@ -1,0 +1,66 @@
+name: PR33 Repository Hygiene Validation
+
+on:
+  push:
+    branches:
+      - pre-public/hardening
+
+permissions:
+  contents: read
+
+jobs:
+  repository-hygiene:
+    name: Repository hygiene contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch main
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+
+      - name: Validate final hygiene contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check origin/main...HEAD
+
+          mapfile -t changed < <(git diff --name-only origin/main...HEAD | sort)
+          allowed=(
+            '.github/workflows/pr33-hygiene-validation.yml'
+            '.gitignore'
+            'CHANGELOG.md'
+            'LICENSE'
+            'README.md'
+          )
+          printf '%s\n' "${changed[@]}" > "$RUNNER_TEMP/changed.txt"
+          printf '%s\n' "${allowed[@]}" | sort > "$RUNNER_TEMP/allowed.txt"
+          diff -u "$RUNNER_TEMP/allowed.txt" "$RUNNER_TEMP/changed.txt"
+
+          grep -Fq '# StudyFlash' README.md
+          grep -Fq 'Active engineering professionalization' README.md
+          grep -Fqi 'not release-certified' README.md
+          grep -Fq 'portfolio/revamp-2026' README.md
+          grep -Fqi 'qualified' README.md
+
+          grep -Fq 'StudyFlash — Changelog' CHANGELOG.md
+          grep -Fqi 'StudiFlow' CHANGELOG.md
+          grep -Fqi 'histor' CHANGELOG.md
+
+          grep -Fqi 'Proprietary' LICENSE
+          grep -Fqi 'All Rights Reserved' LICENSE
+          if grep -Eqi 'permission is hereby granted|apache license|gnu general public license|mozilla public license' LICENSE; then
+            echo 'Unexpected permissive/copyleft license grant detected.' >&2
+            exit 1
+          fi
+
+          grep -Eq '^\.env\*?$|^\.env\.\*$|^\.env\.local$' .gitignore || grep -Fq '.env' .gitignore
+          grep -Fq 'storage-state' .gitignore
+          grep -Fq 'trace.zip' .gitignore
+          grep -Fq '.vercel' .gitignore
+
+          echo 'PR #33 repository hygiene validation passed.'
