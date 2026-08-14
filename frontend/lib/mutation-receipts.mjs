@@ -19,7 +19,9 @@ function validRequestKey(requestKey) {
 }
 
 function isRetryableTransactionConflict(error) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (error.code === "P2034") return true;
+  return error.code === "P2002" && error.meta?.modelName === "UserProfile";
 }
 
 function isReceiptConflict(error) {
@@ -73,7 +75,9 @@ export async function runMutationWithReceipt({ userId, kind, requestKey, fingerp
           },
         });
 
-        const { receiptResultId: _resultId, receiptXpAwarded: _xpAwarded, ...response } = effect;
+        const response = { ...effect };
+        delete response.receiptResultId;
+        delete response.receiptXpAwarded;
         return response;
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {
