@@ -79,10 +79,18 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
     await signIn(page);
     await page.goto(`/estudar?deckId=${deck.id}`);
     await expect(page).toHaveURL(new RegExp(`/estudar\\?deckId=${deck.id}`));
+    await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
     await expect(page.getByText(firstFront, { exact: true })).toBeVisible();
     await expect(page.getByText("1 / 2", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Sessão de estudo" })).toBeVisible();
     await expectNoBlockingAxeViolations(page);
+
+    if (testInfo.project.name.includes("desktop")) {
+      await testInfo.attach("study-active-desktop-light", {
+        body: await page.screenshot({ fullPage: true, animations: "disabled" }),
+        contentType: "image/png",
+      });
+    }
 
     const activeSession = await prisma.studySession.findFirstOrThrow({
       where: { userId, scopeKey: `DECKS:${deck.id}`, status: "ACTIVE" },
