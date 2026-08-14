@@ -79,7 +79,12 @@ test("failed review stays put, retry commits once, and reload resumes only pendi
     await signIn(page);
     await page.goto(`/estudar?deckId=${deck.id}`);
     await expect(page).toHaveURL(new RegExp(`/estudar\\?deckId=${deck.id}`));
-    await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
+    if (testInfo.project.name.includes("desktop")) {
+      await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
+    } else {
+      await expect(page.getByRole("button", { name: "Abrir menu" })).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Navegação principal" })).toHaveCount(0);
+    }
     await expect(page.getByText(firstFront, { exact: true })).toBeVisible();
     await expect(page.getByText("1 / 2", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Sessão de estudo" })).toBeVisible();
