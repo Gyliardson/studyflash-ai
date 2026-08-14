@@ -141,6 +141,7 @@ export default function ColecaoPage() {
                             />
                             <button
                                 type="button"
+                                aria-label="Criar"
                                 onClick={() => void handleCreateDeck()}
                                 disabled={isCreating || !newDeckName.trim()}
                                 aria-busy={isCreating}
