@@ -246,7 +246,7 @@ function StudyContent() {
                             <p className="text-muted-foreground mb-8 max-w-md mx-auto">
                                 Todas as revisões confirmadas foram salvas.
                                 <br />
-                                <span className="text-sm opacity-75">Total nesta seleção: {totalCards} cartas.</span>
+                                <span className="text-sm text-foreground">Total nesta seleção: {totalCards} cartas.</span>
                             </p>
 
                             <div className="flex flex-col gap-3 max-w-xs mx-auto">
