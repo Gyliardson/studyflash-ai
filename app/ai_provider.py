@@ -1,22 +1,23 @@
 from __future__ import annotations
 
+import json
+import os
 from collections.abc import Callable
 from functools import lru_cache
 from typing import Protocol, TypeVar
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
+from .ai_errors import (
+    AIInvalidOutputError,
+    AIProviderError,
+    AIProviderRateLimitError,
+    AIProviderTimeoutError,
+    AIProviderUnavailableError,
+)
 from .models import ConjuntoFlashcards, PlanoEstudo, QuestaoProvaGeracao
-
-
-class AIProviderError(RuntimeError):
-    """Base error raised by the StudyFlash AI provider boundary."""
-
-
-class AIProviderRateLimitError(AIProviderError):
-    """Both configured model attempts were rate limited."""
 
 
 class AIProvider(Protocol):
@@ -31,11 +32,67 @@ class AIProvider(Protocol):
 
 TModel = TypeVar("TModel", bound=BaseModel)
 TResult = TypeVar("TResult")
+DEFAULT_PROVIDER_TIMEOUT_SECONDS = 8.0
+MAX_PROVIDER_TIMEOUT_SECONDS = 30.0
+
+
+def _provider_timeout_seconds() -> float:
+    raw = os.getenv("AI_PROVIDER_TIMEOUT_SECONDS", str(DEFAULT_PROVIDER_TIMEOUT_SECONDS))
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_PROVIDER_TIMEOUT_SECONDS
+    if value <= 0 or value > MAX_PROVIDER_TIMEOUT_SECONDS:
+        return DEFAULT_PROVIDER_TIMEOUT_SECONDS
+    return value
+
+
+def _status_code(exc: Exception) -> int | None:
+    value = getattr(exc, "status_code", None)
+    return value if isinstance(value, int) else None
 
 
 def _is_rate_limit_error(exc: Exception) -> bool:
+    if _status_code(exc) == 429:
+        return True
     message = str(exc).lower()
     return any(token in message for token in ("429", "rate limit", "quota", "too many requests"))
+
+
+def _is_timeout_error(exc: Exception) -> bool:
+    status = _status_code(exc)
+    if status in {408, 504}:
+        return True
+    if isinstance(exc, TimeoutError):
+        return True
+    name = type(exc).__name__.lower()
+    return "timeout" in name or "timedout" in name
+
+
+def _is_invalid_output_error(exc: Exception) -> bool:
+    if isinstance(exc, (ValidationError, json.JSONDecodeError)):
+        return True
+    name = type(exc).__name__.lower()
+    return any(token in name for token in ("outputparser", "parsing", "validation"))
+
+
+def _is_unavailable_error(exc: Exception) -> bool:
+    status = _status_code(exc)
+    if status is not None and 500 <= status <= 599:
+        return True
+    name = type(exc).__name__.lower()
+    return any(token in name for token in ("connection", "network", "serviceunavailable"))
+
+
+def _raise_typed_provider_error(exc: Exception, *, backup: bool = False) -> None:
+    if _is_timeout_error(exc):
+        raise AIProviderTimeoutError("AI provider timed out") from exc
+    if _is_invalid_output_error(exc):
+        raise AIInvalidOutputError("AI provider returned invalid structured output") from exc
+    if _is_unavailable_error(exc):
+        raise AIProviderUnavailableError("AI provider is unavailable") from exc
+    prefix = "AI backup provider" if backup else "AI provider"
+    raise AIProviderUnavailableError(f"{prefix} request failed") from exc
 
 
 def invoke_with_bounded_fallback(
@@ -48,14 +105,16 @@ def invoke_with_bounded_fallback(
         return primary()
     except Exception as exc:
         if not _is_rate_limit_error(exc):
-            raise AIProviderError(f"AI provider request failed: {type(exc).__name__}") from exc
+            _raise_typed_provider_error(exc)
 
     try:
         return backup()
     except Exception as exc:
         if _is_rate_limit_error(exc):
             raise AIProviderRateLimitError("AI provider rate limit exhausted") from exc
-        raise AIProviderError(f"AI backup provider request failed: {type(exc).__name__}") from exc
+        _raise_typed_provider_error(exc, backup=True)
+
+    raise AIProviderError("AI provider fallback ended unexpectedly")
 
 
 class GroqAIProvider:
@@ -89,8 +148,14 @@ Não use 'todas as anteriores' e não invente IDs.
 """
 
     def __init__(self) -> None:
-        self._primary = ChatGroq(temperature=0, model_name=self.PRIMARY_MODEL)
-        self._backup = ChatGroq(temperature=0, model_name=self.BACKUP_MODEL)
+        timeout = _provider_timeout_seconds()
+        client_kwargs = {
+            "temperature": 0,
+            "timeout": timeout,
+            "max_retries": 0,
+        }
+        self._primary = ChatGroq(model_name=self.PRIMARY_MODEL, **client_kwargs)
+        self._backup = ChatGroq(model_name=self.BACKUP_MODEL, **client_kwargs)
 
     def _invoke_structured(
         self,
