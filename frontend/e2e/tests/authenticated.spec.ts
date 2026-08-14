@@ -139,6 +139,7 @@ test("invalid generated cards are rejected by the real save Server Action withou
 test("collection mutation server predicates are owner-scoped and repeated deletes fail closed", async () => {
   const frontendRoot = resolve(process.cwd(), "..");
   const actionsSource = await readFile(resolve(frontendRoot, "app/actions.ts"), "utf8");
+  const idempotentActionsSource = await readFile(resolve(frontendRoot, "app/idempotent-actions.ts"), "utf8");
   const saveModalSource = await readFile(resolve(frontendRoot, "app/components/SaveModal.tsx"), "utf8");
   const deckDetailSource = await readFile(resolve(frontendRoot, "app/(platform)/colecao/[deckId]/page.tsx"), "utf8");
   expect(actionsSource).toContain("const normalized = normalizeDeckName(nome);");
@@ -147,7 +148,9 @@ test("collection mutation server predicates are owner-scoped and repeated delete
   expect(actionsSource).toContain("await prisma.deck.delete({ where: { id, userId } });");
   expect(actionsSource).toContain("await prisma.flashcard.delete({ where: { id, userId } });");
   expect(actionsSource).toContain("await prisma.studyPlan.delete({ where: { id, userId } });");
-  expect(saveModalSource).toContain("salvarFlashcards(cards, undefined, name)");
+  expect(idempotentActionsSource).toContain("saveFlashcardsIdempotentForUser(userId, normalizedCards.cards, deckId, normalizedDeckName, requestKey)");
+  expect(saveModalSource).toContain("salvarFlashcardsIdempotente(cards, undefined, name, currentRequestKey())");
+  expect(saveModalSource).toContain("requestKeyRef.current");
   expect(saveModalSource).not.toContain("criarBaralho(");
   expect(deckDetailSource).toContain("<ConfirmDialog");
   expect(deckDetailSource).not.toContain("confirm(");
