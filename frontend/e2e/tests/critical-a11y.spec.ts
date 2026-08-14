@@ -56,6 +56,22 @@ test("dashboard exposes named generation controls and keyboard-safe save dialog"
   await expectNoBlockingAxeViolations(page);
 });
 
+test("collection and profile representative routes pass blocking Axe checks", async ({ page }) => {
+  await page.goto("/colecao");
+  await expect(page).toHaveURL(/\/colecao(?:[/?#]|$)/);
+  await expect(page.getByRole("heading").first()).toBeVisible();
+  await expectNoBlockingAxeViolations(page);
+
+  await page.goto("/perfil");
+  await expect(page).toHaveURL(/\/perfil(?:[/?#]|$)/);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const progress = page.getByRole("progressbar", { name: /Progresso para o nível/i });
+  await expect(progress).toBeVisible();
+  await expect(progress).toHaveAttribute("aria-valuemin", "0");
+  await expect(progress).toHaveAttribute("aria-valuemax", "100");
+  await expectNoBlockingAxeViolations(page);
+});
+
 test("exam configuration uses native keyboard-operable selectors and valid toggles", async ({ page }) => {
   await page.goto("/simulado");
   await expect(page).toHaveURL(/\/simulado(?:[/?#]|$)/);
