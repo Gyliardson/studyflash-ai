@@ -4,7 +4,7 @@ import Link from "next/link";
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import UserHUD from "./UserHUD";
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, BrainCircuit, Library, Menu, Moon, Plus, Sun, UserRound, X } from "lucide-react";
+import { BookOpen, BrainCircuit, Library, Menu, Moon, Plus, Settings, Sun, UserRound, X } from "lucide-react";
 import { useTheme } from "next-themes";
 
 const primaryLinks = [
@@ -13,6 +13,7 @@ const primaryLinks = [
     { href: "/planos", label: "Planos", icon: BookOpen },
     { href: "/simulado", label: "Simulados", icon: BrainCircuit },
     { href: "/perfil", label: "Perfil", icon: UserRound },
+    { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
 export default function Header() {
@@ -66,12 +67,12 @@ export default function Header() {
                 </div>
 
                 <SignedIn>
-                    <nav aria-label="Navegação principal" className="hidden items-center gap-1 lg:flex">
+                    <nav aria-label="Navegação principal" className="hidden items-center gap-0.5 lg:flex">
                         {primaryLinks.map(({ href, label, icon: Icon }) => (
                             <Link
                                 key={href}
                                 href={href}
-                                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
                                 <Icon className="h-4 w-4" aria-hidden="true" />
                                 {label}
@@ -93,7 +94,7 @@ export default function Header() {
                     )}
 
                     <SignedIn>
-                        <div className="hidden xl:block"><UserHUD /></div>
+                        <div className="hidden 2xl:block"><UserHUD /></div>
                     </SignedIn>
 
                     <div className="flex items-center border-l border-border pl-2">
