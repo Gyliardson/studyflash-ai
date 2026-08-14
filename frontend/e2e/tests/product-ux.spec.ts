@@ -60,7 +60,8 @@ test("portfolio evidence captures representative responsive light and dark produ
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/colecao");
-  await expect(page.getByRole("navigation", { name: "Navegação principal" })).toBeVisible();
+  await page.getByRole("button", { name: "Abrir menu" }).click();
+  await expect(page.getByRole("navigation", { name: "Navegação principal móvel" })).toBeVisible();
   await attachScreenshot(page, testInfo, "collection-mobile-dark");
 
   await page.goto("/configuracoes");
