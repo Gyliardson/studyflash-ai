@@ -18,17 +18,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  public-browser:
-    name: Public browser smoke
+  browser:
+    name: Public, auth and accessibility browser gates
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: studyflash_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d studyflash_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_e2e
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5hY2NvdW50cy5kZXYk
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      E2E_CLERK_TEST_EMAIL: studyflash.e2e+clerk_test@example.com
       CI: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Verify Clerk E2E configuration is present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" || { echo "E2E Clerk publishable key is not configured" >&2; exit 1; }
+          test -n "$CLERK_SECRET_KEY" || { echo "E2E Clerk secret key is not configured" >&2; exit 1; }
+          echo "Clerk E2E development configuration is present."
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -43,9 +68,37 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Install browser test dependencies
+      - name: Bootstrap E2E lockfile for Clerk testing
+        working-directory: frontend/e2e
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Install browser test dependencies from lockfile
         working-directory: frontend/e2e
         run: npm ci
+
+      - name: Upload generated E2E lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-lock-${{ github.sha }}
+          path: frontend/e2e/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Generate Prisma client
+        working-directory: frontend
+        run: npx prisma generate
+
+      - name: Apply migrations to empty disposable PostgreSQL
+        working-directory: frontend
+        run: npm run db:migrate:deploy
+
+      - name: Verify migration history
+        working-directory: frontend
+        run: npm run db:migrate:status
+
+      - name: Verify database matches Prisma schema
+        working-directory: frontend
+        run: npm run db:schema:verify
 
       - name: Install Chromium
         working-directory: frontend/e2e
@@ -55,7 +108,7 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Run deterministic browser smoke
+      - name: Run deterministic browser gates
         working-directory: frontend
         run: npm run test:e2e
 
