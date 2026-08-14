@@ -12,7 +12,7 @@ import {
 } from "@/lib/gamification-transactions";
 
 type FlashcardInput = { frente: string; verso: string };
-type MutationResult<T extends object = object> = ({ success: true } & T) | { success: false; error: string };
+type MutationResult<T extends object = object> = ({ success: true; error?: undefined } & T) | { success: false; error: string };
 type ExamStartCard = { id: string; frente: string; options: string[] };
 type ExamStartResult = MutationResult<{ attemptId: string; cards: ExamStartCard[] }>;
 
