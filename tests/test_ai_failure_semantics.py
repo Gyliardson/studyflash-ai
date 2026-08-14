@@ -91,7 +91,7 @@ class AIFailureSemanticsTests(unittest.TestCase):
             os.environ.pop("AI_PROVIDER_TIMEOUT_SECONDS", None)
             self.assertEqual(_provider_timeout_seconds(), DEFAULT_PROVIDER_TIMEOUT_SECONDS)
 
-        for value in ("0", "-1", "not-a-number", "999"):
+        for value in ("0", "-1", "not-a-number", "10", "999"):
             with self.subTest(value=value), patch.dict(os.environ, {"AI_PROVIDER_TIMEOUT_SECONDS": value}):
                 self.assertEqual(_provider_timeout_seconds(), DEFAULT_PROVIDER_TIMEOUT_SECONDS)
 
