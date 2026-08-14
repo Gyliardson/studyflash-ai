@@ -217,14 +217,18 @@ test("exam recovery converges when the committed finalization response is lost",
   await page.getByRole("button", { name: /Iniciar Simulado/i }).click();
   await expect(page.getByText(/1\s*\/\s*5/)).toBeVisible({ timeout: 20_000 });
 
-  let droppedCommittedResponse = false;
+  let replacedCommittedResponse = false;
   await page.route("**/*", async (route) => {
     const request = route.request();
-    if (!droppedCommittedResponse && request.method() === "POST" && request.headers()["next-action"]) {
+    if (!replacedCommittedResponse && request.method() === "POST" && request.headers()["next-action"]) {
       const response = await route.fetch();
       expect(response.ok()).toBe(true);
-      droppedCommittedResponse = true;
-      await route.abort("failed");
+      replacedCommittedResponse = true;
+      await route.fulfill({
+        status: 503,
+        contentType: "text/plain",
+        body: "Simulated gateway failure after upstream commit",
+      });
       return;
     }
     await route.continue();
@@ -237,7 +241,7 @@ test("exam recovery converges when the committed finalization response is lost",
   }
 
   await expect(page.getByRole("heading", { name: "Suas respostas foram preservadas" })).toBeVisible({ timeout: 20_000 });
-  expect(droppedCommittedResponse).toBe(true);
+  expect(replacedCommittedResponse).toBe(true);
 
   await page.getByRole("button", { name: "Tentar salvar novamente" }).click();
   await expect(page.getByRole("heading", { name: "Simulado Concluído!" })).toBeVisible({ timeout: 20_000 });
