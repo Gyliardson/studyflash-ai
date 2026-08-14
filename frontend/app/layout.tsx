@@ -2,12 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-// Imports do Clerk
-import { ClerkProvider } from '@clerk/nextjs'
-import { ptPT } from '@clerk/localizations'
-
-// 1. Importar o Analytics
-import { Analytics } from "@vercel/analytics/react"
+import { ClerkProvider } from "@clerk/nextjs";
+import { ptPT } from "@clerk/localizations";
+import { Analytics } from "@vercel/analytics/react";
 import { ThemeProvider } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -22,8 +19,6 @@ export const viewport: Viewport = {
   themeColor: "#4f46e5",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export default function RootLayout({
