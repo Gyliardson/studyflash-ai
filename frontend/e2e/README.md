@@ -14,11 +14,13 @@ Authenticated E2E uses a dedicated Clerk **development instance** only. Provide 
 
 In GitHub Actions these variables are mapped from repository secrets. Never commit or print their values, and never substitute production credentials.
 
-The E2E setup calls `clerkSetup()` and uses only a synthetic `+clerk_test` identity. Tests use Clerk's official `clerk.signIn()` helper. No application auth bypass or fake session exists.
+The Playwright `setup` project calls `clerkSetup()` before dependent browser projects. It also creates or reuses only the synthetic `studyflash.e2e+clerk_test@example.com` identity. Authenticated tests use Clerk's official `clerk.signIn()` helper. No application auth bypass or fake session exists.
 
 No Playwright storage state is written. `.auth/` and `storage-state*.json` are gitignored defensively, and authenticated projects have traces disabled.
 
-The gate-critical authenticated flow signs in, reaches the protected dashboard, submits an empty generation request, verifies the deterministic validation message, confirms no AI request is made, and runs Axe against that authenticated state.
+The gate-critical authenticated flow signs in, reaches the protected dashboard, focuses and submits the real generation control with no text/PDF, verifies the deterministic validation message, confirms no AI request is made, and runs Axe against that authenticated state.
+
+CI provisions disposable PostgreSQL 16, applies migrations, verifies migration history and schema parity, then builds the production Next.js application before starting Playwright. The E2E dependency graph is committed and installed with `npm ci`.
 
 The suite must not depend on production Neon, production Clerk, or a remote LLM.
 
