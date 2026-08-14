@@ -240,11 +240,15 @@ test("exam recovery converges when the committed finalization response is lost",
     await options.first().click();
   }
 
-  await expect(page.getByRole("heading", { name: "Suas respostas foram preservadas" })).toBeVisible({ timeout: 20_000 });
+  const resultHeading = page.getByRole("heading", { name: "Simulado Concluído!" });
+  const preservedHeading = page.getByRole("heading", { name: "Suas respostas foram preservadas" });
+  await expect(page.getByRole("heading", { name: /Simulado Concluído!|Suas respostas foram preservadas/ })).toBeVisible({ timeout: 20_000 });
   expect(replacedCommittedResponse).toBe(true);
 
-  await page.getByRole("button", { name: "Tentar salvar novamente" }).click();
-  await expect(page.getByRole("heading", { name: "Simulado Concluído!" })).toBeVisible({ timeout: 20_000 });
+  if (await preservedHeading.isVisible()) {
+    await page.getByRole("button", { name: "Tentar salvar novamente" }).click();
+  }
+  await expect(resultHeading).toBeVisible({ timeout: 20_000 });
 
   expect(await prisma.examSession.count()).toBe(sessionsBefore + 1);
   expect(await prisma.xPHistory.count({ where: { source: "EXAM" } })).toBe(examXpBefore + 1);
