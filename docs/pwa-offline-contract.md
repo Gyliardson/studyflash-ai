@@ -8,7 +8,7 @@ StudyFlash is installable, but it is **not an offline-first data application**. 
 | --- | --- | --- |
 | Next.js hashed static assets | Cache First, bounded | Reuse immutable build assets when present |
 | Static product images/icons | Cache First, bounded | Reuse cached static media when present |
-| HTML navigation, public or authenticated | Network Only | Show `/_offline` if the network cannot answer |
+| HTML navigation, public or authenticated | Network Only | Show `/offline` if the network cannot answer |
 | RSC/data/API GETs | Network Only | Fail; UI must not substitute stale authenticated data |
 | Server Actions / POST mutations | Network only by browser; never runtime-cached | Operation remains unconfirmed and UI must not claim durable success |
 | AI generation | Network only | Report network failure; no generated-success state |
@@ -17,7 +17,7 @@ StudyFlash is installable, but it is **not an offline-first data application**. 
 
 ## Route contract
 
-Public routes such as `/`, `/termos` and `/privacidade` require the network for fresh documents. Once the production service worker controls the page, an uncached navigation without network receives the generic `/_offline` document.
+Public routes such as `/`, `/termos` and `/privacidade` require the network for fresh documents. Once the production service worker controls the page, an uncached navigation without network receives the generic `/offline` document.
 
 Authenticated routes (`/dashboard`, `/colecao`, deck detail, `/estudar`, `/simulado`, `/perfil` and study-plan routes) are also Network Only at the document/data layer. StudyFlash does not advertise previously visited authenticated pages as available offline.
 
