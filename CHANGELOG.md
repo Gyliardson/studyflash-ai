@@ -1,4 +1,6 @@
-# Histórico de Versões - StudiFlow
+# StudyFlash — Changelog
+
+> Earlier entries may reference the former working name **StudiFlow**. Historical entries preserve development context and are not release certification. PWA/offline behavior is under active validation as part of the current professionalization program.
 
 ## [v0.7.0] - 18/12/2025 (Marketing, Legal & Reestruturação de Rotas)
 
