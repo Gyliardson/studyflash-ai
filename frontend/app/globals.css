@@ -175,6 +175,12 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* A disabled-looking exam XP card is still informational content. Do not fade the
+   entire muted card: compositing opacity also fades its text below WCAG contrast. */
+.bg-card .bg-muted.border-border.opacity-70 {
+  opacity: 1;
+}
+
 /* === ANIMAÇÕES GLOBAIS === */
 
 /* Feixe de luz correndo da esquerda para direita */

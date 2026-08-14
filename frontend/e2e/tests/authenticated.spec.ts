@@ -202,3 +202,44 @@ test("authenticated exam runs through the real server-authoritative attempt boun
   }
   await expect(page.getByRole("heading", { name: "Simulado Concluído!" })).toBeVisible({ timeout: 20_000 });
 });
+
+test("exam recovery converges when the committed finalization response is lost", async ({ page }) => {
+  const sessionsBefore = await prisma.examSession.count();
+  const examXpBefore = await prisma.xPHistory.count({ where: { source: "EXAM" } });
+
+  await signIn(page);
+  await page.goto("/simulado");
+  await page.getByRole("button", { name: /Prática/i }).click();
+  await page.getByLabel("3. Volume").fill("5");
+  await page.getByRole("button", { name: /Iniciar Simulado/i }).click();
+  await expect(page.getByText(/1\s*\/\s*5/)).toBeVisible({ timeout: 20_000 });
+
+  let droppedCommittedResponse = false;
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (!droppedCommittedResponse && request.method() === "POST" && request.headers()["next-action"]) {
+      const response = await route.fetch();
+      expect(response.ok()).toBe(true);
+      droppedCommittedResponse = true;
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+
+  for (let question = 1; question <= 5; question += 1) {
+    const options = page.getByRole("group", { name: "Alternativas da questão" }).getByRole("button");
+    await expect(options.first()).toBeVisible();
+    await options.first().click();
+  }
+
+  await expect(page.getByRole("heading", { name: "Suas respostas foram preservadas" })).toBeVisible({ timeout: 20_000 });
+  expect(droppedCommittedResponse).toBe(true);
+
+  await page.getByRole("button", { name: "Tentar salvar novamente" }).click();
+  await expect(page.getByRole("heading", { name: "Simulado Concluído!" })).toBeVisible({ timeout: 20_000 });
+
+  expect(await prisma.examSession.count()).toBe(sessionsBefore + 1);
+  expect(await prisma.xPHistory.count({ where: { source: "EXAM" } })).toBe(examXpBefore + 1);
+  await expectNoBlockingAxeViolations(page);
+});

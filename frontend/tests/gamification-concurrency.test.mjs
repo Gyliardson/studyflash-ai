@@ -290,19 +290,26 @@ test("legacy isCorrect claims cannot turn a wrong selected option into a correct
   assert.equal(result.score, 0);
 });
 
-test("sequential replay of an exam attempt creates one session and one XP grant", async () => {
+test("sequential retry returns the canonical persisted result without another XP effect", async () => {
   const attempt = await createAttempt();
   const payload = finalizePayload(attempt);
   const first = await finalizeExamForUser(userA, payload, now);
-  const replay = await finalizeExamForUser(userA, payload, now);
+  const replay = await finalizeExamForUser(userA, {
+    ...payload,
+    timeSpentSeconds: 999,
+    answers: payload.answers.map((answer) => ({ ...answer, selectedOption: "Wrong 1", timeTaken: 999 })),
+  }, new Date(now.getTime() + 60_000));
 
   assert.equal(first.success, true);
-  assert.equal(replay.success, false);
+  assert.deepEqual(replay, first);
   assert.equal(await prisma.examSession.count({ where: { attemptId: attempt.attemptId } }), 1);
   assert.equal(await prisma.xPHistory.count({ where: { userId: userA, source: "EXAM" } }), 1);
+  const persisted = await prisma.examSession.findUniqueOrThrow({ where: { attemptId: attempt.attemptId } });
+  assert.equal(persisted.timeSpentSeconds, 30);
+  assert.equal(persisted.correctAnswers, 1);
 });
 
-test("concurrent replay of one exam attempt grants XP exactly once", async () => {
+test("concurrent replay converges on one session and one XP grant", async () => {
   const attempt = await createAttempt();
   const payload = finalizePayload(attempt);
   const results = await Promise.all([
@@ -310,7 +317,8 @@ test("concurrent replay of one exam attempt grants XP exactly once", async () =>
     finalizeExamForUser(userA, payload, now),
   ]);
 
-  assert.equal(results.filter((result) => result.success).length, 1);
+  assert.equal(results.filter((result) => result.success).length, 2);
+  assert.deepEqual(results[0], results[1]);
   assert.equal(await prisma.examSession.count({ where: { attemptId: attempt.attemptId } }), 1);
   assert.equal(await prisma.xPHistory.count({ where: { userId: userA, source: "EXAM" } }), 1);
 });
