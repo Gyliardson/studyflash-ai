@@ -45,14 +45,18 @@ test("flashcard save retry converges after server commit response is lost", asyn
     where: { userId: deck.userId, source: "CREATE_CARD" },
   }).then((result) => result._sum.amount ?? 0);
 
-  let droppedCommittedResponse = false;
+  let replacedCommittedResponse = false;
   await page.route("**/*", async (route) => {
     const request = route.request();
-    if (!droppedCommittedResponse && request.method() === "POST" && request.headers()["next-action"]) {
+    if (!replacedCommittedResponse && request.method() === "POST" && request.headers()["next-action"]) {
       const response = await route.fetch();
       expect(response.ok()).toBe(true);
-      droppedCommittedResponse = true;
-      await route.abort("failed");
+      replacedCommittedResponse = true;
+      await route.fulfill({
+        status: 503,
+        contentType: "text/plain",
+        body: "Simulated gateway failure after upstream commit",
+      });
       return;
     }
     await route.continue();
@@ -60,7 +64,7 @@ test("flashcard save retry converges after server commit response is lost", asyn
 
   await dialog.getByRole("button", { name: "Confirmar" }).click();
   await expect(dialog.getByRole("alert")).toContainText("mesmo pedido será recuperado sem duplicar cards ou XP");
-  expect(droppedCommittedResponse).toBe(true);
+  expect(replacedCommittedResponse).toBe(true);
 
   await dialog.getByRole("button", { name: "Confirmar" }).click();
   await expect(dialog).toHaveCount(0);
