@@ -158,7 +158,7 @@ jobs:
         run: |
           set +e
           npx eslint --version 2>&1 | tee /tmp/studyflash-eslint.log
-          npx eslint . --max-warnings -1 2>&1 | tee -a /tmp/studyflash-eslint.log
+          npx eslint . 2>&1 | tee -a /tmp/studyflash-eslint.log
           status=${PIPESTATUS[0]}
           echo "eslint_exit_status=$status" | tee -a /tmp/studyflash-eslint.log
           exit "$status"
