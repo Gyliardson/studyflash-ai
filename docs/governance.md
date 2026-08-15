@@ -10,12 +10,13 @@ Normal engineering changes follow:
 
 `main` is the release branch. `portfolio/revamp-2026` is the controlled integration branch. Work branches must not bypass the integration pull-request path. The final integration-to-`main` pull request is created only after clean-room validation, governance reconciliation, and the independent adversarial release audit. Automation must never merge that final pull request.
 
-Before final certification, the integration candidate must also contain the current `main` history. If `main` advances independently while professionalization is in progress, reconcile that history through a reviewed work-branch pull request, resolve any overlapping release-facing files deliberately, and re-run the exact-SHA deterministic matrix. Do not defer branch divergence or conflict resolution to the final `portfolio/revamp-2026` -> `main` pull request, because that would create an unvalidated merge result.
+Before final certification, the integration candidate must also contain the current `main` history. If `main` advances independently while professionalization is in progress, reconcile that history through a reviewed work-branch pull request, resolve overlapping release-facing files deliberately, and re-run the exact-SHA deterministic matrix. Do not defer branch divergence or conflict resolution to the final `portfolio/revamp-2026` -> `main` pull request, because that would create an unvalidated merge result.
 
 ## Required deterministic evidence
 
-The release candidate must be validated at its exact head SHA. The intended required gates are:
+The release candidate must be validated at its exact head SHA. The required gates are:
 
+- `Secret Scan / Git history secret scan`
 - `CI / Frontend lint, typecheck and build`
 - `CI / Frontend dependency security`
 - `CI / Ownership and gamification (PostgreSQL)`
@@ -28,30 +29,31 @@ A moved head invalidates evidence from the previous SHA. The same deterministic 
 
 Browser E2E uses standard `pull_request` events. The secret-bearing authenticated Clerk job is restricted to pushes and same-repository pull requests, so untrusted fork code must not receive repository development secrets.
 
-## GitHub settings target
+## Enforced GitHub control plane
 
-The repository control plane should enforce the process above rather than relying only on convention.
+The repository currently enforces this process with active repository rulesets for both protected promotion branches.
 
 ### `main`
 
-Create a branch ruleset or equivalent branch protection that:
+`Protect main` applies to the default branch and:
 
 1. requires changes through pull requests;
-2. blocks normal direct pushes and force pushes;
-3. requires the deterministic checks listed above once their exact GitHub check contexts are confirmed on the final candidate;
-4. requires the branch to be current with the protected base before merge, so stale checks cannot authorize a moved candidate;
-5. preserves administrator emergency access only when intentionally configured and auditable.
+2. blocks deletion and non-fast-forward updates;
+3. requires the deterministic status checks listed above with strict up-to-date semantics;
+4. requires review-thread resolution before merge;
+5. has no bypass actors configured.
 
 ### `portfolio/revamp-2026`
 
-Create a ruleset or equivalent branch protection that:
+`Protect portfolio integration` applies specifically to `refs/heads/portfolio/revamp-2026` and:
 
-1. requires normal integration changes through pull requests from `work/*` branches;
-2. blocks force pushes and accidental deletion;
-3. requires the stable deterministic integration checks appropriate to the change, including Browser E2E and clean-room proof for release-gate changes;
-4. never requires a live remote LLM.
+1. requires normal integration changes through pull requests from work branches;
+2. blocks deletion and non-fast-forward updates;
+3. requires the same deterministic release-gate contexts, including Secret Scan, Browser E2E and Clean Room Release Proof;
+4. requires review-thread resolution before merge;
+5. has no bypass actors configured.
 
-The exact required-status contexts must be copied from successful GitHub check runs, not guessed from workflow filenames.
+The exact required-status contexts come from successful GitHub check runs rather than workflow filenames. A live remote LLM is not a required status check.
 
 ## Supply-chain policy
 
@@ -59,29 +61,22 @@ Security-sensitive GitHub-owned actions in the release workflows are pinned to i
 
 The workflows use least-privilege `contents: read` permissions unless a future job demonstrates a narrower additional permission is necessary.
 
+The `Secret Scan` workflow checks Git history with full checkout depth and a SHA-pinned Gitleaks action. Secret scanning is a required release gate rather than an advisory-only workflow.
+
 ## Vulnerability reporting
 
-GitHub Private Vulnerability Reporting is the preferred repository-native disclosure path and should be enabled in repository settings. Until it is verifiably enabled, `SECURITY.md` must not claim that it is available; reporters should use the documented private maintainer-contact path instead of publishing exploit details.
+GitHub Private Vulnerability Reporting is enabled for the repository and is the preferred disclosure path. `SECURITY.md` directs reporters to GitHub's private vulnerability-reporting flow and retains a private maintainer-contact fallback if that repository-native channel is temporarily unavailable.
 
-After enabling Private Vulnerability Reporting, update `SECURITY.md` to make that channel primary and record the setting in release evidence.
+Security reports must not be opened as public issues when they contain exploit details, credentials, personal data, or reproducible attack payloads.
 
 ## Repository metadata
 
-The public repository description should match the current product rather than legacy provider-specific framing. Recommended description:
+The public repository description is reconciled with the current product and stack:
 
-> StudyFlash — plataforma de estudos com flashcards, revisão espaçada e simulados com IA; Next.js, FastAPI, PostgreSQL/Neon e Clerk.
+> StudyFlash - AI-powered study platform for flashcards, spaced repetition, and practice exams; built with Next.js, FastAPI, PostgreSQL/Neon, and Clerk.
 
-This metadata is a GitHub control-plane setting. Source documentation must not claim it was changed until the repository setting itself is re-read and verified.
+Legacy provider-specific positioning is no longer used as the repository description.
 
-## Manual settings checklist
+## Verification rule
 
-The following items require GitHub repository-settings access when automation cannot mutate them:
-
-- create and verify the `main` ruleset/protection;
-- create and verify the `portfolio/revamp-2026` ruleset/protection;
-- confirm the exact required check contexts from successful candidate runs;
-- enable Private Vulnerability Reporting and then reconcile `SECURITY.md`;
-- replace the stale repository description;
-- re-read rulesets/protection, vulnerability-reporting state, and repository metadata from GitHub and attach the observed result to issue #28.
-
-Issue #28 remains open until these control-plane requirements are actually enforced. Documentation of a desired setting is not evidence that the setting exists.
+Source documentation is not sufficient evidence for governance state. Final certification must re-read the active rulesets, required checks, Private Vulnerability Reporting state, repository metadata, exact candidate SHA, and corresponding successful checks from GitHub.
