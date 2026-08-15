@@ -141,7 +141,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Enforce fail-closed trusted browser evidence
+      - name: Checkout shared required-gate policy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Enforce shared fail-closed trusted browser policy
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -150,13 +153,9 @@ jobs:
           EXECUTION_RESULT: ${{ needs.browser-execution.result }}
         run: |
           set -euo pipefail
-          # STUDYFLASH_REQUIRED_GATE_POLICY_V1
-          if [[ "$EVENT_NAME" == "pull_request" && "$HEAD_REPO" != "$REPOSITORY" ]]; then
-            echo "Fork pull requests are not eligible to satisfy the trusted Browser E2E release gate; secrets remain withheld and promotion fails closed." >&2
-            exit 1
-          fi
-          if [[ "$EXECUTION_RESULT" != "success" ]]; then
-            echo "Mandatory trusted Browser E2E execution did not succeed: ${EXECUTION_RESULT}" >&2
-            exit 1
-          fi
-          echo "Required Browser E2E context is backed by successful trusted execution evidence."
+          # STUDYFLASH_REQUIRED_GATE_POLICY_V2
+          python3 .github/scripts/required-gate-policy.py evaluate \
+            --event-name "$EVENT_NAME" \
+            --head-repo "$HEAD_REPO" \
+            --repository "$REPOSITORY" \
+            --execution-result "$EXECUTION_RESULT"
