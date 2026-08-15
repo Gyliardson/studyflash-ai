@@ -154,7 +154,15 @@ Deployments must provision migrations separately from application startup and ke
 
 ## Portfolio evidence
 
-Deterministic Playwright runs generate desktop/mobile product screenshots and preserve Browser E2E reports/artifacts in GitHub Actions. Final curated repository media is intentionally treated as release evidence and should only be committed after the corresponding UI candidate has passed Browser E2E/accessibility review. Capture names, provenance requirements and refresh rules are documented in [`docs/media.md`](docs/media.md).
+Deterministic Playwright runs generate desktop/mobile product screenshots and preserve Browser E2E reports/artifacts in GitHub Actions. The curated repository copies below come from synthetic Browser E2E candidate `0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`, which passed CI #561, Study Session Integrity #276 and Browser E2E #405 before visual inspection and curation. Full provenance and refresh rules are documented in [`docs/media.md`](docs/media.md).
+
+### Desktop — create study material
+
+![StudyFlash desktop creation flow](docs/media/create-flashcards-desktop-light.webp)
+
+### Mobile — profile and progress
+
+![StudyFlash mobile profile and progress](docs/media/profile-mobile-light.webp)
 
 ## Security and license
 
