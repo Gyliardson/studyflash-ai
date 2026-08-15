@@ -79,6 +79,9 @@ jobs:
       - name: Run deterministic frontend AI failure policy tests
         run: node --test --experimental-strip-types tests/ai-failure-policy.test.mjs
 
+      - name: Run deterministic exam timing race tests
+        run: node --test --experimental-strip-types tests/exam-timing.test.mjs
+
       - name: Gate production gamification wiring
         shell: bash
         run: |
