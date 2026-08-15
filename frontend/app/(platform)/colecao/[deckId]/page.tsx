@@ -7,9 +7,11 @@ import { listarCardsDoBaralho, excluirFlashcard } from "@/app/actions";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 
+type DeckCard = Awaited<ReturnType<typeof listarCardsDoBaralho>>[number];
+
 export default function DetalhesBaralhoPage({ params }: { params: Promise<{ deckId: string }> }) {
     const { isLoaded, isSignedIn } = useUser();
-    const [cards, setCards] = useState<any[]>([]);
+    const [cards, setCards] = useState<DeckCard[]>([]);
     const [loading, setLoading] = useState(true);
     const [deckId, setDeckId] = useState<string>("");
     const [mutationError, setMutationError] = useState<string | null>(null);

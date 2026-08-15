@@ -1,3 +1,5 @@
+import type { Prisma, PrismaClient } from "@prisma/client";
+
 type MutationFailure = { success: false; error: string };
 type MutationSuccess<T extends object = object> = { success: true } & T;
 type MutationResult<T extends object = object> = MutationSuccess<T> | MutationFailure;
@@ -13,7 +15,7 @@ type Receipt = {
   createdAt: Date;
 };
 
-type DbLike = Record<string, any>;
+type DbLike = PrismaClient | Prisma.TransactionClient;
 
 export function mutationFingerprint(value: unknown): string;
 export function normalizedDeckNameKey(name: string): string;
@@ -33,7 +35,7 @@ export function runMutationWithReceipt<T extends object>(input: {
   requestKey: string;
   fingerprint: string;
   replay: (receipt: Receipt, db: DbLike) => Promise<MutationResult<T>> | MutationResult<T>;
-}, operation: (tx: DbLike) => Promise<(MutationResult<T> & { receiptResultId?: string; receiptXpAwarded?: number })>): Promise<MutationResult<T>>;
+}, operation: (tx: Prisma.TransactionClient) => Promise<(MutationResult<T> & { receiptResultId?: string; receiptXpAwarded?: number })>): Promise<MutationResult<T>>;
 
 export function createDeckForUser(userId: string, name: string, requestKey: string): Promise<MutationResult<{ deck: { id: string; userId: string; nome: string; nameKey: string | null; createdAt: Date } }>>;
 

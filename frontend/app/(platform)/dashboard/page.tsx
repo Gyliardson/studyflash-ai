@@ -6,11 +6,14 @@ import Flashcard from "@/app/components/Flashcard";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import SaveModal from "@/app/components/SaveModal";
 
+type GeneratedFlashcard = { frente: string; verso: string };
+type GenerateResponse = { cartoes?: GeneratedFlashcard[]; detail?: string };
+
 export default function Home() {
     const { isSignedIn } = useUser();
     const [texto, setTexto] = useState("");
     const [arquivo, setArquivo] = useState<File | null>(null);
-    const [flashcards, setFlashcards] = useState<any[]>([]);
+    const [flashcards, setFlashcards] = useState<GeneratedFlashcard[]>([]);
     const [loading, setLoading] = useState(false);
     const [erro, setErro] = useState("");
     const [saveSuccess, setSaveSuccess] = useState(false);
@@ -44,23 +47,27 @@ export default function Home() {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
+                const errorData = await response.json().catch(() => ({})) as GenerateResponse;
                 const mensagemErro = errorData.detail || "Ocorreu um erro ao processar.";
                 if (response.status === 504) throw new Error("O servidor demorou muito. Tente um arquivo menor.");
                 if (response.status === 422) throw new Error(mensagemErro);
                 throw new Error(mensagemErro);
             }
 
-            const data = await response.json();
+            const data = await response.json() as GenerateResponse;
+            if (!Array.isArray(data.cartoes)) throw new Error("A geração retornou um formato inválido. Tente novamente.");
             setFlashcards(data.cartoes);
             if (arquivo) {
                 setArquivo(null);
                 if (fileInputRef.current) fileInputRef.current.value = "";
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            if (error.name === "AbortError") setErro("Tempo esgotado. Tente um texto ou PDF menor.");
-            else setErro(error.message);
+            if (error instanceof Error && error.name === "AbortError") {
+                setErro("Tempo esgotado. Tente um texto ou PDF menor.");
+            } else {
+                setErro(error instanceof Error ? error.message : "Ocorreu um erro inesperado durante a geração.");
+            }
         } finally {
             setLoading(false);
         }
@@ -217,7 +224,7 @@ export default function Home() {
                         </div>
 
                         <div className="mt-6 grid grid-cols-1 gap-6 pb-8 md:grid-cols-2 lg:grid-cols-3">
-                            {flashcards.map((card: any, index) => (
+                            {flashcards.map((card, index) => (
                                 <Flashcard key={index} index={index} frente={card.frente} verso={card.verso} />
                             ))}
                         </div>

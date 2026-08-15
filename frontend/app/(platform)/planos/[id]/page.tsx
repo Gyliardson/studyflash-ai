@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { buscarPlanoPorId } from "@/app/actions";
 import { gerarCardsParaTopicoIdempotente } from "@/app/idempotent-actions";
 import { useUser } from "@clerk/nextjs";
@@ -32,16 +32,8 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
     const [id, setId] = useState<string>("");
     const generationKeysRef = useRef<Record<string, string>>({});
 
-    useEffect(() => {
-        params.then((resolved) => setId(resolved.id));
-    }, [params]);
-
-    useEffect(() => {
-        if (!isLoaded || !id) return;
-        void carregarPlano(true);
-    }, [isLoaded, id]);
-
-    async function carregarPlano(showLoading = false) {
+    const carregarPlano = useCallback(async (showLoading = false) => {
+        if (!id) return;
         if (showLoading) setLoading(true);
         setLoadError(false);
         try {
@@ -53,7 +45,16 @@ export default function DetalhesPlanoPage({ params }: { params: Promise<{ id: st
         } finally {
             if (showLoading) setLoading(false);
         }
-    }
+    }, [id]);
+
+    useEffect(() => {
+        params.then((resolved) => setId(resolved.id));
+    }, [params]);
+
+    useEffect(() => {
+        if (!isLoaded || !id) return;
+        void carregarPlano(true);
+    }, [carregarPlano, id, isLoaded]);
 
     async function handleGerarConteudo(topicId: string, topicTitle: string) {
         if (generatingTopicIds.includes(topicId)) return;
