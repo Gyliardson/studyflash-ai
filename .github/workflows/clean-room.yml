@@ -201,9 +201,26 @@ jobs:
             *) echo "Clean-room Browser E2E must use a Clerk development key" >&2; exit 1 ;;
           esac
 
+      - name: Prove clean-room browser gate is retry-free
+        working-directory: frontend/e2e
+        shell: bash
+        env:
+          RETRY_POLICY_CANARY: '1'
+        run: |
+          set +e
+          npx playwright test tests/retry-policy.smoke.spec.ts --project=public-desktop 2>&1 | tee /tmp/studyflash-retry-policy.log
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0 || { echo "Retry-policy canary unexpectedly passed; retries may be enabled" >&2; exit 1; }
+          grep -F "RETRY_POLICY_CANARY_FIRST_ATTEMPT" /tmp/studyflash-retry-policy.log >/dev/null || {
+            echo "Retry-policy canary did not fail for the intended first-attempt sentinel" >&2
+            exit 1
+          }
+          echo "Clean-room Browser E2E is fail-closed on the first failed attempt."
+
       - name: Run Browser E2E desktop/mobile, accessibility and PWA gates
         working-directory: frontend
-        run: npm run test:e2e
+        run: npm run test:e2e -- --retries=0
 
       - name: Confirm backend remained healthy
         shell: bash
@@ -218,6 +235,7 @@ jobs:
             /tmp/studyflash-fastapi.log
             /tmp/studyflash-health.json
             /tmp/studyflash-eslint.log
+            /tmp/studyflash-retry-policy.log
             frontend/e2e/test-results
             frontend/e2e/playwright-report
           if-no-files-found: ignore

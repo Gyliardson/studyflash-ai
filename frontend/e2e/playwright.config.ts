@@ -11,7 +11,10 @@ const pwaTests = /pwa\.spec\.ts/;
 
 export default defineConfig({
   testDir: "./tests",
-  retries: process.env.CI ? 1 : 0,
+  // Release evidence must be fail-closed: a first-attempt failure is a gate failure.
+  // Keep retries disabled in every environment so Browser E2E and Clean Room cannot
+  // turn a deterministic regression or flake into a green required check.
+  retries: 0,
   workers: process.env.CI ? 1 : undefined,
   outputDir: "test-results",
   reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],

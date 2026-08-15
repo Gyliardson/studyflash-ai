@@ -101,9 +101,26 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Prove release browser gate is retry-free
+        working-directory: frontend/e2e
+        shell: bash
+        env:
+          RETRY_POLICY_CANARY: '1'
+        run: |
+          set +e
+          npx playwright test tests/retry-policy.smoke.spec.ts --project=public-desktop 2>&1 | tee /tmp/studyflash-retry-policy.log
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0 || { echo "Retry-policy canary unexpectedly passed; retries may be enabled" >&2; exit 1; }
+          grep -F "RETRY_POLICY_CANARY_FIRST_ATTEMPT" /tmp/studyflash-retry-policy.log >/dev/null || {
+            echo "Retry-policy canary did not fail for the intended first-attempt sentinel" >&2
+            exit 1
+          }
+          echo "Release Browser E2E is fail-closed on the first failed attempt."
+
       - name: Run deterministic browser gates
-        working-directory: frontend
-        run: npm run test:e2e
+        working-directory: frontend/e2e
+        run: npx playwright test --retries=0
 
       - name: Upload browser evidence
         if: always()
@@ -111,6 +128,7 @@ jobs:
         with:
           name: browser-e2e-${{ env.EVIDENCE_SHA }}
           path: |
+            /tmp/studyflash-retry-policy.log
             frontend/e2e/test-results
             frontend/e2e/playwright-report
           if-no-files-found: ignore
