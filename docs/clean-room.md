@@ -17,6 +17,10 @@ The workflow uses only disposable/development infrastructure:
 - no production Clerk project;
 - no remote LLM as a critical verification dependency.
 
+Application dependency versions are source-controlled: the frontend/E2E trees use npm lockfiles and the backend installs the exact versions recorded in `requirements.txt`, whose direct dependency intent is maintained separately in `requirements.in`. Hosted-runner image internals are recorded by the run and are not claimed to be bit-for-bit reproducible outside GitHub Actions.
+
+The disposable PostgreSQL service intentionally follows the maintained `postgres:16` patch line instead of freezing one patch digest indefinitely. This keeps CI on current PostgreSQL 16 security/bugfix releases while migrations and domain behavior are revalidated from an empty database on every candidate. The exact server/client versions are visible in each run's service/tool logs; StudyFlash does not claim an immutable container image here.
+
 ## Fresh-state assertions
 
 Immediately after `actions/checkout`, the workflow requires the absence of:
@@ -32,7 +36,7 @@ A failure here means the repository accidentally depends on generated or local s
 ## Bootstrap and verification order
 
 1. Record the exact Git SHA and Python/Node/npm/PostgreSQL client versions.
-2. `pip install -r requirements.txt`.
+2. Install the exact backend dependency graph from `requirements.txt`; backend tests verify every installable lock entry uses `==` and every direct entry from `requirements.in` remains represented.
 3. Compile the Python application and execute deterministic backend tests.
 4. Start FastAPI with a synthetic internal key and require `GET /` to return successfully.
 5. `npm ci` in `frontend/` and `frontend/e2e/`.
@@ -81,4 +85,4 @@ Authenticated Browser E2E additionally requires the documented Clerk development
 
 ## Release interpretation
 
-A green clean-room workflow proves repository bootstrap and deterministic composition for the exact tested SHA. It does **not** by itself authorize promotion to `main`. Final promotion still requires repository governance/rulesets and the adversarial audit tracked by the professionalization program.
+A green clean-room workflow proves that the exact tested repository SHA can bootstrap from fresh state using its committed application dependency locks and pass the deterministic domain/browser matrix against disposable infrastructure. It does **not** claim that GitHub's hosted runner image or maintained PostgreSQL 16 patch tag is bit-for-bit immutable, and it does **not** by itself authorize promotion to `main`. Final promotion still requires repository governance/rulesets and the adversarial audit tracked by the professionalization program.

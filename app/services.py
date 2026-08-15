@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-import fitz
+import pymupdf
 
 from .ai_errors import AIInvalidInputError, AIInvalidOutputError
 from .ai_provider import AIProvider, get_ai_provider
@@ -19,7 +19,7 @@ def limpar_texto_pdf(texto_bruto: str) -> str:
 def extrair_texto_do_pdf(arquivo_bytes: bytes) -> str:
     doc = None
     try:
-        doc = fitz.open(stream=arquivo_bytes, filetype="pdf")
+        doc = pymupdf.open(stream=arquivo_bytes, filetype="pdf")
         parts = [page.get_text("text") for page in doc]
         return limpar_texto_pdf(" ".join(part for part in parts if part))
     except Exception:
