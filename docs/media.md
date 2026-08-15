@@ -13,7 +13,7 @@ The capture contract lives in `frontend/e2e/tests/product-ux.spec.ts`. It attach
 - `study-desktop-light` — 1440×1000 viewport;
 - `exam-desktop-light` — 1440×1000 viewport.
 
-Additional Browser E2E specs may attach screenshots for failure/recovery or creation flows, but final portfolio media should prefer the stable representative surfaces above unless a specific behavior needs evidence.
+Additional Browser E2E specs may attach screenshots for failure/recovery or creation flows, but final portfolio media should prefer stable representative surfaces unless a specific behavior needs evidence.
 
 ## Evidence provenance
 
@@ -25,13 +25,16 @@ A screenshot set is acceptable as release/portfolio evidence only when all of th
 4. synthetic test identity/data only;
 5. visual inspection for clipping, overflow, unintended secrets/identifiers, loading/error artifacts and responsive regressions.
 
-For the #26 documentation candidate, predecessor SHA `8a8a629190727a3f2d29d42036b3637958284368` passed Browser E2E #391 and produced artifact `browser-e2e-8a8a629190727a3f2d29d42036b3637958284368`. That artifact was visually inspected during #26 and included the required desktop/mobile light/dark surfaces. It is evidence for the inspected SHA only; it must not be reused as merge eligibility for a later head.
+The curated #26 media was sourced from candidate SHA `0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`, which passed Browser E2E #405 together with CI #561 and Study Session Integrity #276. Artifact `browser-e2e-0fdda9a71a9c23ec77d63d4ce31c195ef9605c95` was downloaded and its representative desktop/mobile, light/dark, study/exam/create/profile/navigation captures were visually inspected before curation.
 
 ## Curated repository media
 
-GitHub Actions artifacts expire, so final README/portfolio screenshots must be copied from a green exact-SHA artifact into a durable repository media location (for example `docs/media/`) only after visual review. Preserve descriptive filenames and record the source SHA in the commit/PR.
+The repository keeps a deliberately small portfolio set rather than duplicating the complete expiring Playwright artifact:
 
-Do not optimize, crop or restyle a screenshot in a way that hides product defects. If compression is applied, keep text readable and do not alter UI content.
+- `docs/media/create-flashcards-desktop-light.webp` — desktop/light creation surface, downscaled from the reviewed exact-SHA artifact without cropping or content alteration;
+- `docs/media/profile-mobile-light.webp` — mobile/light profile surface from the same reviewed artifact.
+
+The WebP copies are presentation derivatives of the reviewed screenshots. Compression/downscaling must keep text readable and must never crop or restyle the UI to hide defects. Full-resolution evidence remains available in the corresponding Browser E2E artifact while retained by GitHub Actions.
 
 ## Refresh procedure
 
@@ -40,5 +43,5 @@ Do not optimize, crop or restyle a screenshot in a way that hides product defect
 3. Download the Browser E2E artifact.
 4. Inspect every proposed screenshot at full resolution.
 5. Copy only approved screenshots to the durable media paths.
-6. Update README references if the selected filenames change.
+6. Update this provenance record and README references if filenames change.
 7. Re-run CI/Browser E2E if committing media or documentation changes moves the PR head; merge eligibility always belongs to the new exact head.
