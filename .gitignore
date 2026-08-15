@@ -1,8 +1,53 @@
+# Python
+.venv/
 venv/
-.env
 __pycache__/
-.DS_Store
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment files and credentials
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Node / Next.js
 node_modules/
 .next/
-.vs
-.VScode
+out/
+coverage/
+
+# Browser test and authentication artifacts
+**/e2e/test-results/
+**/e2e/playwright-report/
+**/e2e/.auth/
+**/e2e/storage-state*.json
+**/trace.zip
+**/.clerk/
+
+# Local deployment state
+**/.vercel/
+
+# Databases, backups, and debug output
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.backup
+*.orig
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editors
+.DS_Store
+.vs/
+.vscode/
+.idea/
