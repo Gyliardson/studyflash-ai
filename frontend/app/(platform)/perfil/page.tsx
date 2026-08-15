@@ -7,9 +7,17 @@ import { calcularNivel } from "@/lib/gamification";
 import { useUser } from "@clerk/nextjs";
 import { Settings } from "lucide-react";
 
+type UserProfile = {
+    xp: number;
+    level: number;
+    currentStreak: number;
+    longestStreak?: number;
+    weeklyXp: number;
+};
+
 export default function PerfilPage() {
     const { user } = useUser();
-    const [profile, setProfile] = useState<any>(null);
+    const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
 
@@ -58,6 +66,7 @@ export default function PerfilPage() {
     const safeProgress = Math.max(0, Math.min(100, progress));
     const memberSince = user?.createdAt ? new Date(user.createdAt).getFullYear() : null;
     const displayName = user?.fullName || user?.firstName || "Seu perfil";
+    const avatarLabel = user?.fullName ? `Avatar de ${user.fullName}` : "Avatar do usuário";
 
     return (
         <main className="min-h-screen bg-background flex flex-col items-center p-4 md:p-6 transition-colors duration-300">
@@ -71,10 +80,11 @@ export default function PerfilPage() {
                         <div className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-6">
                             <div className="-mt-16 relative z-10 shrink-0">
                                 {user?.imageUrl ? (
-                                    <img
-                                        src={user.imageUrl}
-                                        alt={user?.fullName ? `Avatar de ${user.fullName}` : "Avatar do usuário"}
-                                        className="w-32 h-32 rounded-3xl border-4 border-card shadow-xl bg-muted object-cover"
+                                    <div
+                                        role="img"
+                                        aria-label={avatarLabel}
+                                        className="w-32 h-32 rounded-3xl border-4 border-card shadow-xl bg-muted bg-cover bg-center"
+                                        style={{ backgroundImage: `url(${JSON.stringify(user.imageUrl)})` }}
                                     />
                                 ) : (
                                     <div className="flex h-32 w-32 items-center justify-center rounded-3xl border-4 border-card bg-muted text-3xl font-black text-muted-foreground shadow-xl" aria-label="Avatar indisponível">
