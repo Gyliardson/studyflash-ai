@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Check, Monitor, Moon, Sun, UserRound } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
 
 const appearanceOptions = [
   { value: "light", label: "Claro", description: "Sempre usar a interface clara.", icon: Sun },
@@ -13,9 +12,6 @@ const appearanceOptions = [
 
 export default function ConfiguracoesPage() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
 
   return (
     <main className="min-h-screen bg-background px-4 pb-16 pt-4 md:px-6">
@@ -36,7 +32,7 @@ export default function ConfiguracoesPage() {
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3" aria-label="Tema da interface">
             {appearanceOptions.map(({ value, label, description, icon: Icon }) => {
-              const selected = mounted && theme === value;
+              const selected = theme === value;
               return (
                 <button
                   key={value}
