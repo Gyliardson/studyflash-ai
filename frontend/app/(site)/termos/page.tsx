@@ -17,7 +17,7 @@ export default function TermsPage() {
         <div className="p-4 bg-muted/50 border border-border rounded-lg">
           <p className="font-semibold text-foreground mb-2">Aviso Importante sobre Inteligência Artificial:</p>
           <p>
-            O usuário reconhece que o conteúdo gerado pela nossa Inteligência Artificial (LLM) pode conter erros, imprecisões ou "alucinações". O StudyFlash atua como uma ferramenta de auxílio e não substitui o estudo direto das fontes originais. 
+            O usuário reconhece que o conteúdo gerado pela nossa Inteligência Artificial (LLM) pode conter erros, imprecisões ou &ldquo;alucinações&rdquo;. O StudyFlash atua como uma ferramenta de auxílio e não substitui o estudo direto das fontes originais. 
             <strong> É de responsabilidade exclusiva do usuário verificar a veracidade e exatidão de todo o material gerado antes de utilizá-lo para fins acadêmicos ou profissionais.</strong>
           </p>
         </div>
