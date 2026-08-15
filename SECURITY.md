@@ -2,9 +2,9 @@
 
 ## Reporting a vulnerability
 
-If you believe you found a security vulnerability in StudyFlash, please report it privately to the repository maintainer rather than opening a public issue with exploit details, credentials, personal data or reproducible attack payloads.
+If you believe you found a security vulnerability in StudyFlash, use GitHub's **Private Vulnerability Reporting** for this repository whenever possible. Open the repository's **Security** tab, choose **Report a vulnerability**, and submit the report privately rather than opening a public issue with exploit details, credentials, personal data or reproducible attack payloads.
 
-Use the maintainer's public GitHub profile/contact channels to establish a private reporting channel. Include the affected component, impact, reproduction conditions and any evidence needed to validate the issue, while minimizing exposure of sensitive data.
+If Private Vulnerability Reporting is temporarily unavailable, use the maintainer's public GitHub profile/contact channels only to establish an alternative private reporting channel. Include the affected component, impact, reproduction conditions and the minimum evidence needed to validate the issue, while minimizing exposure of sensitive data.
 
 ## Scope
 
