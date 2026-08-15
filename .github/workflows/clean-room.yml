@@ -152,9 +152,16 @@ jobs:
           test ! -e frontend/prisma/seed.js
           echo "No production-like seed is required; deterministic suites create isolated synthetic fixtures."
 
-      - name: Lint frontend
+      - name: Lint frontend with durable diagnostics
         working-directory: frontend
-        run: npx eslint . --max-warnings=-1
+        shell: bash
+        run: |
+          set +e
+          npx eslint --version 2>&1 | tee /tmp/studyflash-eslint.log
+          npx eslint . --max-warnings -1 2>&1 | tee -a /tmp/studyflash-eslint.log
+          status=${PIPESTATUS[0]}
+          echo "eslint_exit_status=$status" | tee -a /tmp/studyflash-eslint.log
+          exit "$status"
 
       - name: Typecheck frontend
         working-directory: frontend
@@ -210,6 +217,7 @@ jobs:
           path: |
             /tmp/studyflash-fastapi.log
             /tmp/studyflash-health.json
+            /tmp/studyflash-eslint.log
             frontend/e2e/test-results
             frontend/e2e/playwright-report
           if-no-files-found: ignore
