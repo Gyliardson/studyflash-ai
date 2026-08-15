@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "StudyFlash",
-  description: "Gera flashcards com IA",
+  description: "Flashcards, revisão espaçada e simulados com IA e progresso persistente.",
   manifest: "/manifest.webmanifest",
 };
 
