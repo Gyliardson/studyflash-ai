@@ -143,7 +143,26 @@ export default function SimuladoContent() {
         try {
             const res = await finalizarSimulado({ attemptId, timeSpentSeconds: totalTime, answers: finalAnswers });
             if (res.success) {
-                setFinalResult({ ...res, totalTime, limitReached: res.limitReached ?? false });
+                if (
+                    typeof res.score !== "number" ||
+                    typeof res.correctAnswers !== "number" ||
+                    typeof res.totalQuestions !== "number" ||
+                    typeof res.xpGained !== "number" ||
+                    !res.difficulty
+                ) {
+                    setFinalizeError("O servidor confirmou a tentativa, mas retornou um resultado incompleto. Tente recuperar o resultado novamente.");
+                    setStep('FINALIZE_ERROR');
+                    return;
+                }
+                setFinalResult({
+                    score: res.score,
+                    difficulty: res.difficulty,
+                    correctAnswers: res.correctAnswers,
+                    totalQuestions: res.totalQuestions,
+                    limitReached: res.limitReached ?? false,
+                    xpGained: res.xpGained,
+                    totalTime,
+                });
                 setStep('RESULT');
                 return;
             }
