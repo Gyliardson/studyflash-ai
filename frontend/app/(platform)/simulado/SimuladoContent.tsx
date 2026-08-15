@@ -143,7 +143,7 @@ export default function SimuladoContent() {
         try {
             const res = await finalizarSimulado({ attemptId, timeSpentSeconds: totalTime, answers: finalAnswers });
             if (res.success) {
-                setFinalResult({ ...res, totalTime, limitReached: res.limitReached });
+                setFinalResult({ ...res, totalTime, limitReached: res.limitReached ?? false });
                 setStep('RESULT');
                 return;
             }
