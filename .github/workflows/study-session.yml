@@ -50,6 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 ../.github/scripts/required-gate-policy.py self-test
+          python3 ../.github/scripts/required-gate-policy.py mutation-test
           python3 ../.github/scripts/required-gate-policy.py verify-workflows --repo-root ..
 
       - name: Setup Node.js
