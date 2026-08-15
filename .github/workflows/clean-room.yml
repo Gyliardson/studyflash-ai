@@ -1,0 +1,224 @@
+name: Clean Room Release Proof
+
+on:
+  push:
+    branches:
+      - 'work/27-*'
+      - portfolio/revamp-2026
+  pull_request:
+    branches:
+      - portfolio/revamp-2026
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clean-room-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-room:
+    name: Fresh clone bootstrap and full deterministic matrix
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: studyflash_cleanroom
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d studyflash_cleanroom"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_cleanroom
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      E2E_CLERK_TEST_EMAIL: studyflash.e2e+clerk_test@example.com
+      AI_API_URL: http://127.0.0.1:8000
+      STUDYFLASH_INTERNAL_API_KEY: clean-room-only-internal-key-00000000000000000000000000000000
+      CORS_ORIGINS: http://127.0.0.1:3100,http://localhost:3100
+      EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      CI: '1'
+    steps:
+      - name: Fresh checkout
+        uses: actions/checkout@v5
+        with:
+          clean: true
+          fetch-depth: 1
+
+      - name: Prove generated/local state is absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e .venv
+          test ! -e node_modules
+          test ! -e frontend/node_modules
+          test ! -e frontend/e2e/node_modules
+          test ! -e frontend/.next
+          test ! -e frontend/e2e/.auth
+          test ! -e .env
+          test ! -e frontend/.env.local
+          test ! -e frontend/e2e/storage-state.json
+          echo "Fresh checkout contains no generated dependencies, build output, local env files or browser auth state."
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/e2e/package-lock.json
+
+      - name: Record tool versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python --version
+          node --version
+          npm --version
+          psql --version
+          git rev-parse HEAD
+
+      - name: Install backend dependencies from lock input
+        run: pip install -r requirements.txt
+
+      - name: Compile backend
+        run: python -m compileall -q app tests
+
+      - name: Run backend deterministic tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Start FastAPI and prove healthcheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/studyflash-fastapi.log 2>&1 &
+          echo $! > /tmp/studyflash-fastapi.pid
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/ > /tmp/studyflash-health.json; then
+              cat /tmp/studyflash-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/studyflash-fastapi.log >&2
+          exit 1
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install browser test dependencies
+        working-directory: frontend/e2e
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: frontend
+        run: npx prisma generate
+
+      - name: Apply migrations to empty PostgreSQL
+        working-directory: frontend
+        run: npm run db:migrate:deploy
+
+      - name: Verify migration history
+        working-directory: frontend
+        run: npm run db:migrate:status
+
+      - name: Verify schema matches migrations
+        working-directory: frontend
+        run: npm run db:schema:verify
+
+      - name: Execute documented no-seed policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e frontend/prisma/seed.ts
+          test ! -e frontend/prisma/seed.js
+          echo "No production-like seed is required; deterministic suites create isolated synthetic fixtures."
+
+      - name: Lint frontend with durable diagnostics
+        working-directory: frontend
+        shell: bash
+        run: |
+          set +e
+          npx eslint --version 2>&1 | tee /tmp/studyflash-eslint.log
+          npx eslint . 2>&1 | tee -a /tmp/studyflash-eslint.log
+          status=${PIPESTATUS[0]}
+          echo "eslint_exit_status=$status" | tee -a /tmp/studyflash-eslint.log
+          exit "$status"
+
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Run deterministic frontend AI failure tests
+        working-directory: frontend
+        run: node --test --experimental-strip-types tests/ai-failure-policy.test.mjs
+
+      - name: Run ownership and domain integration matrix
+        working-directory: frontend
+        env:
+          TZ: UTC
+        run: |
+          set -euo pipefail
+          node --test --experimental-strip-types tests/ownership.test.mjs
+          node --test --experimental-strip-types tests/gamification-concurrency.test.mjs
+          node --test --experimental-strip-types tests/content-creation-idempotency.test.mjs
+          node --test --experimental-strip-types tests/timezone-boundaries.test.mjs
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install Chromium
+        working-directory: frontend/e2e
+        run: npm run install:chromium
+
+      - name: Verify Clerk DEVELOPMENT test configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" || { echo "Missing development Clerk E2E publishable key" >&2; exit 1; }
+          test -n "$CLERK_SECRET_KEY" || { echo "Missing development Clerk E2E secret key" >&2; exit 1; }
+          case "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" in
+            pk_test_*) ;;
+            *) echo "Clean-room Browser E2E must use a Clerk development key" >&2; exit 1 ;;
+          esac
+
+      - name: Run Browser E2E desktop/mobile, accessibility and PWA gates
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Confirm backend remained healthy
+        shell: bash
+        run: curl --fail --silent http://127.0.0.1:8000/
+
+      - name: Upload clean-room evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-room-${{ env.EVIDENCE_SHA }}
+          path: |
+            /tmp/studyflash-fastapi.log
+            /tmp/studyflash-health.json
+            /tmp/studyflash-eslint.log
+            frontend/e2e/test-results
+            frontend/e2e/playwright-report
+          if-no-files-found: ignore
+          retention-days: 14

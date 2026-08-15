@@ -23,7 +23,8 @@ export default function Header() {
     const menuButtonRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
-        setMounted(true);
+        const frame = window.requestAnimationFrame(() => setMounted(true));
+        return () => window.cancelAnimationFrame(frame);
     }, []);
 
     useEffect(() => {

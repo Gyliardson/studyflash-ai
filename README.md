@@ -44,7 +44,7 @@ The browser never receives the internal FastAPI credential and should not call t
 - `app/` — FastAPI AI service.
 - `tests/` — deterministic backend tests.
 - `docs/` — focused architecture, database, AI, PWA and correctness contracts.
-- `.github/workflows/` — deterministic CI, Browser E2E and integrity gates.
+- `.github/workflows/` — deterministic CI, Browser E2E, integrity and clean-room gates.
 - `security/` — reviewed dependency-security policy evidence.
 
 ## Local setup
@@ -121,6 +121,8 @@ npm run db:schema:verify
 
 Database-backed CI additionally runs ownership, gamification, retry/idempotency and timezone-boundary suites against disposable PostgreSQL. Browser E2E applies the checked-in migrations to an empty database, builds the production frontend and exercises public/authenticated, accessibility, study, exam, mutation recovery and PWA paths.
 
+The dedicated clean-room gate proves a fresh checkout can install dependencies, bootstrap an empty PostgreSQL database, start FastAPI, build/start the production frontend and execute the deterministic browser/test matrix without production infrastructure. See [`docs/clean-room.md`](docs/clean-room.md).
+
 Critical gates do **not** depend on a remote LLM. See [`docs/ai.md`](docs/ai.md) and [`docs/ai-failure-policy.md`](docs/ai-failure-policy.md).
 
 ## Correctness and security contracts
@@ -133,6 +135,7 @@ Critical gates do **not** depend on a remote LLM. See [`docs/ai.md`](docs/ai.md)
 - StudyFlash calendar/streak policy: [`docs/gamification-time-policy.md`](docs/gamification-time-policy.md)
 - PWA/offline contract: [`docs/pwa-offline-contract.md`](docs/pwa-offline-contract.md)
 - Dependency-security policy: [`docs/dependencies.md`](docs/dependencies.md)
+- Clean-room release verification: [`docs/clean-room.md`](docs/clean-room.md)
 - Deployment/operator notes: [`docs/deploy.md`](docs/deploy.md)
 - Portfolio media provenance/capture policy: [`docs/media.md`](docs/media.md)
 - Vulnerability disclosure policy: [`SECURITY.md`](SECURITY.md)
