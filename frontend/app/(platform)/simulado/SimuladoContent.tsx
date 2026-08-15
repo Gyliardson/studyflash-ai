@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { iniciarSimulado, finalizarSimulado, listarMeusBaralhos, listarMeusPlanos } from "@/app/actions";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import {
+    claimExamQuestionSubmission,
+    examQuestionDeadlineMs,
+    remainingExamQuestionSeconds,
+} from "@/lib/exam-timing";
 
 function CustomDropdown({
     options,
@@ -88,6 +93,9 @@ export default function SimuladoContent() {
     const [finalResult, setFinalResult] = useState<any>(null);
     const [configError, setConfigError] = useState<string | null>(null);
     const [finalizeError, setFinalizeError] = useState<string | null>(null);
+    const claimedQuestionIndexRef = useRef<number | null>(null);
+    const questionDeadlineRef = useRef<number | null>(null);
+    const finalizingRef = useRef(false);
 
     useEffect(() => {
         Promise.all([listarMeusBaralhos(), listarMeusPlanos()]).then(([d, p]) => {
@@ -102,79 +110,15 @@ export default function SimuladoContent() {
         });
     }, [searchParams]);
 
-    useEffect(() => {
-        if (step !== 'EXAM') return;
-        const limit = DIFFICULTIES[difficulty].timePerQuestion;
-        if (limit === 0) return;
-        const timer = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    confirmAnswer(null, true);
-                    return limit;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [step, currentIndex, difficulty]);
-
-    async function handleStartExam() {
-        setConfigError(null);
-        setFinalizeError(null);
-
-        if (sourceType !== 'GLOBAL' && !sourceId) {
-            setConfigError("Selecione um baralho, trilha ou tópico antes de iniciar o simulado.");
-            return;
-        }
-
-        setStep('LOADING');
-        setLoadingText("Preparando questões a partir dos seus flashcards…");
-
-        try {
-            const res = await iniciarSimulado(sourceType, sourceId || undefined, quantity, difficulty);
-            if (!res.success || !res.cards || res.cards.length === 0 || !res.attemptId) {
-                setConfigError(res.error || "Não foi possível preparar o simulado. Verifique se há flashcards suficientes e tente novamente.");
-                setStep('CONFIG');
-                return;
-            }
-
-            setAttemptId(res.attemptId);
-            setExamCards(res.cards);
-            setCurrentIndex(0);
-            setAnswers([]);
-            setStartTime(Date.now());
-            setQuestionStartTime(Date.now());
-            if (DIFFICULTIES[difficulty].timePerQuestion > 0) setTimeLeft(DIFFICULTIES[difficulty].timePerQuestion);
-            setStep('EXAM');
-        } catch (error) {
-            console.error("Erro ao iniciar simulado:", error);
-            setConfigError("Não foi possível iniciar o simulado agora. Confira sua conexão e tente novamente.");
-            setStep('CONFIG');
-        }
-    }
-
-    async function confirmAnswer(optionSelected: string | null, timeOut: boolean = false) {
-        const timeTaken = (Date.now() - questionStartTime) / 1000;
-        const currentCard = examCards[currentIndex];
-        const newAnswer: ExamAnswer = { flashcardId: currentCard.id, selectedOption: timeOut ? null : optionSelected, timeTaken };
-        const newAnswers = [...answers, newAnswer];
-        setAnswers(newAnswers);
-        setSelectedOption(null);
-        if (currentIndex < examCards.length - 1) {
-            setCurrentIndex(currentIndex + 1);
-            setQuestionStartTime(Date.now());
-            if (DIFFICULTIES[difficulty].timePerQuestion > 0) setTimeLeft(DIFFICULTIES[difficulty].timePerQuestion);
-        } else {
-            void finishExam(newAnswers);
-        }
-    }
-
-    async function finishExam(finalAnswers: ExamAnswer[]) {
+    const finishExam = useCallback(async (finalAnswers: ExamAnswer[]) => {
+        if (finalizingRef.current) return;
+        finalizingRef.current = true;
         setFinalizeError(null);
         setStep('LOADING');
         setLoadingText("Confirmando respostas e calculando o resultado…");
 
         if (!attemptId) {
+            finalizingRef.current = false;
             setConfigError("Esta tentativa não está mais disponível. Inicie um novo simulado para continuar.");
             setStep('CONFIG');
             return;
@@ -196,6 +140,105 @@ export default function SimuladoContent() {
             console.error("Erro ao finalizar simulado:", error);
             setFinalizeError("Não foi possível confirmar o resultado por uma falha de conexão. Suas respostas continuam nesta tentativa e você pode tentar novamente.");
             setStep('FINALIZE_ERROR');
+        } finally {
+            finalizingRef.current = false;
+        }
+    }, [attemptId, startTime]);
+
+    const confirmAnswer = useCallback((optionSelected: string | null, timeOut: boolean = false) => {
+        const claim = claimExamQuestionSubmission(claimedQuestionIndexRef.current, currentIndex);
+        if (!claim.accepted) return;
+        claimedQuestionIndexRef.current = claim.claimedQuestionIndex;
+
+        const now = Date.now();
+        const currentCard = examCards[currentIndex];
+        if (!currentCard) return;
+
+        const timeTaken = (now - questionStartTime) / 1000;
+        const newAnswer: ExamAnswer = { flashcardId: currentCard.id, selectedOption: timeOut ? null : optionSelected, timeTaken };
+        const newAnswers = [...answers, newAnswer];
+        setAnswers(newAnswers);
+        setSelectedOption(null);
+
+        if (currentIndex < examCards.length - 1) {
+            const nextIndex = currentIndex + 1;
+            const limit = DIFFICULTIES[difficulty].timePerQuestion;
+            setCurrentIndex(nextIndex);
+            setQuestionStartTime(now);
+            if (limit > 0) {
+                questionDeadlineRef.current = examQuestionDeadlineMs(now, limit);
+                setTimeLeft(limit);
+            } else {
+                questionDeadlineRef.current = null;
+                setTimeLeft(0);
+            }
+            return;
+        }
+
+        questionDeadlineRef.current = null;
+        void finishExam(newAnswers);
+    }, [answers, currentIndex, difficulty, examCards, finishExam, questionStartTime]);
+
+    useEffect(() => {
+        if (step !== 'EXAM') return;
+        const limit = DIFFICULTIES[difficulty].timePerQuestion;
+        if (limit === 0) return;
+
+        const tick = () => {
+            const deadline = questionDeadlineRef.current;
+            if (deadline === null) return;
+            const remaining = remainingExamQuestionSeconds(deadline, Date.now());
+            setTimeLeft(remaining);
+            if (remaining === 0) confirmAnswer(null, true);
+        };
+
+        tick();
+        const timer = setInterval(tick, 250);
+        return () => clearInterval(timer);
+    }, [confirmAnswer, currentIndex, difficulty, step]);
+
+    async function handleStartExam() {
+        setConfigError(null);
+        setFinalizeError(null);
+
+        if (sourceType !== 'GLOBAL' && !sourceId) {
+            setConfigError("Selecione um baralho, trilha ou tópico antes de iniciar o simulado.");
+            return;
+        }
+
+        setStep('LOADING');
+        setLoadingText("Preparando questões a partir dos seus flashcards…");
+
+        try {
+            const res = await iniciarSimulado(sourceType, sourceId || undefined, quantity, difficulty);
+            if (!res.success || !res.cards || res.cards.length === 0 || !res.attemptId) {
+                setConfigError(res.error || "Não foi possível preparar o simulado. Verifique se há flashcards suficientes e tente novamente.");
+                setStep('CONFIG');
+                return;
+            }
+
+            const now = Date.now();
+            const limit = DIFFICULTIES[difficulty].timePerQuestion;
+            setAttemptId(res.attemptId);
+            setExamCards(res.cards);
+            setCurrentIndex(0);
+            setAnswers([]);
+            setStartTime(now);
+            setQuestionStartTime(now);
+            claimedQuestionIndexRef.current = null;
+            finalizingRef.current = false;
+            if (limit > 0) {
+                questionDeadlineRef.current = examQuestionDeadlineMs(now, limit);
+                setTimeLeft(limit);
+            } else {
+                questionDeadlineRef.current = null;
+                setTimeLeft(0);
+            }
+            setStep('EXAM');
+        } catch (error) {
+            console.error("Erro ao iniciar simulado:", error);
+            setConfigError("Não foi possível iniciar o simulado agora. Confira sua conexão e tente novamente.");
+            setStep('CONFIG');
         }
     }
 
