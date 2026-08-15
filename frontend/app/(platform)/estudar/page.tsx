@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Flashcard from "@/app/components/Flashcard";
 import { contarTotalFlashcards } from "@/app/actions";
 import { iniciarOuRetomarSessaoEstudo, registrarRevisaoDaSessao } from "@/app/study-actions";
@@ -62,7 +62,10 @@ function StudyContent() {
 
     const deckIdsParam = searchParams.get("decks");
     const singleDeckId = searchParams.get("deckId");
-    const deckIds = deckIdsParam ? deckIdsParam.split(",") : (singleDeckId ? [singleDeckId] : []);
+    const deckIds = useMemo(
+        () => deckIdsParam ? deckIdsParam.split(",") : (singleDeckId ? [singleDeckId] : []),
+        [deckIdsParam, singleDeckId],
+    );
     const planId = searchParams.get("planId") || undefined;
     const topicId = searchParams.get("topicId") || undefined;
 
@@ -111,7 +114,7 @@ function StudyContent() {
 
         void carregar();
         return () => { cancelled = true; };
-    }, [isLoaded, isSignedIn, deckIdsParam, singleDeckId, planId, topicId, reloadKey]);
+    }, [isLoaded, isSignedIn, deckIds, planId, topicId, reloadKey]);
 
     const submitReview = async (avaliacao: ReviewEvaluation) => {
         if (submitLock.current || submissionState === "submitting") return;
