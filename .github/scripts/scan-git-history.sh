@@ -61,11 +61,17 @@ if (( commit_count < 2 )); then
   exit 2
 fi
 
-echo "Shared history scanner: ${commit_count} commits reachable from HEAD"
+merge_count="$(git rev-list --min-parents=2 --count HEAD)"
+echo "Shared history scanner: ${commit_count} commits reachable from HEAD (${merge_count} merge commits)"
+
+# `git log -p` suppresses ordinary merge diffs by default. `-m` expands each
+# merge against every parent so content introduced only by conflict/merge
+# resolution is scanned as well. `--full-history` avoids history simplification.
+log_opts="--full-history -m HEAD"
 
 args=(
   git
-  --log-opts=HEAD
+  "--log-opts=${log_opts}"
   --redact
   --report-format json
   --report-path "$report"
