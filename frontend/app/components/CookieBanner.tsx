@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 export default function CookieBanner() {
   const [showBanner, setShowBanner] = useState(false);
 
   useEffect(() => {
-    const consent = localStorage.getItem("cookie_consent");
-    if (!consent) setShowBanner(true);
+    const frame = window.requestAnimationFrame(() => {
+      setShowBanner(!localStorage.getItem("cookie_consent"));
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const acceptCookies = () => {
