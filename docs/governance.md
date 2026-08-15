@@ -10,6 +10,8 @@ Normal engineering changes follow:
 
 `main` is the release branch. `portfolio/revamp-2026` is the controlled integration branch. Work branches must not bypass the integration pull-request path. The final integration-to-`main` pull request is created only after clean-room validation, governance reconciliation, and the independent adversarial release audit. Automation must never merge that final pull request.
 
+Before final certification, the integration candidate must also contain the current `main` history. If `main` advances independently while professionalization is in progress, reconcile that history through a reviewed work-branch pull request, resolve any overlapping release-facing files deliberately, and re-run the exact-SHA deterministic matrix. Do not defer branch divergence or conflict resolution to the final `portfolio/revamp-2026` -> `main` pull request, because that would create an unvalidated merge result.
+
 ## Required deterministic evidence
 
 The release candidate must be validated at its exact head SHA. The intended required gates are:
