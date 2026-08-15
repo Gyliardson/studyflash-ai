@@ -11,7 +11,14 @@ from .ai_errors import (
     AIProviderUnavailableError,
 )
 from .models import ConjuntoFlashcards, PedidoConteudoTopico, PedidoGerarProva, PedidoPlano, PlanoEstudo, QuestaoProva
-from .request_security import get_cors_origins, read_upload_limited, require_internal_api_key, validate_pdf_metadata
+from .request_security import (
+    PDFTooLargeError,
+    PDFValidationError,
+    get_cors_origins,
+    read_upload_limited,
+    require_internal_api_key,
+    validate_pdf_metadata,
+)
 from .services import extrair_texto_do_pdf, gerar_conteudo_topico_service, gerar_distratores_batch, gerar_flashcards_service, gerar_plano_service
 
 load_dotenv()
@@ -75,6 +82,10 @@ async def gerar_flashcards(
 
     except HTTPException:
         raise
+    except PDFTooLargeError as exc:
+        raise HTTPException(status_code=413, detail="PDF excede o tamanho máximo permitido.") from exc
+    except PDFValidationError as exc:
+        raise HTTPException(status_code=400, detail="Arquivo PDF inválido.") from exc
     except AIError as exc:
         _log_ai_failure("flashcards", exc)
         raise _ai_http_exception(exc) from exc
