@@ -46,7 +46,7 @@ class PDFEndpointSemanticsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(raised.exception.detail, "Arquivo PDF inválido.")
 
     async def test_oversized_pdf_maps_to_413_and_stops_reading_early(self):
-        data = b"%PDF-1.7\n" + b"x" * 256
+        data = b"%PDF-1.7\n" + b"x" * (128 * 1024)
         upload = FakeUpload(data)
         with patch.dict(os.environ, {"MAX_PDF_BYTES": "32"}, clear=False):
             with self.assertRaises(HTTPException) as raised:
