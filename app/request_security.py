@@ -11,6 +11,14 @@ INTERNAL_API_KEY_ENV = "STUDYFLASH_INTERNAL_API_KEY"
 INTERNAL_API_KEY_HEADER = "X-StudyFlash-Internal-Key"
 
 
+class PDFValidationError(ValueError):
+    """Expected user-correctable PDF validation failure."""
+
+
+class PDFTooLargeError(PDFValidationError):
+    """PDF upload exceeded the configured bounded-reader limit."""
+
+
 def get_max_pdf_bytes() -> int:
     raw = os.getenv("MAX_PDF_BYTES", str(DEFAULT_MAX_PDF_BYTES))
     try:
@@ -57,14 +65,14 @@ def require_internal_api_key(
 
 def validate_pdf_metadata(filename: str | None, content_type: str | None) -> None:
     if not filename or not filename.lower().endswith(".pdf"):
-        raise ValueError("Apenas arquivos PDF são aceitos.")
+        raise PDFValidationError("Apenas arquivos PDF são aceitos.")
     if content_type and content_type.lower() not in PDF_CONTENT_TYPES:
-        raise ValueError("Tipo de arquivo inválido; envie um PDF.")
+        raise PDFValidationError("Tipo de arquivo inválido; envie um PDF.")
 
 
 def validate_pdf_signature(data: bytes) -> None:
     if not data.startswith(b"%PDF-"):
-        raise ValueError("O arquivo enviado não possui uma assinatura PDF válida.")
+        raise PDFValidationError("O arquivo enviado não possui uma assinatura PDF válida.")
 
 
 async def read_upload_limited(upload, *, max_bytes: int | None = None, chunk_size: int = 64 * 1024) -> bytes:
@@ -80,7 +88,7 @@ async def read_upload_limited(upload, *, max_bytes: int | None = None, chunk_siz
             break
         total += len(chunk)
         if total > limit:
-            raise ValueError("PDF excede o tamanho máximo permitido.")
+            raise PDFTooLargeError("PDF excede o tamanho máximo permitido.")
         chunks.append(chunk)
 
     data = b"".join(chunks)
