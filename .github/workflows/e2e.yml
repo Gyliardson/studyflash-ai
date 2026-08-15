@@ -20,6 +20,9 @@ concurrency:
 jobs:
   browser:
     name: Public, auth and accessibility browser gates
+    # Standard pull_request events already withhold repository Actions secrets
+    # from forked code. Keep that platform boundary explicit as defense in depth:
+    # authenticated Clerk E2E runs only for pushes and same-repository PRs.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -116,8 +119,8 @@ jobs:
           echo "Release Browser E2E is fail-closed on the first failed attempt."
 
       - name: Run deterministic browser gates
-        working-directory: frontend
-        run: npm run test:e2e -- --retries=0
+        working-directory: frontend/e2e
+        run: npx playwright test --retries=0
 
       - name: Upload browser evidence
         if: always()
