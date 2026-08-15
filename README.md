@@ -134,6 +134,7 @@ Critical gates do **not** depend on a remote LLM. See [`docs/ai.md`](docs/ai.md)
 - PWA/offline contract: [`docs/pwa-offline-contract.md`](docs/pwa-offline-contract.md)
 - Dependency-security policy: [`docs/dependencies.md`](docs/dependencies.md)
 - Deployment/operator notes: [`docs/deploy.md`](docs/deploy.md)
+- Portfolio media provenance/capture policy: [`docs/media.md`](docs/media.md)
 - Vulnerability disclosure policy: [`SECURITY.md`](SECURITY.md)
 
 ## PWA / offline scope
@@ -153,7 +154,7 @@ Deployments must provision migrations separately from application startup and ke
 
 ## Portfolio evidence
 
-Deterministic Playwright runs generate desktop/mobile product screenshots and preserve Browser E2E reports/artifacts in GitHub Actions. Final curated repository media is intentionally treated as release evidence and should only be committed after the corresponding UI candidate has passed Browser E2E/accessibility review.
+Deterministic Playwright runs generate desktop/mobile product screenshots and preserve Browser E2E reports/artifacts in GitHub Actions. Final curated repository media is intentionally treated as release evidence and should only be committed after the corresponding UI candidate has passed Browser E2E/accessibility review. Capture names, provenance requirements and refresh rules are documented in [`docs/media.md`](docs/media.md).
 
 ## Security and license
 
