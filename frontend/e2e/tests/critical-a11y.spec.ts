@@ -149,17 +149,18 @@ test("mobile primary navigation exposes state and returns focus on Escape", asyn
   test.skip(!testInfo.project.name.includes("mobile"), "Mobile navigation is only rendered in the mobile project.");
 
   await page.goto("/dashboard");
-  const menuButton = page.getByRole("button", { name: "Abrir menu" });
+  await expect(page.getByRole("button", { name: "Abrir menu do utilizador", exact: true })).toBeVisible();
+  const menuButton = page.getByRole("button", { name: "Abrir menu", exact: true });
   await expect(menuButton).toHaveAttribute("aria-expanded", "false");
   await menuButton.click();
 
-  const closeButton = page.getByRole("button", { name: "Fechar menu" });
+  const closeButton = page.getByRole("button", { name: "Fechar menu", exact: true });
   await expect(closeButton).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("navigation", { name: "Navegação principal móvel" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Navegação principal móvel", exact: true })).toBeVisible();
 
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
-  await expect(page.getByRole("navigation", { name: "Navegação principal móvel" })).toHaveCount(0);
+  await expect(menuButton).toBeFocused();
+  await expect(page.getByRole("navigation", { name: "Navegação principal móvel", exact: true })).toHaveCount(0);
 
   await expectNoBlockingAxeViolations(page);
 });
