@@ -18,11 +18,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  browser:
-    name: Public, auth and accessibility browser gates
-    # Standard pull_request events already withhold repository Actions secrets
-    # from forked code. Keep that platform boundary explicit as defense in depth:
-    # authenticated Clerk E2E runs only for pushes and same-repository PRs.
+  browser-execution:
+    name: Trusted browser execution
+    # Repository secrets must never be exposed to untrusted fork code. The required
+    # context is a separate unconditional aggregator below, so this skip cannot
+    # become a successful required release gate.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -133,3 +133,30 @@ jobs:
             frontend/e2e/playwright-report
           if-no-files-found: ignore
           retention-days: 14
+
+  browser:
+    name: Public, auth and accessibility browser gates
+    if: always()
+    needs: browser-execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Enforce fail-closed trusted browser evidence
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+          EXECUTION_RESULT: ${{ needs.browser-execution.result }}
+        run: |
+          set -euo pipefail
+          # STUDYFLASH_REQUIRED_GATE_POLICY_V1
+          if [[ "$EVENT_NAME" == "pull_request" && "$HEAD_REPO" != "$REPOSITORY" ]]; then
+            echo "Fork pull requests are not eligible to satisfy the trusted Browser E2E release gate; secrets remain withheld and promotion fails closed." >&2
+            exit 1
+          fi
+          if [[ "$EXECUTION_RESULT" != "success" ]]; then
+            echo "Mandatory trusted Browser E2E execution did not succeed: ${EXECUTION_RESULT}" >&2
+            exit 1
+          fi
+          echo "Required Browser E2E context is backed by successful trusted execution evidence."

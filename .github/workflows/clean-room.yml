@@ -18,8 +18,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  clean-room:
-    name: Fresh clone bootstrap and full deterministic matrix
+  clean-room-execution:
+    name: Trusted clean-room execution
+    # Repository secrets remain unavailable to untrusted fork code. The required
+    # context is a separate unconditional aggregator below, so a skipped trusted
+    # execution cannot satisfy branch protection.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -240,3 +243,30 @@ jobs:
             frontend/e2e/playwright-report
           if-no-files-found: ignore
           retention-days: 14
+
+  clean-room:
+    name: Fresh clone bootstrap and full deterministic matrix
+    if: always()
+    needs: clean-room-execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Enforce fail-closed trusted clean-room evidence
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+          EXECUTION_RESULT: ${{ needs.clean-room-execution.result }}
+        run: |
+          set -euo pipefail
+          # STUDYFLASH_REQUIRED_GATE_POLICY_V1
+          if [[ "$EVENT_NAME" == "pull_request" && "$HEAD_REPO" != "$REPOSITORY" ]]; then
+            echo "Fork pull requests are not eligible to satisfy the trusted Clean Room release gate; secrets remain withheld and promotion fails closed." >&2
+            exit 1
+          fi
+          if [[ "$EXECUTION_RESULT" != "success" ]]; then
+            echo "Mandatory trusted Clean Room execution did not succeed: ${EXECUTION_RESULT}" >&2
+            exit 1
+          fi
+          echo "Required Clean Room context is backed by successful trusted execution evidence."

@@ -45,6 +45,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
+      - name: Prove required release gates fail closed for fork-shaped PRs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ../.github/scripts/required-gate-policy.py self-test
+          python3 ../.github/scripts/required-gate-policy.py verify-workflows --repo-root ..
+
       - name: Setup Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
