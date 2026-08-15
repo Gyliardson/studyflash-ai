@@ -46,6 +46,8 @@ function CustomDropdown({
     );
 }
 
+type ExamDifficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'IMPOSSIBLE';
+
 const DIFFICULTIES = {
     EASY: {
         id: 'EASY', label: "Prática", description: "Sem tempo.", timePerQuestion: 0, multiplier: 1,
@@ -67,30 +69,42 @@ const DIFFICULTIES = {
         color: "text-info-fg", bg: "bg-info-bg", border: "border-info-border", ring: "ring-info-ring",
         icon: <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
     }
-};
+} as const;
 
 type ExamStep = 'CONFIG' | 'LOADING' | 'EXAM' | 'FINALIZE_ERROR' | 'RESULT';
 type ExamAnswer = { flashcardId: string; selectedOption: string | null; timeTaken: number };
+type Deck = Awaited<ReturnType<typeof listarMeusBaralhos>>[number];
+type StudyPlan = Awaited<ReturnType<typeof listarMeusPlanos>>[number];
+type ExamCard = { id: string; frente: string; options: string[] };
+type ExamFinalResult = {
+    score: number;
+    difficulty: ExamDifficulty;
+    correctAnswers: number;
+    totalQuestions: number;
+    limitReached: boolean;
+    xpGained: number;
+    totalTime: number;
+};
 
 export default function SimuladoContent() {
     const searchParams = useSearchParams();
     const [step, setStep] = useState<ExamStep>('CONFIG');
     const [loadingText, setLoadingText] = useState("Preparando sua prova...");
-    const [decks, setDecks] = useState<any[]>([]);
-    const [planos, setPlanos] = useState<any[]>([]);
+    const [decks, setDecks] = useState<Deck[]>([]);
+    const [planos, setPlanos] = useState<StudyPlan[]>([]);
     const [sourceType, setSourceType] = useState<'GLOBAL' | 'DECK' | 'TOPIC' | 'PLAN'>('GLOBAL');
     const [sourceId, setSourceId] = useState<string>("");
     const [quantity, setQuantity] = useState(10);
-    const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD' | 'IMPOSSIBLE'>('MEDIUM');
+    const [difficulty, setDifficulty] = useState<ExamDifficulty>('MEDIUM');
     const [attemptId, setAttemptId] = useState<string | null>(null);
-    const [examCards, setExamCards] = useState<any[]>([]);
+    const [examCards, setExamCards] = useState<ExamCard[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<ExamAnswer[]>([]);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     const [startTime, setStartTime] = useState<number>(0);
     const [questionStartTime, setQuestionStartTime] = useState<number>(0);
     const [timeLeft, setTimeLeft] = useState<number>(0);
-    const [finalResult, setFinalResult] = useState<any>(null);
+    const [finalResult, setFinalResult] = useState<ExamFinalResult | null>(null);
     const [configError, setConfigError] = useState<string | null>(null);
     const [finalizeError, setFinalizeError] = useState<string | null>(null);
     const claimedQuestionIndexRef = useRef<number | null>(null);
@@ -277,7 +291,7 @@ export default function SimuladoContent() {
                                 </button>
                                 <CustomDropdown options={decks.map(d => ({ id: d.id, label: d.nome }))} value={sourceType === 'DECK' ? sourceId : ''} onChange={(val) => { setSourceType('DECK'); setSourceId(val); setConfigError(null); }} placeholder="Baralho" isActive={sourceType === 'DECK'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" /></svg>} />
                                 <CustomDropdown options={planos.map(p => ({ id: p.id, label: p.title }))} value={sourceType === 'PLAN' ? sourceId : ''} onChange={(val) => { setSourceType('PLAN'); setSourceId(val); setConfigError(null); }} placeholder="Trilha" isActive={sourceType === 'PLAN'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.08 12.08 0 0118.825 17 11.95 11.95 0 0012 20.055 11.95 11.95 0 005.176 17a12.08 12.08 0 01.665-6.422L12 14z" /></svg>} />
-                                <CustomDropdown options={planos.flatMap(p => p.topics.map((t:any) => ({ id: t.id, label: `${p.title} - ${t.title}` })))} value={sourceType === 'TOPIC' ? sourceId : ''} onChange={(val) => { setSourceType('TOPIC'); setSourceId(val); setConfigError(null); }} placeholder="Tópico" isActive={sourceType === 'TOPIC'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>} />
+                                <CustomDropdown options={planos.flatMap(p => p.topics.map(t => ({ id: t.id, label: `${p.title} - ${t.title}` })))} value={sourceType === 'TOPIC' ? sourceId : ''} onChange={(val) => { setSourceType('TOPIC'); setSourceId(val); setConfigError(null); }} placeholder="Tópico" isActive={sourceType === 'TOPIC'} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>} />
                             </div>
                         </fieldset>
 
@@ -285,7 +299,7 @@ export default function SimuladoContent() {
                             <legend className="text-xs font-bold text-muted-foreground uppercase tracking-widest">2. Intensidade</legend>
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                                 {Object.values(DIFFICULTIES).map((diff) => (
-                                    <button type="button" aria-pressed={difficulty === diff.id} key={diff.id} onClick={() => setDifficulty(diff.id as any)} className={`p-3 rounded-2xl border-2 text-left transition-all relative group flex flex-col justify-between h-full min-h-[120px] ${difficulty === diff.id ? `${diff.border} ${diff.bg} ${diff.ring} ring-1 shadow-md` : "border-border hover:border-border/80 hover:bg-muted"}`}>
+                                    <button type="button" aria-pressed={difficulty === diff.id} key={diff.id} onClick={() => setDifficulty(diff.id)} className={`p-3 rounded-2xl border-2 text-left transition-all relative group flex flex-col justify-between h-full min-h-[120px] ${difficulty === diff.id ? `${diff.border} ${diff.bg} ${diff.ring} ring-1 shadow-md` : "border-border hover:border-border/80 hover:bg-muted"}`}>
                                         <div><div className={`font-bold ${diff.color} flex items-center gap-2 text-sm mb-1`}>{diff.icon}{diff.label}</div><div className="text-[10px] text-muted-foreground font-medium leading-relaxed">{diff.description}</div></div>
                                         <div className={`mt-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold border w-max ${diff.border} bg-card text-muted-foreground`}>XP x{diff.multiplier}</div>
                                     </button>
@@ -363,7 +377,7 @@ export default function SimuladoContent() {
 
             {step === 'RESULT' && finalResult && (
                 <div className="bg-card rounded-3xl shadow-2xl overflow-hidden border border-border animate-in zoom-in duration-300 max-w-lg mx-auto">
-                    <div className={`p-10 text-center text-white relative overflow-hidden ${finalResult.score >= 0.7 ? "bg-success-solid" : "bg-primary"}`}><div className="relative z-10"><div className="text-7xl mb-4 filter drop-shadow-md" aria-hidden="true">{finalResult.score >= 0.9 ? "👑" : finalResult.score >= 0.7 ? "🎉" : "💪"}</div><h2 className="text-3xl font-extrabold mb-1">Simulado Concluído!</h2><p className="opacity-90 font-medium">Desafio {DIFFICULTIES[finalResult.difficulty as keyof typeof DIFFICULTIES]?.label ?? "Concluído"} Finalizado</p></div></div>
+                    <div className={`p-10 text-center text-white relative overflow-hidden ${finalResult.score >= 0.7 ? "bg-success-solid" : "bg-primary"}`}><div className="relative z-10"><div className="text-7xl mb-4 filter drop-shadow-md" aria-hidden="true">{finalResult.score >= 0.9 ? "👑" : finalResult.score >= 0.7 ? "🎉" : "💪"}</div><h2 className="text-3xl font-extrabold mb-1">Simulado Concluído!</h2><p className="opacity-90 font-medium">Desafio {DIFFICULTIES[finalResult.difficulty]?.label ?? "Concluído"} Finalizado</p></div></div>
                     <div className="p-8">
                         <div className="grid grid-cols-2 gap-4 mb-8"><div className="bg-muted p-5 rounded-2xl border border-border text-center"><div className="text-muted-foreground text-[10px] font-bold uppercase tracking-wider mb-1">Acertos</div><div className="text-3xl font-black text-foreground">{finalResult.correctAnswers}<span className="text-muted-foreground text-xl">/{finalResult.totalQuestions}</span></div></div><div className={`p-5 rounded-2xl border text-center ${finalResult.limitReached ? 'bg-muted border-border opacity-70' : 'bg-primary/10 border-primary/20'}`}><div className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${finalResult.limitReached ? 'text-muted-foreground' : 'text-primary'}`}>{finalResult.limitReached ? "Limite Diário" : "XP Total"}</div><div className={`text-3xl font-black ${finalResult.limitReached ? 'text-muted-foreground' : 'text-primary'}`}>{finalResult.limitReached ? "MAX" : `+${finalResult.xpGained}`}</div></div></div>
                         {finalResult.limitReached && <div role="status" className="mb-6 p-3 bg-warning-bg border border-warning-border rounded-xl text-xs text-warning-fg text-center">Você atingiu o limite de 3 simulados valendo XP por dia. Continue praticando para fixar o conteúdo! 🧠</div>}
