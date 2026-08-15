@@ -1,0 +1,21 @@
+title = "StudyFlash Gitleaks policy"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Documented public synthetic Clerk key-format example used only for static CI build validation"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:\s+pk_test_ZXhhbXBsZS5hY2NvdW50cy5kZXYk''']
+  paths = ['''^\.github/workflows/ci\.yml$''']
+
+  [[rules.allowlists]]
+  description = "Deterministic idempotency request-key fixture, not a credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''const requestKey = "topic-generation-0001";''']
+  paths = ['''^frontend/tests/content-creation-idempotency\.test\.mjs$''']
