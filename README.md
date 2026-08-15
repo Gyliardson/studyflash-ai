@@ -134,6 +134,7 @@ Critical gates do **not** depend on a remote LLM. See [`docs/ai.md`](docs/ai.md)
 - PWA/offline contract: [`docs/pwa-offline-contract.md`](docs/pwa-offline-contract.md)
 - Dependency-security policy: [`docs/dependencies.md`](docs/dependencies.md)
 - Deployment/operator notes: [`docs/deploy.md`](docs/deploy.md)
+- Vulnerability disclosure policy: [`SECURITY.md`](SECURITY.md)
 
 ## PWA / offline scope
 
@@ -153,6 +154,12 @@ Deployments must provision migrations separately from application startup and ke
 ## Portfolio evidence
 
 Deterministic Playwright runs generate desktop/mobile product screenshots and preserve Browser E2E reports/artifacts in GitHub Actions. Final curated repository media is intentionally treated as release evidence and should only be committed after the corresponding UI candidate has passed Browser E2E/accessibility review.
+
+## Security and license
+
+Please report vulnerabilities according to [`SECURITY.md`](SECURITY.md) and avoid publishing credentials, personal data or exploit details in public issues.
+
+StudyFlash is publicly visible for portfolio and evaluation purposes but is **not open source**. The repository is distributed under the proprietary terms in [`LICENSE`](LICENSE); third-party dependencies retain their own licenses.
 
 ## Project status
 
