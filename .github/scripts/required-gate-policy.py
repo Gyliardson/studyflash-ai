@@ -47,8 +47,12 @@ def parse_jobs(text: str) -> dict[str, str]:
     return jobs
 
 
+def has_job_level_line(job: str, value: str) -> bool:
+    return re.search(rf"(?m)^    {re.escape(value)}\s*$", job) is not None
+
+
 def verify_workflows(repo_root: Path) -> int:
-    same_repo_guard = "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository"
+    same_repo_guard = "if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository"
     for relative_path, required_id, execution_id, required_name in REQUIRED_GATES:
         jobs = parse_jobs((repo_root / relative_path).read_text(encoding="utf-8"))
         required = jobs.get(required_id, "")
@@ -57,9 +61,9 @@ def verify_workflows(repo_root: Path) -> int:
             raise SystemExit(f"{relative_path}: required context name is not on aggregator {required_id}")
         if f"name: {required_name}" in execution:
             raise SystemExit(f"{relative_path}: required context name is attached to conditional execution")
-        if "if: always()" not in required:
-            raise SystemExit(f"{relative_path}: required aggregator must use if: always()")
-        if f"needs: {execution_id}" not in required:
+        if not has_job_level_line(required, "if: always()"):
+            raise SystemExit(f"{relative_path}: required aggregator must use job-level if: always()")
+        if not has_job_level_line(required, f"needs: {execution_id}"):
             raise SystemExit(f"{relative_path}: required aggregator must depend on {execution_id}")
         if "STUDYFLASH_REQUIRED_GATE_POLICY_V1" not in required:
             raise SystemExit(f"{relative_path}: required aggregator lost fail-closed policy marker")
@@ -67,9 +71,9 @@ def verify_workflows(repo_root: Path) -> int:
             raise SystemExit(f"{relative_path}: required aggregator does not require successful trusted execution")
         if 'HEAD_REPO" != "$REPOSITORY"' not in required:
             raise SystemExit(f"{relative_path}: required aggregator does not reject fork-shaped pull requests")
-        if same_repo_guard not in execution:
-            raise SystemExit(f"{relative_path}: trusted execution lost same-repository secret boundary")
-        if "if: always()" in execution:
+        if not has_job_level_line(execution, same_repo_guard):
+            raise SystemExit(f"{relative_path}: trusted execution lost same-repository job-level secret boundary")
+        if has_job_level_line(execution, "if: always()"):
             raise SystemExit(f"{relative_path}: trusted secret-bearing execution became unconditional")
     print("Workflow governance proof passed: required contexts are unconditional fail-closed aggregators.")
     return 0
