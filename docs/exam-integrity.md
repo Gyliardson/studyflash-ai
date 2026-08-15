@@ -10,6 +10,16 @@ The browser receives the attempt ID, prompts and shuffled options. It does **not
 
 Finalization accepts only the attempt ID, selected option per question (or `null` for an unanswered/timed-out question) and timing telemetry. Timing is informational and does not increase XP.
 
+## Browser question submission contract
+
+Timed exam questions use an explicit deadline derived from the question start instant and configured difficulty limit. The displayed countdown is recomputed from that deadline rather than mutating a decrementing counter as the source of truth.
+
+Each rendered question also has a synchronous client-side claim keyed by its question index. Click submission and timeout submission must acquire the same claim before they can append an answer, advance the exam or enter finalization. A second click, or a timeout racing after a click on the same rendered question, is ignored. Advancing to the next question creates a new deadline and the new index becomes independently claimable.
+
+Timeout handling runs outside React state updater callbacks. This keeps state calculation pure and prevents timer callbacks from embedding navigation/finalization side effects inside `setState` transitions.
+
+This client-side claim is a UX/correctness guard, not a security boundary: browser timing and selected answers remain untrusted input. Server-side validation, ownership, canonical scoring and exactly-once persistence remain authoritative even if a client is modified or bypasses the UI.
+
 ## Server evaluation
 
 Inside a serializable PostgreSQL transaction, first finalization:
@@ -45,4 +55,6 @@ The current schema intentionally does **not** persist the selected option itself
 
 ## Verification
 
-`frontend/tests/gamification-concurrency.test.mjs` covers valid scoring and adversarial paths including forged correctness/difficulty/source data, sequential lost-response retry, tampered retry, concurrent convergence, expiry, malformed submissions, cross-user isolation and the daily XP cap. CI applies migrations to empty PostgreSQL 16, verifies migration history/schema parity, and then runs the ownership and gamification suites.
+`frontend/tests/exam-timing.test.mjs` proves the pure claim/deadline contract, including click/timeout races, rapid repeated input, countdown boundaries and fail-closed invalid inputs. CI runs this suite explicitly. `frontend/e2e/tests/exam-race.spec.ts` exercises the production component by dispatching two synchronous clicks to the same rendered answer control and requiring exactly one question transition.
+
+`frontend/tests/gamification-concurrency.test.mjs` covers valid scoring and adversarial server paths including forged correctness/difficulty/source data, sequential lost-response retry, tampered retry, concurrent convergence, expiry, malformed submissions, cross-user isolation and the daily XP cap. CI applies migrations to empty PostgreSQL 16, verifies migration history/schema parity, and then runs the ownership and gamification suites.
