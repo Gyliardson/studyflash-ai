@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+pymupdf
+langchain-groq
+langchain
+python-dotenv
+pydantic
+aiofiles
