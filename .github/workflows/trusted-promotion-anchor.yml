@@ -156,8 +156,8 @@ jobs:
             '[.workflow_runs[] | select(.head_sha == $sha and any(.pull_requests[]?; .number == $pr))] | sort_by([.run_number, .run_attempt]) | last // empty' \
             <<<"$runs")
 
-          LATEST_RUN_ID=$(jq -r '.id // empty' <<<"${latest_run:-{}}")
-          LATEST_RUN_ATTEMPT=$(jq -r '.run_attempt // empty' <<<"${latest_run:-{}}")
+          LATEST_RUN_ID=$(jq -r '.id // empty' <<<"$latest_run")
+          LATEST_RUN_ATTEMPT=$(jq -r '.run_attempt // empty' <<<"$latest_run")
 
           state=failure
           description="Trusted promotion policy rejected this pull request"
