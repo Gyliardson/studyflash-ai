@@ -1,0 +1,76 @@
+name: Trusted Promotion Anchor
+
+on:
+  pull_request_target:
+    branches:
+      - main
+      - portfolio/revamp-2026
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: trusted-promotion-anchor-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  trusted-promotion-source:
+    name: Trusted promotion source policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Enforce trusted same-repository promotion topology
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REPOSITORY: ${{ github.repository }}
+          BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          test "$EVENT_NAME" = "pull_request_target" || {
+            echo "This trust anchor only accepts pull_request_target events." >&2
+            exit 1
+          }
+
+          test "$BASE_REPO" = "$REPOSITORY" || {
+            echo "Unexpected base repository: $BASE_REPO" >&2
+            exit 1
+          }
+
+          # Fail closed for forks. This workflow definition is loaded from the
+          # default branch and never checks out or executes pull-request code.
+          test "$HEAD_REPO" = "$REPOSITORY" || {
+            echo "Fork pull requests are not eligible for protected promotion." >&2
+            exit 1
+          }
+
+          case "$BASE_REF" in
+            main)
+              test "$HEAD_REF" = "portfolio/revamp-2026" || {
+                echo "Only portfolio/revamp-2026 may promote into main." >&2
+                exit 1
+              }
+              ;;
+            portfolio/revamp-2026)
+              case "$HEAD_REF" in
+                work/*)
+                  ;;
+                *)
+                  echo "Only work/* branches may promote into portfolio/revamp-2026." >&2
+                  exit 1
+                  ;;
+              esac
+              ;;
+            *)
+              echo "Unexpected protected base ref: $BASE_REF" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "Trusted promotion source policy passed for $HEAD_REF -> $BASE_REF."
