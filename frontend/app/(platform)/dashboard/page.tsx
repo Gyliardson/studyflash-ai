@@ -5,6 +5,7 @@ import { FileText, LoaderCircle, Save, Sparkles, Text, X } from "lucide-react";
 import Flashcard from "@/app/components/Flashcard";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import SaveModal from "@/app/components/SaveModal";
+import { isAbortTimeout, safeAiUserMessage } from "@/lib/ai-failure-policy";
 
 type GeneratedFlashcard = { frente: string; verso: string };
 type GenerateResponse = { cartoes?: GeneratedFlashcard[]; detail?: string };
@@ -47,26 +48,25 @@ export default function Home() {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({})) as GenerateResponse;
-                const mensagemErro = errorData.detail || "Ocorreu um erro ao processar.";
-                if (response.status === 504) throw new Error("O servidor demorou muito. Tente um arquivo menor.");
-                if (response.status === 422) throw new Error(mensagemErro);
-                throw new Error(mensagemErro);
+                setErro(safeAiUserMessage(response.status));
+                return;
             }
 
             const data = await response.json() as GenerateResponse;
-            if (!Array.isArray(data.cartoes)) throw new Error("A geração retornou um formato inválido. Tente novamente.");
+            if (!Array.isArray(data.cartoes)) {
+                setErro(safeAiUserMessage(502));
+                return;
+            }
             setFlashcards(data.cartoes);
             if (arquivo) {
                 setArquivo(null);
                 if (fileInputRef.current) fileInputRef.current.value = "";
             }
         } catch (error: unknown) {
-            console.error(error);
-            if (error instanceof Error && error.name === "AbortError") {
-                setErro("Tempo esgotado. Tente um texto ou PDF menor.");
+            if (isAbortTimeout(error)) {
+                setErro(safeAiUserMessage(504));
             } else {
-                setErro(error instanceof Error ? error.message : "Ocorreu um erro inesperado durante a geração.");
+                setErro(safeAiUserMessage(0));
             }
         } finally {
             setLoading(false);
