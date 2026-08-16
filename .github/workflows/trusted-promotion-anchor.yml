@@ -1,79 +1,98 @@
 name: Trusted Promotion Anchor
 
 on:
-  pull_request_target:
-    branches:
-      - main
-      - portfolio/revamp-2026
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+  workflow_run:
+    workflows:
+      - CI
+    types: [completed]
 
 permissions:
   contents: read
   pull-requests: read
+  statuses: write
 
 concurrency:
-  group: trusted-promotion-anchor-${{ github.event.pull_request.number }}-${{ github.event.pull_request.base.ref }}
-  cancel-in-progress: true
+  group: trusted-promotion-anchor-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
 
 jobs:
-  trusted-promotion-source:
-    # Keep the required context base-specific. A success earned while targeting
-    # portfolio/revamp-2026 must never satisfy the more privileged main ruleset
-    # if the same head SHA is later retargeted.
-    name: Trusted promotion source policy (${{ github.event.pull_request.base.ref }})
+  publish-trusted-promotion-policy:
+    name: Publish trusted promotion policy
+    if: github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Enforce trusted same-repository promotion topology
+      - name: Evaluate trusted metadata and publish status on tested SHA
         shell: bash
         env:
-          EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          API_URL: ${{ github.api_url }}
           REPOSITORY: ${{ github.repository }}
-          BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+          SOURCE_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          SOURCE_URL: ${{ github.event.workflow_run.html_url }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          BASE_REPO: ${{ github.event.workflow_run.pull_requests[0].base.repo.full_name }}
+          BASE_REF: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_REF: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
 
-          test "$EVENT_NAME" = "pull_request_target" || {
-            echo "This trust anchor only accepts pull_request_target events." >&2
-            exit 1
-          }
-
-          test "$BASE_REPO" = "$REPOSITORY" || {
-            echo "Unexpected base repository: $BASE_REPO" >&2
-            exit 1
-          }
-
-          # Fail closed for forks. This workflow definition is loaded from the
-          # default branch and never checks out or executes pull-request code.
-          test "$HEAD_REPO" = "$REPOSITORY" || {
-            echo "Fork pull requests are not eligible for protected promotion." >&2
-            exit 1
-          }
+          state=failure
+          description="Trusted promotion policy rejected this pull request"
+          context=""
 
           case "$BASE_REF" in
             main)
-              test "$HEAD_REF" = "portfolio/revamp-2026" || {
-                echo "Only portfolio/revamp-2026 may promote into main." >&2
-                exit 1
-              }
+              context="Trusted promotion source policy (main)"
               ;;
             portfolio/revamp-2026)
-              case "$HEAD_REF" in
-                work/*)
-                  ;;
-                *)
-                  echo "Only work/* branches may promote into portfolio/revamp-2026." >&2
-                  exit 1
-                  ;;
-              esac
+              context="Trusted promotion source policy (portfolio/revamp-2026)"
               ;;
             *)
-              echo "Unexpected protected base ref: $BASE_REF" >&2
-              exit 1
+              echo "Unexpected or missing base ref: ${BASE_REF:-<empty>}" >&2
               ;;
           esac
 
-          echo "Trusted promotion source policy passed for $HEAD_REF -> $BASE_REF."
+          if [[ -z "$TARGET_SHA" || -z "$PR_NUMBER" || -z "$context" ]]; then
+            echo "Missing trusted workflow_run pull-request metadata; refusing success." >&2
+          elif [[ "$BASE_REPO" != "$REPOSITORY" ]]; then
+            echo "Unexpected base repository: $BASE_REPO" >&2
+          elif [[ "$HEAD_REPO" != "$REPOSITORY" ]]; then
+            echo "Fork pull requests are not eligible for protected promotion." >&2
+          elif [[ "$SOURCE_CONCLUSION" != "success" ]]; then
+            echo "Source CI did not succeed: $SOURCE_CONCLUSION" >&2
+          elif [[ "$BASE_REF" == "main" && "$HEAD_REF" != "portfolio/revamp-2026" ]]; then
+            echo "Only portfolio/revamp-2026 may promote into main." >&2
+          elif [[ "$BASE_REF" == "portfolio/revamp-2026" && "$HEAD_REF" != work/* ]]; then
+            echo "Only work/* branches may promote into portfolio/revamp-2026." >&2
+          else
+            state=success
+            description="Trusted promotion topology accepted"
+          fi
+
+          if [[ -z "$context" || -z "$TARGET_SHA" ]]; then
+            echo "Cannot publish a meaningful status without context and target SHA." >&2
+            exit 1
+          fi
+
+          payload=$(jq -cn \
+            --arg state "$state" \
+            --arg context "$context" \
+            --arg description "$description" \
+            --arg target_url "$SOURCE_URL" \
+            '{state:$state, context:$context, description:$description, target_url:$target_url}')
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2026-03-10" \
+            "$API_URL/repos/$REPOSITORY/statuses/$TARGET_SHA" \
+            --data "$payload"
+
+          echo
+          echo "Published '$context'=$state on tested SHA $TARGET_SHA."
+
+          test "$state" = success
