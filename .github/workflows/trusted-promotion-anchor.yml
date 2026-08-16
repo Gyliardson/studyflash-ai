@@ -22,28 +22,57 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Evaluate trusted metadata and publish status on tested SHA
+      - name: Evaluate current PR topology and publish status on tested SHA
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           API_URL: ${{ github.api_url }}
           REPOSITORY: ${{ github.repository }}
-          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
-          SOURCE_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-          SOURCE_URL: ${{ github.event.workflow_run.html_url }}
-          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
-          BASE_REPO: ${{ github.event.workflow_run.pull_requests[0].base.repo.full_name }}
-          BASE_REF: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
-          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
-          HEAD_REF: ${{ github.event.workflow_run.head_branch }}
+          EVENT_PATH: ${{ github.event_path }}
         run: |
           set -euo pipefail
 
-          state=failure
-          description="Trusted promotion policy rejected this pull request"
-          context=""
+          run_pr_count=$(jq '.workflow_run.pull_requests | length' "$EVENT_PATH")
+          if [[ "$run_pr_count" -ne 1 ]]; then
+            echo "Expected exactly one pull request in workflow_run metadata; got $run_pr_count." >&2
+            exit 1
+          fi
 
-          case "$BASE_REF" in
+          TARGET_SHA=$(jq -r '.workflow_run.head_sha // empty' "$EVENT_PATH")
+          SOURCE_CONCLUSION=$(jq -r '.workflow_run.conclusion // empty' "$EVENT_PATH")
+          SOURCE_URL=$(jq -r '.workflow_run.html_url // empty' "$EVENT_PATH")
+          PR_NUMBER=$(jq -r '.workflow_run.pull_requests[0].number // empty' "$EVENT_PATH")
+          RUN_HEAD_SHA=$(jq -r '.workflow_run.pull_requests[0].head.sha // empty' "$EVENT_PATH")
+          RUN_HEAD_REF=$(jq -r '.workflow_run.pull_requests[0].head.ref // empty' "$EVENT_PATH")
+          RUN_BASE_SHA=$(jq -r '.workflow_run.pull_requests[0].base.sha // empty' "$EVENT_PATH")
+          RUN_BASE_REF=$(jq -r '.workflow_run.pull_requests[0].base.ref // empty' "$EVENT_PATH")
+
+          if [[ -z "$TARGET_SHA" || -z "$PR_NUMBER" || -z "$RUN_HEAD_SHA" || -z "$RUN_HEAD_REF" || -z "$RUN_BASE_SHA" || -z "$RUN_BASE_REF" ]]; then
+            echo "Incomplete workflow_run pull-request metadata; refusing to publish success." >&2
+            exit 1
+          fi
+
+          if [[ "$TARGET_SHA" != "$RUN_HEAD_SHA" ]]; then
+            echo "workflow_run head SHA does not match associated PR head SHA." >&2
+            exit 1
+          fi
+
+          current_pr=$(curl --fail-with-body --silent --show-error \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2026-03-10" \
+            "$API_URL/repos/$REPOSITORY/pulls/$PR_NUMBER")
+
+          CURRENT_STATE=$(jq -r '.state // empty' <<<"$current_pr")
+          CURRENT_HEAD_SHA=$(jq -r '.head.sha // empty' <<<"$current_pr")
+          CURRENT_HEAD_REF=$(jq -r '.head.ref // empty' <<<"$current_pr")
+          CURRENT_HEAD_REPO=$(jq -r '.head.repo.full_name // empty' <<<"$current_pr")
+          CURRENT_BASE_SHA=$(jq -r '.base.sha // empty' <<<"$current_pr")
+          CURRENT_BASE_REF=$(jq -r '.base.ref // empty' <<<"$current_pr")
+          CURRENT_BASE_REPO=$(jq -r '.base.repo.full_name // empty' <<<"$current_pr")
+
+          context=""
+          case "$RUN_BASE_REF" in
             main)
               context="Trusted promotion source policy (main)"
               ;;
@@ -51,30 +80,37 @@ jobs:
               context="Trusted promotion source policy (portfolio/revamp-2026)"
               ;;
             *)
-              echo "Unexpected or missing base ref: ${BASE_REF:-<empty>}" >&2
+              echo "Unexpected run base ref: $RUN_BASE_REF" >&2
+              exit 1
               ;;
           esac
 
-          if [[ -z "$TARGET_SHA" || -z "$PR_NUMBER" || -z "$context" ]]; then
-            echo "Missing trusted workflow_run pull-request metadata; refusing success." >&2
-          elif [[ "$BASE_REPO" != "$REPOSITORY" ]]; then
-            echo "Unexpected base repository: $BASE_REPO" >&2
-          elif [[ "$HEAD_REPO" != "$REPOSITORY" ]]; then
-            echo "Fork pull requests are not eligible for protected promotion." >&2
+          state=failure
+          description="Trusted promotion policy rejected this pull request"
+
+          if [[ "$CURRENT_STATE" != "open" ]]; then
+            echo "Pull request is no longer open: ${CURRENT_STATE:-<missing>}" >&2
           elif [[ "$SOURCE_CONCLUSION" != "success" ]]; then
-            echo "Source CI did not succeed: $SOURCE_CONCLUSION" >&2
-          elif [[ "$BASE_REF" == "main" && "$HEAD_REF" != "portfolio/revamp-2026" ]]; then
+            echo "Source CI did not succeed: ${SOURCE_CONCLUSION:-<missing>}" >&2
+          elif [[ "$CURRENT_HEAD_SHA" != "$TARGET_SHA" ]]; then
+            echo "Stale workflow_run: current PR head is $CURRENT_HEAD_SHA, tested SHA is $TARGET_SHA." >&2
+          elif [[ "$CURRENT_HEAD_REF" != "$RUN_HEAD_REF" ]]; then
+            echo "Stale workflow_run: head ref changed from $RUN_HEAD_REF to $CURRENT_HEAD_REF." >&2
+          elif [[ "$CURRENT_BASE_REF" != "$RUN_BASE_REF" ]]; then
+            echo "Stale workflow_run: base ref changed from $RUN_BASE_REF to $CURRENT_BASE_REF." >&2
+          elif [[ "$CURRENT_BASE_SHA" != "$RUN_BASE_SHA" ]]; then
+            echo "Stale workflow_run: base SHA changed from $RUN_BASE_SHA to $CURRENT_BASE_SHA." >&2
+          elif [[ "$CURRENT_BASE_REPO" != "$REPOSITORY" ]]; then
+            echo "Unexpected base repository: $CURRENT_BASE_REPO" >&2
+          elif [[ "$CURRENT_HEAD_REPO" != "$REPOSITORY" ]]; then
+            echo "Fork pull requests are not eligible for protected promotion." >&2
+          elif [[ "$CURRENT_BASE_REF" == "main" && "$CURRENT_HEAD_REF" != "portfolio/revamp-2026" ]]; then
             echo "Only portfolio/revamp-2026 may promote into main." >&2
-          elif [[ "$BASE_REF" == "portfolio/revamp-2026" && "$HEAD_REF" != work/* ]]; then
+          elif [[ "$CURRENT_BASE_REF" == "portfolio/revamp-2026" && "$CURRENT_HEAD_REF" != work/* ]]; then
             echo "Only work/* branches may promote into portfolio/revamp-2026." >&2
           else
             state=success
             description="Trusted promotion topology accepted"
-          fi
-
-          if [[ -z "$context" || -z "$TARGET_SHA" ]]; then
-            echo "Cannot publish a meaningful status without context and target SHA." >&2
-            exit 1
           fi
 
           payload=$(jq -cn \
