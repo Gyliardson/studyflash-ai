@@ -25,12 +25,14 @@ type PendingDeletion =
     | { kind: "plan"; id: string; name: string }
     | null;
 
+type LibraryTab = "DECKS" | "PLANOS";
+
 export default function ColecaoPage() {
     const [decks, setDecks] = useState<Deck[]>([]);
     const [planos, setPlanos] = useState<StudyPlan[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
-    const [activeTab, setActiveTab] = useState<"DECKS" | "PLANOS">("DECKS");
+    const [activeTab, setActiveTab] = useState<LibraryTab>("DECKS");
     const [isCreating, setIsCreating] = useState(false);
     const [newDeckName, setNewDeckName] = useState("");
     const [mutationError, setMutationError] = useState<string | null>(null);
@@ -42,6 +44,26 @@ export default function ColecaoPage() {
     useEffect(() => {
         void carregarDados();
     }, []);
+
+    useEffect(() => {
+        const syncTabFromUrl = () => {
+            const tab = new URLSearchParams(window.location.search).get("tab");
+            setActiveTab(tab === "planos" ? "PLANOS" : "DECKS");
+        };
+
+        syncTabFromUrl();
+        window.addEventListener("popstate", syncTabFromUrl);
+        return () => window.removeEventListener("popstate", syncTabFromUrl);
+    }, []);
+
+    function selectTab(tab: LibraryTab) {
+        setActiveTab(tab);
+        const nextUrl = tab === "PLANOS" ? "/colecao?tab=planos" : "/colecao";
+        const currentUrl = `${window.location.pathname}${window.location.search}`;
+        if (currentUrl !== nextUrl) {
+            window.history.pushState(null, "", nextUrl);
+        }
+    }
 
     async function carregarDados() {
         setLoading(true);
@@ -192,10 +214,10 @@ export default function ColecaoPage() {
                 </section>
 
                 <div className="mb-6 flex gap-2 rounded-2xl bg-muted p-1.5" role="tablist" aria-label="Conteúdo da biblioteca">
-                    <button type="button" role="tab" aria-selected={activeTab === "DECKS"} aria-controls="library-decks" onClick={() => setActiveTab("DECKS")} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "DECKS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                    <button type="button" role="tab" aria-selected={activeTab === "DECKS"} aria-controls="library-decks" onClick={() => selectTab("DECKS")} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "DECKS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
                         <Library className="h-4 w-4" aria-hidden="true" />Baralhos
                     </button>
-                    <button type="button" role="tab" aria-selected={activeTab === "PLANOS"} aria-controls="library-plans" onClick={() => setActiveTab("PLANOS")} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "PLANOS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                    <button type="button" role="tab" aria-selected={activeTab === "PLANOS"} aria-controls="library-plans" onClick={() => selectTab("PLANOS")} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "PLANOS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
                         <Map className="h-4 w-4" aria-hidden="true" />Planos
                     </button>
                 </div>
