@@ -5,19 +5,22 @@ on:
     branches:
       - main
       - portfolio/revamp-2026
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
 
 permissions:
   contents: read
   pull-requests: read
 
 concurrency:
-  group: trusted-promotion-anchor-${{ github.event.pull_request.number }}
+  group: trusted-promotion-anchor-${{ github.event.pull_request.number }}-${{ github.event.pull_request.base.ref }}
   cancel-in-progress: true
 
 jobs:
   trusted-promotion-source:
-    name: Trusted promotion source policy
+    # Keep the required context base-specific. A success earned while targeting
+    # portfolio/revamp-2026 must never satisfy the more privileged main ruleset
+    # if the same head SHA is later retargeted.
+    name: Trusted promotion source policy (${{ github.event.pull_request.base.ref }})
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
