@@ -115,7 +115,10 @@ class AIFailureSemanticsTests(unittest.TestCase):
 
     @patch("app.ai_provider.ChatGroq")
     def test_groq_clients_have_explicit_timeout_and_zero_sdk_retries(self, chat_groq: Mock) -> None:
-        with patch.dict(os.environ, {"AI_PROVIDER_TIMEOUT_SECONDS": "7.5"}):
+        with patch.dict(
+            os.environ,
+            {"AI_PROVIDER_TIMEOUT_SECONDS": "7.5", "GROQ_API_KEY": "test-provider-key"},
+        ):
             GroqAIProvider()
 
         self.assertEqual(chat_groq.call_count, 2)
