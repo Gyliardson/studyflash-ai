@@ -42,7 +42,11 @@ class AIFailureSemanticsTests(unittest.TestCase):
     def tearDown(self) -> None:
         get_ai_provider.cache_clear()
 
-    def _post_flashcards(self, *, text: str = "Mitose divide uma célula em duas células-filhas."):
+    def _post_flashcards(
+        self,
+        *,
+        text: str = "Mitose é o processo de divisão celular que produz duas células-filhas geneticamente equivalentes.",
+    ):
         client = TestClient(app, raise_server_exceptions=False)
         return client.post(
             "/api/gerar",
