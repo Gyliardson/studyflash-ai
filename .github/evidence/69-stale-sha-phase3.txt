@@ -1,0 +1,1 @@
+Disposable #69 stale-SHA proof marker. This commit exists only to advance the PR head and verify a fresh trusted decision is required.
