@@ -14,7 +14,7 @@ Before final certification, the integration candidate must also contain the curr
 
 ## Required deterministic evidence
 
-The release candidate must be validated at its exact head SHA. The required gates are:
+The release candidate must be validated at its exact head SHA. The eight deterministic workflow gates are:
 
 - `Secret Scan / Git history secret scan`
 - `CI / Frontend lint, typecheck and build`
@@ -24,6 +24,13 @@ The release candidate must be validated at its exact head SHA. The required gate
 - `Study Session Integrity / Study review retry and resume (PostgreSQL)`
 - `Browser E2E / Public, auth and accessibility browser gates`
 - `Clean Room Release Proof / Fresh clone bootstrap and full deterministic matrix`
+
+Protected promotion branches require one additional base-specific status context that validates the promotion source/topology in GitHub's control plane:
+
+- `Trusted promotion source policy (main)` when the pull request base is `main`;
+- `Trusted promotion source policy (portfolio/revamp-2026)` when the pull request base is `portfolio/revamp-2026`.
+
+Therefore each protected promotion ruleset currently requires nine status contexts: the eight deterministic workflow gates above plus the corresponding trusted-promotion source-policy context. The trusted-promotion context is not a ninth test workflow and must not be replaced by documentation or by an untrusted status with the same display intent.
 
 A moved head invalidates evidence from the previous SHA. The same deterministic matrix is rechecked after internal merges to `portfolio/revamp-2026`. Remote LLM availability is deliberately excluded from merge eligibility; critical AI behavior is tested through deterministic provider/failure-policy coverage.
 
@@ -39,7 +46,7 @@ The repository currently enforces this process with active repository rulesets f
 
 1. requires changes through pull requests;
 2. blocks deletion and non-fast-forward updates;
-3. requires the deterministic status checks listed above with strict up-to-date semantics;
+3. requires the eight deterministic workflow checks listed above plus `Trusted promotion source policy (main)`, with strict up-to-date semantics;
 4. requires review-thread resolution before merge;
 5. has no bypass actors configured.
 
@@ -49,11 +56,11 @@ The repository currently enforces this process with active repository rulesets f
 
 1. requires normal integration changes through pull requests from work branches;
 2. blocks deletion and non-fast-forward updates;
-3. requires the same deterministic release-gate contexts, including Secret Scan, Browser E2E and Clean Room Release Proof;
+3. requires the eight deterministic workflow checks listed above plus `Trusted promotion source policy (portfolio/revamp-2026)`, with strict up-to-date semantics;
 4. requires review-thread resolution before merge;
 5. has no bypass actors configured.
 
-The exact required-status contexts come from successful GitHub check runs rather than workflow filenames. A live remote LLM is not a required status check.
+The exact required-status contexts come from successful GitHub check runs and commit statuses rather than workflow filenames alone. A live remote LLM is not a required status check.
 
 ## Supply-chain policy
 
