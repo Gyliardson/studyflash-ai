@@ -1,0 +1,161 @@
+name: Browser E2E
+
+on:
+  push:
+    branches:
+      - portfolio/revamp-2026
+      - 'work/**'
+  pull_request:
+    branches:
+      - portfolio/revamp-2026
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-execution:
+    name: Trusted browser execution
+    # Repository secrets must never be exposed to untrusted fork code. The required
+    # context is a separate unconditional aggregator below, so this skip cannot
+    # become a successful required release gate.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: studyflash_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d studyflash_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_e2e
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      E2E_CLERK_TEST_EMAIL: studyflash.e2e+clerk_test@example.com
+      EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      CI: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Verify Clerk E2E configuration is present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" || { echo "E2E Clerk publishable key is not configured" >&2; exit 1; }
+          test -n "$CLERK_SECRET_KEY" || { echo "E2E Clerk secret key is not configured" >&2; exit 1; }
+          echo "Clerk E2E development configuration is present."
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/e2e/package-lock.json
+
+      - name: Install application dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install browser test dependencies
+        working-directory: frontend/e2e
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: frontend
+        run: npx prisma generate
+
+      - name: Apply migrations to empty disposable PostgreSQL
+        working-directory: frontend
+        run: npm run db:migrate:deploy
+
+      - name: Verify migration history
+        working-directory: frontend
+        run: npm run db:migrate:status
+
+      - name: Verify database matches Prisma schema
+        working-directory: frontend
+        run: npm run db:schema:verify
+
+      - name: Install Chromium
+        working-directory: frontend/e2e
+        run: npm run install:chromium
+
+      - name: Build StudyFlash
+        working-directory: frontend
+        run: npm run build
+
+      - name: Prove release browser gate is retry-free
+        working-directory: frontend/e2e
+        shell: bash
+        env:
+          RETRY_POLICY_CANARY: '1'
+        run: |
+          set +e
+          npx playwright test tests/retry-policy.smoke.spec.ts --project=public-desktop 2>&1 | tee /tmp/studyflash-retry-policy.log
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0 || { echo "Retry-policy canary unexpectedly passed; retries may be enabled" >&2; exit 1; }
+          grep -F "RETRY_POLICY_CANARY_FIRST_ATTEMPT" /tmp/studyflash-retry-policy.log >/dev/null || {
+            echo "Retry-policy canary did not fail for the intended first-attempt sentinel" >&2
+            exit 1
+          }
+          echo "Release Browser E2E is fail-closed on the first failed attempt."
+
+      - name: Run deterministic browser gates
+        working-directory: frontend/e2e
+        run: npx playwright test --retries=0
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-e2e-${{ env.EVIDENCE_SHA }}
+          path: |
+            /tmp/studyflash-retry-policy.log
+            frontend/e2e/test-results
+            frontend/e2e/playwright-report
+          if-no-files-found: ignore
+          retention-days: 14
+
+  browser:
+    name: Public, auth and accessibility browser gates
+    if: always()
+    needs: browser-execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout shared required-gate policy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Enforce shared fail-closed trusted browser policy
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+          EXECUTION_RESULT: ${{ needs.browser-execution.result }}
+        run: |
+          set -euo pipefail
+          # STUDYFLASH_REQUIRED_GATE_POLICY_V2
+          python3 .github/scripts/required-gate-policy.py evaluate \
+            --event-name "$EVENT_NAME" \
+            --head-repo "$HEAD_REPO" \
+            --repository "$REPOSITORY" \
+            --execution-result "$EXECUTION_RESULT"

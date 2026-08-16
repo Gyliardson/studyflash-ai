@@ -1,128 +1,280 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Flashcard from "@/app/components/Flashcard";
-import { buscarCartoesParaRevisar, registrarRevisao, contarTotalFlashcards } from "@/app/actions";
+import { contarTotalFlashcards } from "@/app/actions";
+import { iniciarOuRetomarSessaoEstudo, registrarRevisaoDaSessao } from "@/app/study-actions";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { ArrowLeft, CheckCircle2, Gauge, LoaderCircle, RefreshCw, RotateCcw, Sparkles } from "lucide-react";
 
-// Componente interno que usa useSearchParams
+type ReviewEvaluation = "errei" | "dificil" | "facil";
+type StudyCard = { id: string; frente: string; verso: string };
+type SubmissionState = "idle" | "submitting" | "failed";
+
+const REVIEW_CHOICES: Array<{
+    id: ReviewEvaluation;
+    title: string;
+    description: string;
+    icon: typeof RotateCcw;
+    className: string;
+}> = [
+    {
+        id: "errei",
+        title: "Errei",
+        description: "Recomeçar o intervalo",
+        icon: RotateCcw,
+        className: "border-danger-border bg-danger-bg text-danger-fg hover:brightness-95",
+    },
+    {
+        id: "dificil",
+        title: "Difícil",
+        description: "Rever mais cedo",
+        icon: Gauge,
+        className: "border-warning-border bg-warning-bg text-warning-fg hover:brightness-95",
+    },
+    {
+        id: "facil",
+        title: "Fácil",
+        description: "Aumentar o intervalo",
+        icon: Sparkles,
+        className: "border-success-border bg-success-bg text-success-fg hover:brightness-95",
+    },
+];
+
 function StudyContent() {
     const { isLoaded, isSignedIn } = useUser();
     const searchParams = useSearchParams();
+    const submitLock = useRef(false);
 
-    // Estados
-    const [queue, setQueue] = useState<any[]>([]);
+    const [queue, setQueue] = useState<StudyCard[]>([]);
+    const [sessionId, setSessionId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [reloadKey, setReloadKey] = useState(0);
     const [cardAtualIndex, setCardAtualIndex] = useState(0);
     const [finalizou, setFinalizou] = useState(false);
     const [totalCards, setTotalCards] = useState(0);
+    const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
+    const [pendingEvaluation, setPendingEvaluation] = useState<ReviewEvaluation | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [reviewError, setReviewError] = useState<string | null>(null);
 
-    // --- LEITURA DOS PARÂMETROS DA URL (v0.3.0) ---
-    // 1. Decks (Modo Clássico)
-    const deckIdsParam = searchParams.get('decks');     // Suporte a múltiplos (?decks=1,2,3)
-    const singleDeckId = searchParams.get('deckId');    // Suporte a único (?deckId=1) [CORREÇÃO AQUI]
-    
-    // Normaliza para sempre ser um array de strings
-    const deckIds = deckIdsParam 
-        ? deckIdsParam.split(',') 
-        : (singleDeckId ? [singleDeckId] : []);
-
-    // 2. Planos e Tópicos (Modo Tutor)
-    const planId = searchParams.get('planId') || undefined;
-    const topicId = searchParams.get('topicId') || undefined;
+    const deckIdsParam = searchParams.get("decks");
+    const singleDeckId = searchParams.get("deckId");
+    const deckIds = useMemo(
+        () => deckIdsParam ? deckIdsParam.split(",") : (singleDeckId ? [singleDeckId] : []),
+        [deckIdsParam, singleDeckId],
+    );
+    const planId = searchParams.get("planId") || undefined;
+    const topicId = searchParams.get("topicId") || undefined;
 
     useEffect(() => {
+        let cancelled = false;
+
         async function carregar() {
             if (!isLoaded || !isSignedIn) {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
                 return;
             }
 
+            setLoading(true);
+            setLoadError(null);
+            setReviewError(null);
             try {
-                // Passamos os novos filtros para o backend
-                const [revisoes, total] = await Promise.all([
-                    buscarCartoesParaRevisar(false, deckIds, planId, topicId),
-                    contarTotalFlashcards(deckIds, planId, topicId)
+                const [session, total] = await Promise.all([
+                    iniciarOuRetomarSessaoEstudo({ deckIds, planId, topicId }),
+                    contarTotalFlashcards(deckIds, planId, topicId),
                 ]);
+                if (cancelled) return;
 
-                setQueue(revisoes);
                 setTotalCards(total);
+                if (!session.success) {
+                    setQueue([]);
+                    setSessionId(null);
+                    setLoadError(session.error || "Não foi possível carregar sua sessão de estudo.");
+                    return;
+                }
+
+                setQueue(session.cards);
+                setSessionId(session.sessionId ?? null);
+                setCardAtualIndex(0);
+                setFinalizou(session.cards.length === 0 && total > 0);
             } catch (error) {
                 console.error("Erro ao carregar sessão de estudo:", error);
+                if (!cancelled) {
+                    setQueue([]);
+                    setSessionId(null);
+                    setLoadError("Não foi possível carregar sua sessão de estudo. Confira sua conexão e tente novamente.");
+                }
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         }
-        carregar();
-    }, [isLoaded, isSignedIn, deckIdsParam, singleDeckId, planId, topicId]); // Adicionado singleDeckId nas dependências
 
-    const handleAvaliacao = async (avaliacao: 'errei' | 'dificil' | 'facil') => {
+        void carregar();
+        return () => { cancelled = true; };
+    }, [isLoaded, isSignedIn, deckIds, planId, topicId, reloadKey]);
+
+    const submitReview = async (avaliacao: ReviewEvaluation) => {
+        if (submitLock.current || submissionState === "submitting") return;
         const cardAtual = queue[cardAtualIndex];
-        const nextIndex = cardAtualIndex + 1;
-
-        // Otimista: Avança a UI antes do backend responder
-        if (nextIndex < queue.length) {
-            setCardAtualIndex(nextIndex);
-        } else {
-            setFinalizou(true);
+        if (!cardAtual || !sessionId) {
+            setSubmissionState("failed");
+            setPendingEvaluation(avaliacao);
+            setReviewError("A sessão não está disponível. Recarregue a página para retomar com segurança.");
+            return;
         }
 
-        // Chama o backend em segundo plano
-        await registrarRevisao(cardAtual.id, avaliacao);
+        submitLock.current = true;
+        setSubmissionState("submitting");
+        setPendingEvaluation(avaliacao);
+        setReviewError(null);
+
+        try {
+            const result = await registrarRevisaoDaSessao(sessionId, cardAtual.id, avaliacao);
+            if (!result.success) {
+                setSubmissionState("failed");
+                setReviewError(result.error || "Não foi possível salvar sua revisão. Tente novamente.");
+                return;
+            }
+
+            const nextIndex = cardAtualIndex + 1;
+            setSubmissionState("idle");
+            setPendingEvaluation(null);
+            if (nextIndex < queue.length) {
+                setCardAtualIndex(nextIndex);
+            } else {
+                setFinalizou(true);
+            }
+        } catch (error) {
+            console.error("Erro ao confirmar revisão:", error);
+            setSubmissionState("failed");
+            setReviewError("A confirmação falhou. Tente novamente; a mesma revisão pode ser reenviada sem duplicar XP.");
+        } finally {
+            submitLock.current = false;
+        }
     };
 
     const handleEstudarMais = async () => {
+        if (submitLock.current) return;
         setLoading(true);
-        // Modo Extra também respeita todos os filtros (Decks, Plano ou Tópico)
-        const extras = await buscarCartoesParaRevisar(true, deckIds, planId, topicId);
-        
-        if (extras.length > 0) {
-            setQueue(extras);
-            setCardAtualIndex(0);
-            setFinalizou(false);
-        } else {
-            alert("Não há mais cards disponíveis nestes baralhos/tópicos!");
+        setLoadError(null);
+        setReviewError(null);
+        setSubmissionState("idle");
+        setPendingEvaluation(null);
+        try {
+            const session = await iniciarOuRetomarSessaoEstudo({ deckIds, planId, topicId, modeExtra: true });
+            if (!session.success) {
+                setLoadError(session.error || "Não foi possível iniciar a sessão extra.");
+                return;
+            }
+            if (session.cards.length > 0 && session.sessionId) {
+                setQueue(session.cards);
+                setSessionId(session.sessionId);
+                setCardAtualIndex(0);
+                setFinalizou(false);
+            } else {
+                setLoadError("Não há mais cards disponíveis nesta seleção.");
+            }
+        } catch (error) {
+            console.error("Erro ao carregar estudo extra:", error);
+            setLoadError("Não foi possível iniciar a sessão extra. Confira sua conexão e tente novamente.");
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
-    // Título Dinâmico da Sessão
     const getSessionTitle = () => {
-        if (topicId) return "Revisão de Tópico";
-        if (planId) return "Estudo do Plano Completo";
-        if (deckIds.length > 0) return `${deckIds.length} Baralho(s) Selecionado(s)`; // Agora vai cair aqui corretamente
-        return "Modo Global (Tudo)";
+        if (topicId) return "Revisão de tópico";
+        if (planId) return "Plano completo";
+        if (deckIds.length === 1) return "Baralho selecionado";
+        if (deckIds.length > 1) return `${deckIds.length} baralhos selecionados`;
+        return "Revisão global";
     };
+
+    const backHref = planId ? `/planos/${planId}` : "/colecao";
+    const progress = queue.length > 0 ? Math.round(((cardAtualIndex + 1) / queue.length) * 100) : 0;
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center py-20">
-                <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full"></div>
+            <div className="mx-auto w-full max-w-2xl px-4 py-16" role="status" aria-live="polite">
+                <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-sm">
+                    <LoaderCircle className="mx-auto h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+                    <p className="mt-4 font-bold text-foreground">Preparando sua sessão</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Buscando apenas revisões confirmadas pelo servidor.</p>
+                </div>
             </div>
         );
     }
 
-    return (
-        <div className="w-full max-w-2xl text-center px-4">
-            {/* Título da Sessão */}
-            <div className="mb-6">
-                <span className="text-xs font-bold text-primary tracking-widest uppercase mb-1 block">
-                    {getSessionTitle()}
-                </span>
-            </div>
+    if (loadError) {
+        return (
+            <section className="mx-auto w-full max-w-xl px-4 py-12" aria-labelledby="study-load-error-title">
+                <div className="rounded-3xl border border-danger-border bg-card p-7 text-left shadow-sm">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-danger-fg">Sessão indisponível</p>
+                    <h1 id="study-load-error-title" className="mt-2 text-2xl font-black tracking-tight text-foreground">Não foi possível preparar o estudo</h1>
+                    <p role="alert" className="mt-3 text-sm leading-6 text-muted-foreground">{loadError}</p>
+                    <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                        <button
+                            type="button"
+                            onClick={() => setReloadKey((value) => value + 1)}
+                            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                            Tentar novamente
+                        </button>
+                        <Link href={backHref} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-background px-5 py-3 font-bold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                            Voltar
+                        </Link>
+                    </div>
+                </div>
+            </section>
+        );
+    }
 
+    return (
+        <div className="mx-auto w-full max-w-3xl px-4 py-8 md:px-6 md:py-12">
             {!finalizou && queue.length > 0 ? (
                 <>
-                    <div className="mb-6 flex justify-between items-end px-2">
-                        <h1 className="text-2xl font-bold text-foreground">Modo Estudo 🧠</h1>
-                        <span className="text-sm font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
-                            {cardAtualIndex + 1} / {queue.length}
-                        </span>
-                    </div>
+                    <header className="mb-6">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-primary">{getSessionTitle()}</p>
+                                <h1 className="mt-2 text-3xl font-black tracking-tight text-foreground">Sessão de estudo</h1>
+                                <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+                                    Revele o verso, avalie a lembrança e aguarde a confirmação antes de avançar. Sua fila pode ser retomada após uma interrupção.
+                                </p>
+                            </div>
+                            <div className="shrink-0 rounded-2xl border border-border bg-card px-4 py-3 text-right shadow-sm">
+                                <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Progresso</span>
+                                <span className="mt-1 block text-lg font-black tabular-nums text-foreground" aria-live="polite">{cardAtualIndex + 1} / {queue.length}</span>
+                            </div>
+                        </div>
+                        <div className="mt-5 h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                            <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${progress}%` }} />
+                        </div>
+                    </header>
 
-                    <div className="mb-8">
+                    {reviewError && (
+                        <div role="alert" className="mb-5 rounded-2xl border border-danger-border bg-danger-bg p-4 text-left text-sm text-danger-fg">
+                            <p className="font-bold">A revisão ainda não foi confirmada.</p>
+                            <p className="mt-1 leading-6">{reviewError}</p>
+                            {submissionState === "failed" && pendingEvaluation && sessionId && queue[cardAtualIndex] && (
+                                <button
+                                    type="button"
+                                    onClick={() => void submitReview(pendingEvaluation)}
+                                    className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-danger-border bg-card px-4 py-2 font-bold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                                    Reenviar esta avaliação
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="mb-6">
                         <Flashcard
                             key={queue[cardAtualIndex].id}
                             index={cardAtualIndex}
@@ -131,82 +283,91 @@ function StudyContent() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        {/* POLISH: Updated to Semantic Danger palette */}
-                        <button onClick={() => handleAvaliacao('errei')} className="py-4 bg-danger-bg text-danger-fg font-bold rounded-xl hover:opacity-80 transition-opacity border border-danger-border active:scale-95">
-                            Errei 😓
-                        </button>
-                        {/* POLISH: Updated to Semantic Warning palette */}
-                        <button onClick={() => handleAvaliacao('dificil')} className="py-4 bg-warning-bg text-warning-fg font-bold rounded-xl hover:opacity-80 transition-opacity border border-warning-border active:scale-95">
-                            Difícil 😐
-                        </button>
-                        {/* POLISH: Updated to Semantic Success palette */}
-                        <button onClick={() => handleAvaliacao('facil')} className="py-4 bg-success-bg text-success-fg font-bold rounded-xl hover:opacity-80 transition-opacity border border-success-border active:scale-95">
-                            Fácil 🤩
-                        </button>
-                    </div>
+                    <fieldset className="rounded-3xl border border-border bg-card p-4 shadow-sm md:p-5" aria-busy={submissionState === "submitting"}>
+                        <legend className="px-2 text-xs font-extrabold uppercase tracking-[0.16em] text-muted-foreground">Como foi lembrar?</legend>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            {REVIEW_CHOICES.map(({ id, title, description, icon: Icon, className }) => (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    disabled={submissionState === "submitting"}
+                                    onClick={() => void submitReview(id)}
+                                    className={`min-h-24 rounded-2xl border p-4 text-left transition active:scale-[0.99] disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${className}`}
+                                >
+                                    <Icon className="h-5 w-5" aria-hidden="true" />
+                                    <span className="mt-3 block font-black">{title}</span>
+                                    <span className="mt-1 block text-xs font-medium opacity-80">{description}</span>
+                                </button>
+                            ))}
+                        </div>
+                        {submissionState === "submitting" && (
+                            <p role="status" className="mt-4 flex items-center justify-center gap-2 text-sm font-medium text-muted-foreground">
+                                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                Salvando sua revisão antes de avançar…
+                            </p>
+                        )}
+                    </fieldset>
                 </>
             ) : (
-                <div className="bg-card p-10 rounded-3xl shadow-xl border border-border text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <section className="rounded-3xl border border-border bg-card p-7 text-center shadow-sm md:p-10" aria-labelledby="study-state-title">
                     {totalCards === 0 ? (
                         <>
-                            <div className="text-6xl mb-4">📭</div>
-                            <h2 className="text-2xl font-bold text-card-foreground mb-2">
-                                Nada por aqui
-                            </h2>
-                            <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                                Não há cartões para estudar nesta seleção. Que tal criar novos conteúdos?
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground" aria-hidden="true">
+                                <CheckCircle2 className="h-6 w-6" />
+                            </div>
+                            <p className="mt-5 text-xs font-extrabold uppercase tracking-[0.18em] text-muted-foreground">Sem cards nesta seleção</p>
+                            <h1 id="study-state-title" className="mt-2 text-2xl font-black tracking-tight text-foreground">Nada para revisar agora</h1>
+                            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+                                Esta seleção ainda não possui cards disponíveis. Volte para sua coleção ou plano para preparar conteúdo de estudo.
                             </p>
-                            
-                            {/* Botão de Voltar Inteligente */}
-                            <Link href={planId ? `/planos/${planId}` : "/colecao"}>
-                                <button className="w-full bg-primary text-primary-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-primary/90 transition shadow-lg active:scale-95">
-                                    {planId ? "Voltar ao Plano" : "Voltar para Coleção"}
-                                </button>
+                            <Link href={backHref} className="mx-auto mt-6 inline-flex min-h-11 w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                                {planId ? "Voltar ao plano" : "Voltar à coleção"}
                             </Link>
                         </>
                     ) : (
                         <>
-                            <div className="text-6xl mb-4 animate-bounce">🎉</div>
-                            <h2 className="text-2xl font-bold text-card-foreground mb-2">
-                                Sessão Finalizada!
-                            </h2>
-                            <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                                Tudo revisado por aqui.
-                                <br />
-                                <span className="text-sm opacity-75">
-                                    Total nesta seleção: {totalCards} cartas.
-                                </span>
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-success-bg text-success-fg" aria-hidden="true">
+                                <CheckCircle2 className="h-6 w-6" />
+                            </div>
+                            <p className="mt-5 text-xs font-extrabold uppercase tracking-[0.18em] text-success-fg">Sessão confirmada</p>
+                            <h1 id="study-state-title" className="mt-2 text-2xl font-black tracking-tight text-foreground">Revisão concluída</h1>
+                            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+                                Todas as avaliações desta fila foram confirmadas pelo servidor. Esta seleção possui {totalCards} {totalCards === 1 ? "card" : "cards"} no total.
                             </p>
-
-                            <div className="flex flex-col gap-3 max-w-xs mx-auto">
+                            <div className="mx-auto mt-7 flex max-w-sm flex-col gap-3 sm:flex-row">
                                 <button
-                                    onClick={handleEstudarMais}
-                                    className="w-full bg-primary text-primary-foreground px-6 py-3.5 rounded-xl font-bold hover:bg-primary/90 transition shadow-lg shadow-primary/20 active:scale-95"
+                                    type="button"
+                                    onClick={() => void handleEstudarMais()}
+                                    className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
-                                    🚀 Estudar Mais (+20)
+                                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                                    Estudar mais cards
                                 </button>
-
-                                {/* Botão Voltar Contextual */}
-                                <Link href={planId ? `/planos/${planId}` : "/colecao"}>
-                                    <button className="w-full bg-card text-foreground border border-border px-6 py-3.5 rounded-xl font-bold hover:bg-muted transition active:scale-95">
-                                        {planId ? "Voltar ao Roteiro" : "Voltar para Coleção"}
-                                    </button>
+                                <Link href={backHref} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-background px-5 py-3 font-bold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                                    Voltar
                                 </Link>
                             </div>
                         </>
                     )}
-                </div>
+                </section>
             )}
         </div>
     );
 }
 
-// Componente Principal
 export default function EstudarPage() {
     return (
-        <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-12 transition-colors duration-300">
-            <Suspense fallback={<div className="text-center p-10 text-muted-foreground">Carregando ambiente de estudo...</div>}>
+        <div className="min-h-[calc(100vh-8rem)] bg-background">
+            <Suspense fallback={
+                <div className="mx-auto w-full max-w-2xl px-4 py-16" role="status">
+                    <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-sm">
+                        <LoaderCircle className="mx-auto h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+                        <p className="mt-4 font-bold text-foreground">Carregando ambiente de estudo…</p>
+                    </div>
+                </div>
+            }>
                 <StudyContent />
             </Suspense>
         </div>

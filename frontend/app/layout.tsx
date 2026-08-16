@@ -2,19 +2,17 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-// Imports do Clerk
-import { ClerkProvider } from '@clerk/nextjs'
-import { ptPT } from '@clerk/localizations'
-
-// 1. Importar o Analytics
-import { Analytics } from "@vercel/analytics/react"
+import { ClerkProvider } from "@clerk/nextjs";
+import { ptPT } from "@clerk/localizations";
+import { Analytics } from "@vercel/analytics/react";
 import { ThemeProvider } from "./providers";
+import PWAClientLifecycle from "./components/PWAClientLifecycle";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "StudyFlash",
-  description: "Gera flashcards com IA",
+  description: "Flashcards, revisão espaçada e simulados com IA e progresso persistente.",
   manifest: "/manifest.webmanifest",
 };
 
@@ -22,8 +20,6 @@ export const viewport: Viewport = {
   themeColor: "#4f46e5",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export default function RootLayout({
@@ -36,6 +32,7 @@ export default function RootLayout({
       <html lang="pt" suppressHydrationWarning>
         <body className={inter.className}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <PWAClientLifecycle />
             {children}
             <Analytics />
           </ThemeProvider>

@@ -32,8 +32,9 @@ model Flashcard {
   repetition     Int      @default(0)
   easinessFactor Float    @default(2.5)
 
-  // --- RELAÇÃO AO SIMULADO ---
-  examResults ExamQuestion[]
+  // --- RELAÇÕES DE ESTUDO / SIMULADO ---
+  studySessionCards StudySessionCard[]
+  examResults       ExamQuestion[]
 
   @@index([userId])
   @@index([userId, nextReview])
@@ -44,10 +45,30 @@ model Deck {
   id        String      @id @default(uuid())
   userId    String
   nome      String
+  nameKey   String?
   createdAt DateTime    @default(now())
   cards     Flashcard[]
 
+  // Registros legados permanecem com nameKey NULL. Novos creates usam uma chave
+  // normalizada para tornar a regra de nome por usuário atômica sem reescrever dados.
+  @@unique([userId, nameKey])
   @@index([userId])
+}
+
+// Receipt durável de uma mutation de criação já concluída. O receipt é gravado na
+// mesma transação do efeito: não existe estado PENDING que possa ficar órfão.
+model MutationReceipt {
+  id          String   @id @default(uuid())
+  userId      String
+  kind        String
+  requestKey  String
+  fingerprint String
+  resultId    String?
+  xpAwarded   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, kind, requestKey])
+  @@index([userId, kind, createdAt])
 }
 
 // --- NOVOS MODELS: PLANOS DE ESTUDO ---
@@ -85,6 +106,42 @@ model Topic {
   @@index([planId])
 }
 
+// --- SESSÕES DE ESTUDO RESUMÍVEIS ---
+
+model StudySession {
+  id        String   @id @default(uuid())
+  userId    String
+  scopeKey  String
+  modeExtra Boolean  @default(false)
+  status    String   @default("ACTIVE")
+  activeKey String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cards StudySessionCard[]
+
+  @@index([userId, status, scopeKey])
+}
+
+model StudySessionCard {
+  id                String       @id @default(uuid())
+  sessionId         String
+  session           StudySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  flashcardId       String
+  flashcard          Flashcard    @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  order             Int
+  status            String       @default("PENDING")
+  evaluation        String?
+  xpGained          Int?
+  isScheduledReview Boolean?
+  committedAt       DateTime?
+
+  @@unique([sessionId, flashcardId])
+  @@unique([sessionId, order])
+  @@index([sessionId, status, order])
+  @@index([flashcardId])
+}
+
 // --- NOVOS MODELS: MODO SIMULADO (v0.5.0) ---
 
 model ExamSession {
@@ -101,6 +158,8 @@ model ExamSession {
   difficulty       String // 'EASY', 'MEDIUM', 'HARD', 'IMPOSSIBLE'
   xpAwarded        Int
   createdAt        DateTime @default(now())
+  attemptId        String?  @unique
+  attempt          ExamAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
 
   questions ExamQuestion[]
 
@@ -121,6 +180,41 @@ model ExamQuestion {
 
   @@index([sessionId])
   @@index([flashcardId])
+}
+
+model ExamAttempt {
+  id            String   @id @default(uuid())
+  userId        String
+  sourceDeckId  String?
+  sourceTopicId String?
+  sourcePlanId  String?
+  sourceType    String
+  difficulty    String
+  status        String   @default("ACTIVE")
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  finalizedAt   DateTime?
+
+  questions ExamAttemptQuestion[]
+  session   ExamSession?
+
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+model ExamAttemptQuestion {
+  id             String      @id @default(uuid())
+  attemptId      String
+  attempt        ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  flashcardId    String
+  prompt         String
+  expectedAnswer String
+  options        Json
+  order          Int
+
+  @@unique([attemptId, flashcardId])
+  @@unique([attemptId, order])
+  @@index([attemptId])
 }
 
 // === GAMIFICATION SYSTEM (v0.4.0) ===

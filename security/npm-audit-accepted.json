@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "accepted": [
+    {
+      "package": "fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-v2hh-gcrm-f6hx",
+      "rationale": "Transitive Prisma tooling path only: @prisma/client -> prisma -> @prisma/dev -> @prisma/streams-local -> ajv -> fast-uri. StudyFlash does not invoke Prisma local streams or this URI parsing surface at runtime."
+    },
+    {
+      "package": "fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-7p8r-x3mc-p8w7",
+      "rationale": "Transitive Prisma tooling path only: @prisma/client -> prisma -> @prisma/dev -> @prisma/streams-local -> ajv -> fast-uri. StudyFlash does not invoke Prisma local streams or this URI parsing surface at runtime."
+    },
+    {
+      "package": "fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-4c8g-83qw-93j6",
+      "rationale": "Transitive Prisma tooling path only: @prisma/client -> prisma -> @prisma/dev -> @prisma/streams-local -> ajv -> fast-uri. StudyFlash does not invoke Prisma local streams or this URI parsing surface at runtime."
+    },
+    {
+      "package": "fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-q3j6-qgpj-74h6",
+      "rationale": "Transitive Prisma tooling path only: @prisma/client -> prisma -> @prisma/dev -> @prisma/streams-local -> ajv -> fast-uri. StudyFlash does not invoke Prisma local streams or this URI parsing surface at runtime."
+    },
+    {
+      "package": "fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-v39h-62p7-jpjc",
+      "rationale": "Transitive Prisma tooling path only: @prisma/client -> prisma -> @prisma/dev -> @prisma/streams-local -> ajv -> fast-uri. StudyFlash does not invoke Prisma local streams or this URI parsing surface at runtime."
+    },
+    {
+      "package": "lodash",
+      "advisory": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc",
+      "rationale": "Transitive Prisma Studio path only: @prisma/client -> prisma -> @prisma/studio-core -> @visx/* -> lodash. StudyFlash does not execute Prisma Studio in application runtime or CI runtime tests."
+    }
+  ]
+}

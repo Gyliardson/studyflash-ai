@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#4f46e5" />
+    <title>Sem conexão | StudyFlash</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        background:
+          radial-gradient(circle at top, rgba(79, 70, 229, 0.12), transparent 34rem),
+          #f8fafc;
+      }
+      main { width: min(100%, 38rem); }
+      section {
+        border: 1px solid #e2e8f0;
+        border-radius: 1.5rem;
+        background: rgba(255, 255, 255, 0.96);
+        padding: clamp(1.75rem, 5vw, 3rem);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.1);
+        text-align: center;
+      }
+      .eyebrow {
+        margin: 0 0 0.75rem;
+        color: #4f46e5;
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      h1 { margin: 0; font-size: clamp(2rem, 7vw, 3rem); line-height: 1.05; letter-spacing: -0.04em; }
+      .description { margin: 1.25rem auto 0; max-width: 31rem; color: #475569; line-height: 1.65; }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        margin-top: 1.5rem;
+        border-radius: 999px;
+        background: #f1f5f9;
+        padding: 0.6rem 0.9rem;
+        color: #475569;
+        font-size: 0.875rem;
+        font-weight: 700;
+      }
+      .dot { width: 0.55rem; height: 0.55rem; border-radius: 999px; background: #f59e0b; }
+      .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; margin-top: 1.75rem; }
+      button, a {
+        min-height: 2.75rem;
+        border-radius: 0.8rem;
+        padding: 0.75rem 1.1rem;
+        font: inherit;
+        font-weight: 800;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      button { border: 0; background: #4f46e5; color: #fff; }
+      button:disabled { cursor: not-allowed; opacity: 0.58; }
+      a { border: 1px solid #cbd5e1; color: #334155; background: transparent; }
+      button:focus-visible, a:focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
+      .note { margin: 1.5rem auto 0; max-width: 31rem; color: #64748b; font-size: 0.82rem; line-height: 1.55; }
+      @media (prefers-color-scheme: dark) {
+        :root { background: #020617; color: #f8fafc; }
+        body { background: radial-gradient(circle at top, rgba(99, 102, 241, 0.2), transparent 34rem), #020617; }
+        section { border-color: #1e293b; background: rgba(15, 23, 42, 0.96); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32); }
+        .eyebrow { color: #a5b4fc; }
+        .description, .status { color: #cbd5e1; }
+        .status { background: #1e293b; }
+        a { border-color: #334155; color: #e2e8f0; }
+        .note { color: #94a3b8; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section aria-labelledby="offline-title">
+        <p class="eyebrow">StudyFlash offline</p>
+        <h1 id="offline-title">Você está sem conexão</h1>
+        <p class="description"><strong>StudyFlash não mantém conteúdos da sua conta em cache offline.</strong> Isso evita exibir decks, sessões, simulados ou progresso autenticado desatualizados.</p>
+        <div class="status" role="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="connection-status">Aguardando a conexão voltar…</span></div>
+        <div class="actions">
+          <button id="retry" type="button" disabled>Tentar novamente</button>
+          <a href="/">Ir para a página inicial</a>
+        </div>
+        <p class="note">Quando a rede voltar, esta página será recarregada para buscar o estado confirmado pelo servidor.</p>
+      </section>
+    </main>
+    <script>
+      (() => {
+        const retry = document.getElementById("retry");
+        const status = document.getElementById("connection-status");
+
+        const markOffline = () => {
+          retry.disabled = true;
+          status.textContent = "Aguardando a conexão voltar…";
+        };
+
+        const markOnline = () => {
+          retry.disabled = false;
+          status.textContent = "Conexão disponível. Você pode tentar novamente.";
+        };
+
+        const probeConnection = async () => {
+          try {
+            const response = await fetch(`/?connectivity-probe=${Date.now()}`, {
+              method: "HEAD",
+              cache: "no-store",
+              credentials: "same-origin",
+            });
+            if (!response.ok) throw new Error("Connectivity probe failed");
+            markOnline();
+          } catch {
+            markOffline();
+          }
+        };
+
+        retry.addEventListener("click", () => window.location.reload());
+        window.addEventListener("online", () => {
+          status.textContent = "Conexão restaurada. Recarregando…";
+          window.location.reload();
+        });
+        window.addEventListener("offline", markOffline);
+        void probeConnection();
+      })();
+    </script>
+  </body>
+</html>

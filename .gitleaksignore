@@ -1,0 +1,6 @@
+# Reviewed historical false positives only. Keep entries fingerprint-specific so
+# new occurrences of the same rule/path still fail the full-history gate.
+# Synthetic idempotency request key used only by a deterministic test.
+459bc664a5b85411f6c75604586b456688c474da:frontend/tests/content-creation-idempotency.test.mjs:generic-api-key:148
+# Public synthetic Clerk development publishable-key example used for static CI build validation.
+42eba4c4ea78c27a43c9e6f6dbac3ee4a494dc99:.github/workflows/ci.yml:generic-api-key:29

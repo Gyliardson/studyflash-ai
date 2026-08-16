@@ -1,0 +1,15 @@
+{
+  "name": "studyflash-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "install:chromium": "playwright install chromium",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
+    "@clerk/testing": "2.2.23",
+    "@playwright/test": "1.62.1"
+  }
+}

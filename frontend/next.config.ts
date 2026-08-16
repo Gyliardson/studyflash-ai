@@ -3,17 +3,69 @@ import withPWAInit from "@ducanh2912/next-pwa";
 
 const withPWA = withPWAInit({
   dest: "public",
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+  // Never create an extra page cache from client-side navigation. StudyFlash pages
+  // can contain user-owned/authenticated data, so HTML/RSC/API reads stay network-only.
+  cacheOnFrontEndNav: false,
+  aggressiveFrontEndNavCaching: false,
+  cacheStartUrl: false,
   reloadOnOnline: true,
-  disable: process.env.NODE_ENV === "development", // Desativa em dev
+  disable: process.env.NODE_ENV === "development",
   workboxOptions: {
     disableDevLogs: true,
+    cleanupOutdatedCaches: true,
+    // Keep the emergency navigation fallback independent from the Next.js/Clerk
+    // runtime. A static document can render with the network fully unavailable and
+    // cannot accidentally expose account-owned application state.
+    additionalManifestEntries: [{ url: "/offline-fallback.html", revision: "studyflash-offline-v2" }],
+    runtimeCaching: [
+      {
+        urlPattern: ({ request }) => request.mode === "navigate",
+        handler: "NetworkOnly",
+        options: {
+          precacheFallback: {
+            fallbackURL: "/offline-fallback.html",
+          },
+        },
+      },
+      {
+        urlPattern: /\/_next\/static\/.*/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "studyflash-next-static-v1",
+          expiration: {
+            maxEntries: 128,
+            maxAgeSeconds: 30 * 24 * 60 * 60,
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+      {
+        urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "studyflash-static-images-v1",
+          expiration: {
+            maxEntries: 64,
+            maxAgeSeconds: 30 * 24 * 60 * 60,
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
+        },
+      },
+      {
+        // All remaining GETs, including RSC payloads, auth/session reads and API data,
+        // must come from the network. Mutating POST/server-action requests are never
+        // intercepted by these GET-only Workbox routes.
+        urlPattern: ({ url }) => url.origin === self.location.origin,
+        handler: "NetworkOnly",
+      },
+    ],
   },
 });
 
-const nextConfig: NextConfig = {
-  /* config options here */
-};
+const nextConfig: NextConfig = {};
 
 export default withPWA(nextConfig);

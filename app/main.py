@@ -1,8 +1,25 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
-from .models import ConjuntoFlashcards, PlanoEstudo, PedidoPlano, PedidoConteudoTopico, PedidoGerarProva, QuestaoProva
-from .services import gerar_flashcards_service, extrair_texto_do_pdf, gerar_plano_service, gerar_conteudo_topico_service, gerar_distratores_batch
 from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+
+from .ai_errors import (
+    AIError,
+    AIInvalidInputError,
+    AIInvalidOutputError,
+    AIProviderRateLimitError,
+    AIProviderTimeoutError,
+    AIProviderUnavailableError,
+)
+from .models import ConjuntoFlashcards, PedidoConteudoTopico, PedidoGerarProva, PedidoPlano, PlanoEstudo, QuestaoProva
+from .request_security import (
+    PDFTooLargeError,
+    PDFValidationError,
+    get_cors_origins,
+    read_upload_limited,
+    require_internal_api_key,
+    validate_pdf_metadata,
+)
+from .services import extrair_texto_do_pdf, gerar_conteudo_topico_service, gerar_distratores_batch, gerar_flashcards_service, gerar_plano_service
 
 load_dotenv()
 
@@ -10,112 +27,109 @@ app = FastAPI(title="StudyFlash AI API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
-@app.post("/api/gerar", response_model=ConjuntoFlashcards)
+
+def _ai_http_exception(exc: AIError) -> HTTPException:
+    if isinstance(exc, AIInvalidInputError):
+        return HTTPException(status_code=422, detail="Os dados enviados não são válidos para esta operação de IA.")
+    if isinstance(exc, AIProviderRateLimitError):
+        return HTTPException(status_code=429, detail="O serviço de IA está temporariamente no limite de capacidade.")
+    if isinstance(exc, AIProviderTimeoutError):
+        return HTTPException(status_code=504, detail="O serviço de IA excedeu o tempo limite de resposta.")
+    if isinstance(exc, AIProviderUnavailableError):
+        return HTTPException(status_code=503, detail="O serviço de IA está temporariamente indisponível.")
+    if isinstance(exc, AIInvalidOutputError):
+        return HTTPException(status_code=502, detail="O serviço de IA retornou uma resposta inválida.")
+    return HTTPException(status_code=503, detail="O serviço de IA não está disponível no momento.")
+
+
+def _log_ai_failure(operation: str, exc: Exception) -> None:
+    # Deliberately log only the domain/type, never provider response bodies or exception text.
+    print(f"AI operation failed: operation={operation} type={type(exc).__name__}")
+
+
+@app.post("/api/gerar", response_model=ConjuntoFlashcards, dependencies=[Depends(require_internal_api_key)])
 async def gerar_flashcards(
-    texto: str = Form(None),         # Opcional: Texto colado
-    arquivo: UploadFile = File(None) # Opcional: Arquivo PDF
+    texto: str = Form(None),
+    arquivo: UploadFile = File(None),
 ):
     texto_final = ""
 
     try:
-        # 1. Prioridade: Se enviou arquivo, processa o PDF
         if arquivo:
-            if not arquivo.filename.endswith(".pdf"):
-                raise HTTPException(status_code=400, detail="Apenas arquivos PDF são aceitos.")
-            
-            # Lê os bytes do arquivo
-            conteudo_arquivo = await arquivo.read()
+            validate_pdf_metadata(arquivo.filename, arquivo.content_type)
+            conteudo_arquivo = await read_upload_limited(arquivo)
             texto_extraido = extrair_texto_do_pdf(conteudo_arquivo)
-            
-            if not texto_extraido:
-                raise HTTPException(status_code=400, detail="Não foi possível ler o texto deste PDF (pode ser uma imagem digitalizada).")
-            
-            texto_final = texto_extraido
 
-        # 2. Se não tem arquivo, usa o texto colado
+            if not texto_extraido:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Não foi possível ler o texto deste PDF (pode ser uma imagem digitalizada).",
+                )
+
+            texto_final = texto_extraido
         elif texto:
             texto_final = texto
-
-        # 3. Se não tem nenhum dos dois
         else:
             raise HTTPException(status_code=400, detail="Envie um texto ou um arquivo PDF.")
 
-        # Chama o serviço de IA com o texto final
-        print(f"Gerando flashcards para texto de tamanho: {len(texto_final)} chars")
-        resultado = gerar_flashcards_service(texto_final)
-        return resultado
+        return gerar_flashcards_service(texto_final)
 
-    except ValueError as ve:
-        # Aqui capturamos o erro "Conteúdo Insuficiente" do services.py
-        # Retornamos 422 (Unprocessable Entity) para o front saber que o input foi ruim
-        raise HTTPException(status_code=422, detail=str(ve))
-        
-    except Exception as e:
-        print(f"Erro interno: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno ao processar solicitação.")
-    
-@app.post("/api/gerar-plano", response_model=PlanoEstudo)
+    except HTTPException:
+        raise
+    except PDFTooLargeError as exc:
+        raise HTTPException(status_code=413, detail="PDF excede o tamanho máximo permitido.") from exc
+    except PDFValidationError as exc:
+        raise HTTPException(status_code=400, detail="Arquivo PDF inválido.") from exc
+    except AIError as exc:
+        _log_ai_failure("flashcards", exc)
+        raise _ai_http_exception(exc) from exc
+    except Exception as exc:
+        _log_ai_failure("flashcards-unexpected", exc)
+        raise HTTPException(status_code=500, detail="Erro interno ao processar solicitação.") from exc
+
+
+@app.post("/api/gerar-plano", response_model=PlanoEstudo, dependencies=[Depends(require_internal_api_key)])
 async def gerar_plano(pedido: PedidoPlano):
     try:
-        resultado = gerar_plano_service(pedido.tema, pedido.dificuldade)
-        return resultado
-    except Exception as e:
-        print(f"Erro ao gerar plano: {e}")
-        raise HTTPException(status_code=500, detail="Ocorreu um erro ao criar seu plano de estudos.")
+        return gerar_plano_service(pedido.tema, pedido.dificuldade)
+    except AIError as exc:
+        _log_ai_failure("study-plan", exc)
+        raise _ai_http_exception(exc) from exc
+    except Exception as exc:
+        _log_ai_failure("study-plan-unexpected", exc)
+        raise HTTPException(status_code=500, detail="Erro interno ao processar solicitação.") from exc
 
-@app.post("/api/debug-pdf")
-async def debug_pdf_leitura(arquivo: UploadFile = File(...)):
-    if not arquivo.filename.endswith(".pdf"):
-        return {"erro": "Por favor, envie um arquivo PDF."}
-    
-    try:
-        # Lê o arquivo
-        conteudo = await arquivo.read()
-        
-        # Usa a mesma função de extração do serviço
-        texto_bruto = extrair_texto_do_pdf(conteudo)
-        
-        # Retorna estatísticas e o texto completo
-        return {
-            "nome_arquivo": arquivo.filename,
-            "tamanho_texto_extraido": len(texto_bruto),
-            "preview_do_texto": texto_bruto[:1000], # Primeiros 1000 caracteres
-            "conteudo_completo": texto_bruto # Cuidado, pode ser grande
-        }
-    except Exception as e:
-        return {"erro_interno": str(e)}
-    
-@app.post("/api/gerar-cards-topico", response_model=ConjuntoFlashcards)
+
+@app.post("/api/gerar-cards-topico", response_model=ConjuntoFlashcards, dependencies=[Depends(require_internal_api_key)])
 async def gerar_cards_topico(pedido: PedidoConteudoTopico):
     try:
-        resultado = gerar_conteudo_topico_service(pedido.tema_plano, pedido.titulo_topico)
-        return resultado
-    except Exception as e:
-        print(f"Erro ao gerar conteúdo: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao gerar material didático.")
-    
-@app.post("/api/gerar-prova", response_model=list[QuestaoProva])
+        return gerar_conteudo_topico_service(pedido.tema_plano, pedido.titulo_topico)
+    except AIError as exc:
+        _log_ai_failure("topic-cards", exc)
+        raise _ai_http_exception(exc) from exc
+    except Exception as exc:
+        _log_ai_failure("topic-cards-unexpected", exc)
+        raise HTTPException(status_code=500, detail="Erro interno ao processar solicitação.") from exc
+
+
+@app.post("/api/gerar-prova", response_model=list[QuestaoProva], dependencies=[Depends(require_internal_api_key)])
 async def gerar_prova(pedido: PedidoGerarProva):
     try:
-        # Limitamos a 20 questões por requisição para evitar timeout do Vercel/Render
-        # Se o usuário pedir 50, o frontend pode quebrar em requisições menores futuramente
-        if len(pedido.cartoes) > 20:
-             # Pega apenas os 20 primeiros para garantir performance no MVP
-             cartoes_processar = pedido.cartoes[:20]
-        else:
-             cartoes_processar = pedido.cartoes
+        cartoes_processar = pedido.cartoes[:20]
+        return await gerar_distratores_batch(cartoes_processar)
+    except AIError as exc:
+        _log_ai_failure("exam", exc)
+        raise _ai_http_exception(exc) from exc
+    except Exception as exc:
+        _log_ai_failure("exam-unexpected", exc)
+        raise HTTPException(status_code=500, detail="Erro interno ao processar solicitação.") from exc
 
-        resultado = await gerar_distratores_batch(cartoes_processar)
-        return resultado
-    except Exception as e:
-        print(f"Erro ao gerar prova: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao gerar prova com IA.")
 
 @app.get("/")
 def health_check():

@@ -1,6 +1,6 @@
-# StudyFlash — Changelog
+# Histórico de Versões — StudyFlash
 
-> Earlier entries may reference the former working name **StudiFlow**. Historical entries preserve development context and are not release certification. PWA/offline behavior is under active validation as part of the current professionalization program.
+> **Nota de contexto:** este changelog preserva snapshots históricos do projeto, incluindo decisões de arquitetura, provedores e comportamento PWA que já foram substituídos ou restringidos. O produto atual se chama **StudyFlash**; referências a tecnologias, garantias ou comportamento abaixo descrevem o estado da versão indicada, não necessariamente o contrato vigente. Para garantias atuais, consulte o [`README.md`](README.md) e os documentos em [`docs/`](docs/), especialmente [`docs/pwa-offline-contract.md`](docs/pwa-offline-contract.md), [`docs/ai.md`](docs/ai.md) e [`docs/database.md`](docs/database.md).
 
 ## [v0.7.0] - 18/12/2025 (Marketing, Legal & Reestruturação de Rotas)
 
@@ -34,10 +34,12 @@
 
 ## [v0.6.1] - 18/12/2025 (PWA & Offline Mode)
 
+> **Contrato vigente:** esta seção registra a implementação de dezembro de 2025. A versão atual é instalável, mas **não** é uma aplicação de dados offline-first: documentos/dados autenticados e mutações permanecem network-authoritative e uma navegação sem rede usa fallback explícito. Consulte [`docs/pwa-offline-contract.md`](docs/pwa-offline-contract.md).
+
 ### 📱 Progressive Web App (PWA)
 
 - **Instalação Nativa:** Agora é possível instalar o StudyFlash como aplicativo no Desktop e Mobile (Adicionado à Home Screen).
-- **Suporte Offline:** Implementação de Service Worker (via `@ducanh2912/next-pwa`) para cache inteligente de assets. O app carrega instantaneamente mesmo em redes instáveis.
+- **Suporte Offline (histórico):** Implementação de Service Worker (via `@ducanh2912/next-pwa`) para cache de assets. O escopo atual foi deliberadamente restringido para não tratar conteúdo autenticado em cache como autoritativo.
 - **Identidade Mobile:** Configuração completa de `manifest.ts` e ícones adaptativos.
 
 ### 🏗️ Infraestrutura & DX
@@ -45,7 +47,7 @@
 - **Next.js Config:** Ajuste na configuração de build para gerar Service Workers apenas em produção.
 - **Compatibilidade:** Adicionada flag `--webpack` no script de dev para garantir compatibilidade de plugins com o Next.js 16.
 
-> Esta versão habilita a distribuição da aplicação como software instalável, aumentando a retenção e performance percebida.
+> Esta versão introduziu a distribuição instalável. As garantias atuais de cache, fallback, reconnect e isolamento estão documentadas no contrato PWA vigente.
 
 ## [v0.6.0] - 15/12/2025 (Design System, Responsividade & Theming)
 
