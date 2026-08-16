@@ -148,14 +148,22 @@ Não use 'todas as anteriores' e não invente IDs.
 """
 
     def __init__(self) -> None:
+        if not os.getenv("GROQ_API_KEY", "").strip():
+            raise AIProviderUnavailableError("AI provider configuration is unavailable")
+
         timeout = _provider_timeout_seconds()
         client_kwargs = {
             "temperature": 0,
             "timeout": timeout,
             "max_retries": 0,
         }
-        self._primary = ChatGroq(model_name=self.PRIMARY_MODEL, **client_kwargs)
-        self._backup = ChatGroq(model_name=self.BACKUP_MODEL, **client_kwargs)
+        try:
+            self._primary = ChatGroq(model_name=self.PRIMARY_MODEL, **client_kwargs)
+            self._backup = ChatGroq(model_name=self.BACKUP_MODEL, **client_kwargs)
+        except (ValidationError, ValueError) as exc:
+            # Client-construction validation is an operational configuration failure.
+            # Do not catch arbitrary exceptions here: programming defects must remain 500s.
+            raise AIProviderUnavailableError("AI provider configuration is invalid") from exc
 
     def _invoke_structured(
         self,
