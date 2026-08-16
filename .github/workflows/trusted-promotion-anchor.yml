@@ -155,7 +155,7 @@ jobs:
           latest_run=$(jq -c \
             --arg sha "$TARGET_SHA" \
             --argjson pr "$PR_NUMBER" \
-            '[.workflow_runs[] | select(.head_sha == $sha and any(.pull_requests[]?; .number == $pr))] | sort_by(.run_number, .run_attempt) | last // empty' \
+            '[.workflow_runs[] | select(.head_sha == $sha and any(.pull_requests[]?; .number == $pr))] | sort_by([.run_number, .run_attempt]) | last // empty' \
             <<<"$runs")
 
           LATEST_RUN_ID=$(jq -r '.id // empty' <<<"${latest_run:-{}}")
