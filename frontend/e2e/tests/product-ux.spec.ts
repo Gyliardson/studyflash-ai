@@ -124,14 +124,20 @@ test("expected AI provider-unavailable failure stays inline without client excep
   const userId = fixtureOwner.userId;
   const beforeFlashcards = await prisma.flashcard.count({ where: { userId } });
   const pageErrors: string[] = [];
-  const clientConsoleErrors: string[] = [];
   const providerBodyMarker = "provider-secret-body-must-not-leak";
   const sourceText = "A mitose possui etapas ordenadas e produz duas células-filhas geneticamente equivalentes.";
 
-  page.on("pageerror", (error) => pageErrors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") clientConsoleErrors.push(message.text());
+  await page.addInitScript(() => {
+    const appConsoleErrors: string[] = [];
+    const instrumentedWindow = window as Window & { __studyflashConsoleErrors?: string[] };
+    instrumentedWindow.__studyflashConsoleErrors = appConsoleErrors;
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      appConsoleErrors.push(args.map(String).join(" "));
+      originalConsoleError(...args);
+    };
   });
+  page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.route("**/api/ai/gerar", async (route) => {
     await route.fulfill({
       status: 503,
@@ -142,7 +148,10 @@ test("expected AI provider-unavailable failure stays inline without client excep
 
   await signIn(page);
   await page.goto("/dashboard");
-  clientConsoleErrors.length = 0;
+  await page.evaluate(() => {
+    const instrumentedWindow = window as Window & { __studyflashConsoleErrors?: string[] };
+    instrumentedWindow.__studyflashConsoleErrors?.splice(0);
+  });
   const source = page.getByLabel("Conteúdo para gerar flashcards");
   await source.fill(sourceText);
   await page.getByRole("button", { name: "Gerar Flashcards" }).click();
@@ -155,8 +164,12 @@ test("expected AI provider-unavailable failure stays inline without client excep
   await expect(page.getByRole("button", { name: "Gerar Flashcards" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Salvar na minha Coleção" })).toHaveCount(0);
 
+  const appConsoleErrors = await page.evaluate(() => {
+    const instrumentedWindow = window as Window & { __studyflashConsoleErrors?: string[] };
+    return instrumentedWindow.__studyflashConsoleErrors ?? [];
+  });
   expect(pageErrors).toEqual([]);
-  expect(clientConsoleErrors).toEqual([]);
+  expect(appConsoleErrors).toEqual([]);
   expect(await prisma.flashcard.count({ where: { userId } })).toBe(beforeFlashcards);
 });
 
