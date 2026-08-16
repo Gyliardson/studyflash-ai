@@ -95,6 +95,27 @@ test("primary Planos navigation crosses the real route into useful empty and exi
   }
 });
 
+test("collection plans tab supports direct deep links and browser history", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/colecao?tab=planos");
+
+  const plansTab = page.getByRole("tab", { name: "Planos" });
+  const decksTab = page.getByRole("tab", { name: "Baralhos" });
+  await expect(plansTab).toHaveAttribute("aria-selected", "true");
+
+  await decksTab.click();
+  await expect(page).toHaveURL(/\/colecao$/);
+  await expect(decksTab).toHaveAttribute("aria-selected", "true");
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/colecao\?tab=planos(?:[&#]|$)/);
+  await expect(plansTab).toHaveAttribute("aria-selected", "true");
+
+  await page.goForward();
+  await expect(page).toHaveURL(/\/colecao$/);
+  await expect(decksTab).toHaveAttribute("aria-selected", "true");
+});
+
 test("appearance settings change only the supported local theme preference", async ({ page }) => {
   await signIn(page);
   await page.goto("/configuracoes");
