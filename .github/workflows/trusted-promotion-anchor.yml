@@ -1,0 +1,212 @@
+name: Trusted Promotion Anchor
+
+on:
+  pull_request_target:
+    branches:
+      - main
+      - portfolio/revamp-2026
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  workflow_run:
+    workflows:
+      - CI
+    types: [completed]
+
+permissions:
+  actions: read
+  pull-requests: read
+  statuses: write
+
+jobs:
+  invalidate-on-pr-lifecycle:
+    name: Invalidate trusted promotion status
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Mark current protected-target context pending
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          API_URL: ${{ github.api_url }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_PATH: ${{ github.event_path }}
+        run: |
+          set -euo pipefail
+
+          ACTION=$(jq -r '.action // empty' "$EVENT_PATH")
+          if [[ "$ACTION" == "edited" ]] && ! jq -e '.changes.base' "$EVENT_PATH" >/dev/null; then
+            echo "PR edit did not change base; trusted status remains unchanged."
+            exit 0
+          fi
+
+          TARGET_SHA=$(jq -r '.pull_request.head.sha // empty' "$EVENT_PATH")
+          BASE_REF=$(jq -r '.pull_request.base.ref // empty' "$EVENT_PATH")
+
+          case "$BASE_REF" in
+            main)
+              context="Trusted promotion source policy (main)"
+              ;;
+            portfolio/revamp-2026)
+              context="Trusted promotion source policy (portfolio/revamp-2026)"
+              ;;
+            *)
+              echo "Unexpected protected base ref: ${BASE_REF:-<missing>}" >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ -z "$TARGET_SHA" ]]; then
+            echo "Missing PR head SHA; refusing lifecycle status publication." >&2
+            exit 1
+          fi
+
+          payload=$(jq -cn \
+            --arg context "$context" \
+            '{state:"pending", context:$context, description:"Awaiting trusted CI evaluation"}')
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2026-03-10" \
+            "$API_URL/repos/$REPOSITORY/statuses/$TARGET_SHA" \
+            --data "$payload"
+
+          echo
+          echo "Invalidated '$context' on current PR head $TARGET_SHA."
+
+  publish-trusted-promotion-policy:
+    name: Publish trusted promotion policy
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Evaluate latest CI against current PR topology
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          API_URL: ${{ github.api_url }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_PATH: ${{ github.event_path }}
+        run: |
+          set -euo pipefail
+
+          run_pr_count=$(jq '.workflow_run.pull_requests | length' "$EVENT_PATH")
+          if [[ "$run_pr_count" -ne 1 ]]; then
+            echo "Expected exactly one pull request in workflow_run metadata; got $run_pr_count." >&2
+            exit 1
+          fi
+
+          SOURCE_RUN_ID=$(jq -r '.workflow_run.id // empty' "$EVENT_PATH")
+          SOURCE_RUN_ATTEMPT=$(jq -r '.workflow_run.run_attempt // empty' "$EVENT_PATH")
+          TARGET_SHA=$(jq -r '.workflow_run.head_sha // empty' "$EVENT_PATH")
+          SOURCE_CONCLUSION=$(jq -r '.workflow_run.conclusion // empty' "$EVENT_PATH")
+          SOURCE_URL=$(jq -r '.workflow_run.html_url // empty' "$EVENT_PATH")
+          PR_NUMBER=$(jq -r '.workflow_run.pull_requests[0].number // empty' "$EVENT_PATH")
+          RUN_HEAD_SHA=$(jq -r '.workflow_run.pull_requests[0].head.sha // empty' "$EVENT_PATH")
+          RUN_HEAD_REF=$(jq -r '.workflow_run.pull_requests[0].head.ref // empty' "$EVENT_PATH")
+          RUN_BASE_SHA=$(jq -r '.workflow_run.pull_requests[0].base.sha // empty' "$EVENT_PATH")
+          RUN_BASE_REF=$(jq -r '.workflow_run.pull_requests[0].base.ref // empty' "$EVENT_PATH")
+
+          if [[ -z "$SOURCE_RUN_ID" || -z "$SOURCE_RUN_ATTEMPT" || -z "$TARGET_SHA" || -z "$PR_NUMBER" || -z "$RUN_HEAD_SHA" || -z "$RUN_HEAD_REF" || -z "$RUN_BASE_SHA" || -z "$RUN_BASE_REF" ]]; then
+            echo "Incomplete workflow_run pull-request metadata; refusing trusted success." >&2
+            exit 1
+          fi
+
+          if [[ "$TARGET_SHA" != "$RUN_HEAD_SHA" ]]; then
+            echo "workflow_run head SHA does not match associated PR head SHA." >&2
+            exit 1
+          fi
+
+          current_pr=$(curl --fail-with-body --silent --show-error \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2026-03-10" \
+            "$API_URL/repos/$REPOSITORY/pulls/$PR_NUMBER")
+
+          CURRENT_STATE=$(jq -r '.state // empty' <<<"$current_pr")
+          CURRENT_HEAD_SHA=$(jq -r '.head.sha // empty' <<<"$current_pr")
+          CURRENT_HEAD_REF=$(jq -r '.head.ref // empty' <<<"$current_pr")
+          CURRENT_HEAD_REPO=$(jq -r '.head.repo.full_name // empty' <<<"$current_pr")
+          CURRENT_BASE_SHA=$(jq -r '.base.sha // empty' <<<"$current_pr")
+          CURRENT_BASE_REF=$(jq -r '.base.ref // empty' <<<"$current_pr")
+          CURRENT_BASE_REPO=$(jq -r '.base.repo.full_name // empty' <<<"$current_pr")
+
+          case "$RUN_BASE_REF" in
+            main)
+              context="Trusted promotion source policy (main)"
+              ;;
+            portfolio/revamp-2026)
+              context="Trusted promotion source policy (portfolio/revamp-2026)"
+              ;;
+            *)
+              echo "Unexpected run base ref: $RUN_BASE_REF" >&2
+              exit 1
+              ;;
+          esac
+
+          encoded_head=$(jq -rn --arg value "$RUN_HEAD_REF" '$value|@uri')
+          runs=$(curl --fail-with-body --silent --show-error \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2026-03-10" \
+            "$API_URL/repos/$REPOSITORY/actions/workflows/ci.yml/runs?event=pull_request&branch=$encoded_head&per_page=100")
+
+          latest_run=$(jq -c \
+            --arg sha "$TARGET_SHA" \
+            --argjson pr "$PR_NUMBER" \
+            '[.workflow_runs[] | select(.head_sha == $sha and any(.pull_requests[]?; .number == $pr))] | sort_by([.run_number, .run_attempt]) | last // empty' \
+            <<<"$runs")
+
+          LATEST_RUN_ID=$(jq -r '.id // empty' <<<"${latest_run:-{}}")
+          LATEST_RUN_ATTEMPT=$(jq -r '.run_attempt // empty' <<<"${latest_run:-{}}")
+
+          state=failure
+          description="Trusted promotion policy rejected this pull request"
+
+          if [[ "$CURRENT_STATE" != "open" ]]; then
+            echo "Pull request is no longer open: ${CURRENT_STATE:-<missing>}" >&2
+          elif [[ "$SOURCE_CONCLUSION" != "success" ]]; then
+            echo "Source CI did not succeed: ${SOURCE_CONCLUSION:-<missing>}" >&2
+          elif [[ "$CURRENT_HEAD_SHA" != "$TARGET_SHA" ]]; then
+            echo "Stale workflow_run: current PR head is $CURRENT_HEAD_SHA, tested SHA is $TARGET_SHA." >&2
+          elif [[ "$CURRENT_HEAD_REF" != "$RUN_HEAD_REF" ]]; then
+            echo "Stale workflow_run: head ref changed from $RUN_HEAD_REF to $CURRENT_HEAD_REF." >&2
+          elif [[ "$CURRENT_BASE_REF" != "$RUN_BASE_REF" ]]; then
+            echo "Stale workflow_run: base ref changed from $RUN_BASE_REF to $CURRENT_BASE_REF." >&2
+          elif [[ "$CURRENT_BASE_SHA" != "$RUN_BASE_SHA" ]]; then
+            echo "Stale workflow_run: base SHA changed from $RUN_BASE_SHA to $CURRENT_BASE_SHA." >&2
+          elif [[ "$CURRENT_BASE_REPO" != "$REPOSITORY" ]]; then
+            echo "Unexpected base repository: $CURRENT_BASE_REPO" >&2
+          elif [[ "$CURRENT_HEAD_REPO" != "$REPOSITORY" ]]; then
+            echo "Fork pull requests are not eligible for protected promotion." >&2
+          elif [[ "$LATEST_RUN_ID" != "$SOURCE_RUN_ID" || "$LATEST_RUN_ATTEMPT" != "$SOURCE_RUN_ATTEMPT" ]]; then
+            echo "Stale CI run: source $SOURCE_RUN_ID/$SOURCE_RUN_ATTEMPT is not latest $LATEST_RUN_ID/$LATEST_RUN_ATTEMPT." >&2
+          elif [[ "$CURRENT_BASE_REF" == "main" && "$CURRENT_HEAD_REF" != "portfolio/revamp-2026" ]]; then
+            echo "Only portfolio/revamp-2026 may promote into main." >&2
+          elif [[ "$CURRENT_BASE_REF" == "portfolio/revamp-2026" && "$CURRENT_HEAD_REF" != work/* ]]; then
+            echo "Only work/* branches may promote into portfolio/revamp-2026." >&2
+          else
+            state=success
+            description="Trusted promotion topology accepted"
+          fi
+
+          payload=$(jq -cn \
+            --arg state "$state" \
+            --arg context "$context" \
+            --arg description "$description" \
+            --arg target_url "$SOURCE_URL" \
+            '{state:$state, context:$context, description:$description, target_url:$target_url}')
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2026-03-10" \
+            "$API_URL/repos/$REPOSITORY/statuses/$TARGET_SHA" \
+            --data "$payload"
+
+          echo
+          echo "Published '$context'=$state on tested SHA $TARGET_SHA."
+
+          test "$state" = success
