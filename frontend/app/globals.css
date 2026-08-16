@@ -18,12 +18,12 @@
   --secondary-foreground: #111827;
   
   --muted: #f3f4f6;
-  --muted-foreground: #6b7280; /* gray-500 */
+  --muted-foreground: #667080; /* accessible muted text on light muted surfaces */
   
   --accent: #f9fafb; /* gray-50 */
   --accent-foreground: #111827;
   
-  --destructive: #ef4444; /* red-500 */
+  --destructive: #b91c1c; /* red-700 */
   --destructive-foreground: #ffffff;
 
   /* SEMANTIC COLORS (Light Mode - Pastel/Soft) */
@@ -34,7 +34,7 @@
   --success-solid: #047857; /* emerald-700 */
 
   --warning-bg: #fffbeb; /* amber-50 */
-  --warning-fg: #92400e; /* amber-800 */
+  --warning-fg: #78350f; /* amber-900; preserves AA contrast even for subdued warning copy */
   --warning-border: #fde68a; /* amber-200 */
   --warning-ring: #f59e0b; /* amber-500 */
   --warning-solid: #b45309; /* amber-700 */
@@ -173,6 +173,12 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* A disabled-looking exam XP card is still informational content. Do not fade the
+   entire muted card: compositing opacity also fades its text below WCAG contrast. */
+.bg-card .bg-muted.border-border.opacity-70 {
+  opacity: 1;
 }
 
 /* === ANIMAÇÕES GLOBAIS === */

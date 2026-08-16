@@ -1,259 +1,296 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-// FIX: Importação corrigida para 'excluirBaralho'
-import { listarMeusBaralhos, listarMeusPlanos, criarBaralho, excluirBaralho, excluirPlano } from "@/app/actions";
+import { useEffect, useRef, useState } from "react";
+import { BookOpenCheck, BrainCircuit, Library, LoaderCircle, Map, Plus, Trash2 } from "lucide-react";
+import { excluirBaralho, excluirPlano, listarMeusBaralhos, listarMeusPlanos } from "@/app/actions";
+import { criarBaralhoIdempotente } from "@/app/idempotent-actions";
+import ConfirmDialog from "@/app/components/ConfirmDialog";
+
+type Deck = {
+    id: string;
+    nome: string;
+    _count?: { cards: number };
+};
+
+type StudyPlan = {
+    id: string;
+    title: string;
+    difficulty: string;
+    topics?: unknown[];
+};
+
+type PendingDeletion =
+    | { kind: "deck"; id: string; name: string }
+    | { kind: "plan"; id: string; name: string }
+    | null;
+
+type LibraryTab = "DECKS" | "PLANOS";
 
 export default function ColecaoPage() {
-    const [decks, setDecks] = useState<any[]>([]);
-    const [planos, setPlanos] = useState<any[]>([]);
+    const [decks, setDecks] = useState<Deck[]>([]);
+    const [planos, setPlanos] = useState<StudyPlan[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'DECKS' | 'PLANOS'>('DECKS');
+    const [loadError, setLoadError] = useState(false);
+    const [activeTab, setActiveTab] = useState<LibraryTab>("DECKS");
     const [isCreating, setIsCreating] = useState(false);
     const [newDeckName, setNewDeckName] = useState("");
+    const [mutationError, setMutationError] = useState<string | null>(null);
+    const [mutationSuccess, setMutationSuccess] = useState<string | null>(null);
+    const [pendingDeletion, setPendingDeletion] = useState<PendingDeletion>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const createDeckKeyRef = useRef<string | null>(null);
 
     useEffect(() => {
-        carregarDados();
+        void carregarDados();
     }, []);
+
+    useEffect(() => {
+        const syncTabFromUrl = () => {
+            const tab = new URLSearchParams(window.location.search).get("tab");
+            setActiveTab(tab === "planos" ? "PLANOS" : "DECKS");
+        };
+
+        syncTabFromUrl();
+        window.addEventListener("popstate", syncTabFromUrl);
+        return () => window.removeEventListener("popstate", syncTabFromUrl);
+    }, []);
+
+    function selectTab(tab: LibraryTab) {
+        setActiveTab(tab);
+        const nextUrl = tab === "PLANOS" ? "/colecao?tab=planos" : "/colecao";
+        const currentUrl = `${window.location.pathname}${window.location.search}`;
+        if (currentUrl !== nextUrl) {
+            window.history.pushState(null, "", nextUrl);
+        }
+    }
 
     async function carregarDados() {
         setLoading(true);
+        setLoadError(false);
         try {
             const [d, p] = await Promise.all([listarMeusBaralhos(), listarMeusPlanos()]);
             setDecks(d);
             setPlanos(p);
         } catch (error) {
             console.error("Erro ao carregar coleção:", error);
+            setLoadError(true);
         } finally {
             setLoading(false);
         }
     }
 
     async function handleCreateDeck() {
-        if (!newDeckName.trim()) return;
-        setIsCreating(true);
-        const res = await criarBaralho(newDeckName);
-        if (res.success) {
-            setNewDeckName("");
-            await carregarDados();
-        } else {
-            alert("Erro ao criar baralho");
+        const name = newDeckName.trim();
+        if (!name) {
+            setMutationError("Informe um nome para o baralho.");
+            return;
         }
-        setIsCreating(false);
+
+        const requestKey = createDeckKeyRef.current ?? crypto.randomUUID();
+        createDeckKeyRef.current = requestKey;
+        setMutationError(null);
+        setMutationSuccess(null);
+        setIsCreating(true);
+        try {
+            const result = await criarBaralhoIdempotente(name, requestKey);
+            if (!result.success) {
+                setMutationError(result.error || "Erro ao criar baralho.");
+                return;
+            }
+
+            createDeckKeyRef.current = null;
+            setNewDeckName("");
+            setMutationSuccess(`Baralho “${name}” criado.`);
+            await carregarDados();
+        } catch (error) {
+            console.error("Erro ao confirmar criação do baralho:", error);
+            setMutationError("Não foi possível confirmar a criação. Tente novamente; o mesmo pedido será recuperado sem duplicar o baralho.");
+        } finally {
+            setIsCreating(false);
+        }
     }
 
-    async function handleDeleteDeck(id: string) {
-        if (!confirm("Tem certeza que deseja excluir este baralho e todos os seus cards?")) return;
-        await excluirBaralho(id);
-        await carregarDados();
+    async function confirmDeletion() {
+        if (!pendingDeletion) return;
+
+        setMutationError(null);
+        setMutationSuccess(null);
+        setIsDeleting(true);
+        try {
+            const result = pendingDeletion.kind === "deck"
+                ? await excluirBaralho(pendingDeletion.id)
+                : await excluirPlano(pendingDeletion.id);
+
+            if (!result.success) {
+                setMutationError(result.error || `Não foi possível excluir ${pendingDeletion.kind === "deck" ? "o baralho" : "o plano"}.`);
+                return;
+            }
+
+            setMutationSuccess(`${pendingDeletion.kind === "deck" ? "Baralho" : "Plano"} “${pendingDeletion.name}” excluído.`);
+            setPendingDeletion(null);
+            await carregarDados();
+        } finally {
+            setIsDeleting(false);
+        }
     }
 
-    async function handleDeletePlan(id: string) {
-        if (!confirm("Tem certeza que deseja excluir esta trilha de estudos?")) return;
-        await excluirPlano(id);
-        await carregarDados();
-    }
+    const deletionTitle = pendingDeletion?.kind === "deck" ? "Excluir baralho?" : "Excluir plano de estudo?";
+    const deletionDescription = pendingDeletion?.kind === "deck"
+        ? `“${pendingDeletion?.name ?? "Este baralho"}” e todos os cards associados serão excluídos. Esta ação não pode ser desfeita.`
+        : `“${pendingDeletion?.name ?? "Este plano"}” e sua estrutura de estudo serão excluídos. Esta ação não pode ser desfeita.`;
 
     return (
-        <div className="min-h-screen bg-background pb-20 transition-colors duration-300">
-
-            <div className="max-w-5xl mx-auto px-4 md:px-6 mt-8">
-                
-                {/* === HEADER DA PÁGINA === */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
-                    <div>
-                        <h1 className="text-3xl font-extrabold text-foreground tracking-tight mb-2">Minha Biblioteca</h1>
-                        <p className="text-muted-foreground">Gerencie seus materiais de estudo e acompanhe seu progresso.</p>
+        <main className="min-h-screen bg-background px-4 pb-20 pt-4 transition-colors md:px-6">
+            <div className="mx-auto w-full max-w-6xl">
+                <header className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="max-w-2xl">
+                        <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Biblioteca</p>
+                        <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">Seus materiais em um só lugar.</h1>
+                        <p className="mt-3 text-base leading-7 text-muted-foreground">Abra um baralho para editar ou estudar, ou acompanhe as trilhas geradas para um objetivo específico.</p>
                     </div>
 
-                    {/* Botão Novo (Contextual) */}
-                    {activeTab === 'DECKS' ? (
-                        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                            <input 
-                                type="text" 
-                                placeholder="Nome do novo baralho..." 
-                                className="flex-1 w-full md:w-64 px-4 py-3 rounded-xl border border-input bg-background text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-primary outline-none shadow-sm"
+                    {activeTab === "DECKS" ? (
+                        <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+                            <label htmlFor="new-deck-name" className="sr-only">Nome do novo baralho</label>
+                            <input
+                                id="new-deck-name"
+                                type="text"
+                                placeholder="Nome do novo baralho"
+                                className="h-11 w-full rounded-xl border border-input bg-background px-4 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20 sm:w-64"
                                 value={newDeckName}
-                                onChange={(e) => setNewDeckName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleCreateDeck()}
+                                onChange={(event) => {
+                                    setNewDeckName(event.target.value);
+                                    createDeckKeyRef.current = null;
+                                    setMutationError(null);
+                                    setMutationSuccess(null);
+                                }}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter") void handleCreateDeck();
+                                }}
+                                disabled={isCreating}
                             />
-                            <button 
-                                onClick={handleCreateDeck}
+                            <button
+                                type="button"
+                                aria-label="Criar"
+                                onClick={() => void handleCreateDeck()}
                                 disabled={isCreating || !newDeckName.trim()}
-                                className="w-full sm:w-auto bg-primary text-primary-foreground px-4 py-3 rounded-xl font-bold hover:bg-primary/90 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                                aria-busy={isCreating}
+                                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             >
-                                {isCreating ? (
-                                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                ) : (
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                                )}
-                                <span>Criar</span>
+                                {isCreating ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+                                {isCreating ? "Criando…" : "Novo baralho"}
                             </button>
                         </div>
                     ) : (
-                        <Link href="/planos/novo" className="w-full md:w-auto">
-                            <button className="w-full bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                                <span>Gerar Novo Plano</span>
-                            </button>
+                        <Link href="/planos/novo" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:w-auto">
+                            <Plus className="h-4 w-4" aria-hidden="true" />
+                            Novo plano
                         </Link>
                     )}
-                </div>
+                </header>
 
-                {/* === BANNER DESTAQUE: SIMULADO === */}
-                <div className="mb-10 relative overflow-hidden rounded-2xl bg-card border border-border shadow-xl shadow-primary/5 group hover:shadow-primary/10 transition-all">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-linear-to-b from-primary to-info-solid"></div>
-                    <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="flex items-center gap-5">
-                            <div className="w-16 h-16 flex items-center justify-center bg-primary/10 text-primary rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <h2 className="text-2xl font-bold text-foreground">Modo Simulado</h2>
-                                    <span className="px-2 py-0.5 bg-warning-bg text-warning-fg border border-warning-border text-[10px] font-bold uppercase tracking-wider rounded-md">Novo</span>
-                                </div>
-                                <p className="text-muted-foreground max-w-md text-sm md:text-base">
-                                    Teste seus conhecimentos sob pressão. Escolha a dificuldade, o tempo e ganhe <span className="font-bold text-primary">muito mais XP</span>.
-                                </p>
-                            </div>
-                        </div>
-                        <Link href="/simulado" className="w-full md:w-auto">
-                            <button className="w-full md:w-auto px-8 py-4 bg-foreground text-background font-bold rounded-xl shadow-lg hover:opacity-90 transition transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-3">
-                                <span>Começar Prova</span>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-                            </button>
-                        </Link>
+                {mutationError && (
+                    <div role="alert" className="mb-5 flex items-start justify-between gap-4 rounded-2xl border border-danger-border bg-danger-bg px-4 py-3 text-sm text-danger-fg">
+                        <p>{mutationError}</p>
+                        <button type="button" onClick={() => setMutationError(null)} className="font-bold underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Fechar</button>
                     </div>
-                </div>
-
-                {/* === NAVEGAÇÃO POR ABAS === */}
-                <div className="flex gap-6 border-b border-border mb-8 overflow-x-auto">
-                    <button 
-                        onClick={() => setActiveTab('DECKS')}
-                        className={`pb-4 px-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all relative whitespace-nowrap ${activeTab === 'DECKS' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                        Baralhos
-                        {activeTab === 'DECKS' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full"></div>}
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('PLANOS')}
-                        className={`pb-4 px-2 text-sm font-bold uppercase tracking-wider flex items-center gap-2 transition-all relative whitespace-nowrap ${activeTab === 'PLANOS' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
-                        Trilhas de Estudo
-                        {activeTab === 'PLANOS' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-t-full"></div>}
-                    </button>
-                </div>
-
-                {/* === CONTEÚDO: BARALHOS === */}
-                {!loading && activeTab === 'DECKS' && (
-                    decks.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {decks.map((deck) => (
-                                <div key={deck.id} className="group bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-xl hover:border-primary/20 transition-all duration-300 relative">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="p-3 bg-primary/10 text-primary rounded-xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                                        </div>
-                                        {/* LIXEIRA DOS DECKS (Invisível até Hover, sempre visível em mobile) */}
-                                        <button 
-                                            onClick={() => handleDeleteDeck(deck.id)}
-                                            className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-destructive/10 transition opacity-100 md:opacity-0 md:group-hover:opacity-100"
-                                            title="Excluir Baralho"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </div>
-                                    
-                                    <h3 className="text-xl font-bold text-card-foreground mb-1 group-hover:text-primary transition-colors truncate">{deck.nome}</h3>
-                                    <p className="text-sm text-muted-foreground mb-6">{deck._count?.cards || 0} flashcards</p>
-                                    
-                                    <div className="flex gap-2">
-                                        <Link href={`/colecao/${deck.id}`} className="flex-1">
-                                            <button className="w-full py-2 bg-background border border-border text-foreground font-bold rounded-lg hover:bg-muted hover:border-border/80 transition text-sm flex items-center justify-center gap-2">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                                Editar
-                                            </button>
-                                        </Link>
-                                        <Link href={`/estudar?deckId=${deck.id}`} className="flex-1">
-                                            <button className="w-full py-2 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition text-sm flex items-center justify-center gap-2 shadow-md shadow-primary/20">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                                Estudar
-                                            </button>
-                                        </Link>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-border">
-                            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground">
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                            </div>
-                            <h3 className="text-lg font-bold text-card-foreground">Nenhum baralho criado</h3>
-                            <p className="text-muted-foreground mb-6">Crie seu primeiro deck para começar.</p>
-                        </div>
-                    )
+                )}
+                {mutationSuccess && (
+                    <div role="status" aria-live="polite" className="mb-5 rounded-2xl border border-success-border bg-success-bg px-4 py-3 text-sm font-medium text-success-fg">{mutationSuccess}</div>
                 )}
 
-                {/* === CONTEÚDO: PLANOS === */}
-                {!loading && activeTab === 'PLANOS' && (
-                    planos.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-4">
-                            {planos.map((plano) => (
-                                <div key={plano.id} className="group bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-xl hover:border-primary/20 transition-all relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                    <Link href={`/planos/${plano.id}`} className="flex-1 flex items-center gap-4 w-full">
-                                        <div className="p-4 bg-info-bg text-info-fg border border-info-border rounded-xl group-hover:bg-info-solid group-hover:text-white transition-colors shrink-0">
-                                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-xl font-bold text-card-foreground group-hover:text-primary transition-colors">{plano.title}</h3>
-                                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${plano.difficulty === 'Iniciante' ? 'bg-success-bg text-success-fg border-success-border' : 'bg-warning-bg text-warning-fg border-warning-border'}`}>
-                                                    {plano.difficulty}
-                                                </span>
-                                                <span>• {plano.topics?.length || 0} módulos</span>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                    
-                                    <div className="flex items-center gap-4 w-full md:w-auto justify-end">
-                                         {/* LIXEIRA DOS PLANOS (Invisível até Hover) */}
-                                        <button 
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleDeletePlan(plano.id);
-                                            }}
-                                            className="text-muted-foreground hover:text-destructive p-2 rounded-lg hover:bg-destructive/10 transition opacity-100 md:opacity-0 md:group-hover:opacity-100 z-10"
-                                            title="Excluir Plano"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-
-                                        <div className="hidden md:block text-muted-foreground group-hover:translate-x-1 transition-transform pointer-events-none">
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-border">
-                            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 text-muted-foreground">
-                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 14l9-5-9-5-9 5 9 5z"></path><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path></svg>
+                <section className="mb-8 rounded-3xl border border-border bg-card p-5 shadow-sm md:p-6" aria-labelledby="exam-shortcut-title">
+                    <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                        <div className="flex gap-4">
+                            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><BrainCircuit className="h-5 w-5" aria-hidden="true" /></span>
+                            <div>
+                                <h2 id="exam-shortcut-title" className="text-lg font-bold text-card-foreground">Praticar com simulado</h2>
+                                <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">Escolha uma fonte, dificuldade e duração. Pontuação e XP são calculados pelo servidor a partir da tentativa registrada.</p>
                             </div>
-                            <h3 className="text-lg font-bold text-card-foreground">Nenhum plano de estudo</h3>
-                            <p className="text-muted-foreground mb-6">Peça para a IA gerar um roteiro completo para você.</p>
-                            <Link href="/planos/novo">
-                                <button className="text-primary font-bold hover:underline">Gerar agora &rarr;</button>
-                            </Link>
                         </div>
-                    )
+                        <Link href="/simulado" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Configurar simulado</Link>
+                    </div>
+                </section>
+
+                <div className="mb-6 flex gap-2 rounded-2xl bg-muted p-1.5" role="tablist" aria-label="Conteúdo da biblioteca">
+                    <button type="button" role="tab" aria-selected={activeTab === "DECKS"} aria-controls="library-decks" onClick={() => selectTab("DECKS")} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "DECKS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                        <Library className="h-4 w-4" aria-hidden="true" />Baralhos
+                    </button>
+                    <button type="button" role="tab" aria-selected={activeTab === "PLANOS"} aria-controls="library-plans" onClick={() => selectTab("PLANOS")} className={`inline-flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeTab === "PLANOS" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+                        <Map className="h-4 w-4" aria-hidden="true" />Planos
+                    </button>
+                </div>
+
+                {loading ? (
+                    <div role="status" aria-live="polite" className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <span className="sr-only">Carregando biblioteca</span>
+                        {[0, 1, 2].map((item) => <div key={item} className="h-48 animate-pulse rounded-2xl border border-border bg-muted/70" aria-hidden="true" />)}
+                    </div>
+                ) : loadError ? (
+                    <section role="alert" className="rounded-3xl border border-danger-border bg-danger-bg p-6 text-danger-fg">
+                        <h2 className="text-lg font-extrabold">Não foi possível carregar sua biblioteca.</h2>
+                        <p className="mt-2 text-sm leading-6">Nenhum material foi tratado como ausente. Tente consultar seus dados novamente.</p>
+                        <button type="button" onClick={() => void carregarDados()} className="mt-4 rounded-xl bg-foreground px-4 py-2.5 text-sm font-bold text-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Tentar novamente</button>
+                    </section>
+                ) : activeTab === "DECKS" ? (
+                    <section id="library-decks" role="tabpanel" aria-label="Baralhos">
+                        {decks.length > 0 ? (
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {decks.map((deck) => (
+                                    <article key={deck.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Library className="h-5 w-5" aria-hidden="true" /></span>
+                                            <button type="button" onClick={() => setPendingDeletion({ kind: "deck", id: deck.id, name: deck.nome })} aria-label={`Excluir baralho ${deck.nome}`} className="rounded-lg p-2 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+                                        </div>
+                                        <h2 className="mt-5 truncate text-xl font-bold text-card-foreground">{deck.nome}</h2>
+                                        <p className="mt-1 text-sm text-muted-foreground">{deck._count?.cards || 0} flashcards</p>
+                                        <div className="mt-6 grid grid-cols-2 gap-2">
+                                            <Link href={`/colecao/${deck.id}`} className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Editar</Link>
+                                            <Link href={`/estudar?deckId=${deck.id}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><BookOpenCheck className="h-4 w-4" aria-hidden="true" />Estudar</Link>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="rounded-3xl border border-dashed border-border bg-card px-6 py-14 text-center">
+                                <Library className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
+                                <h2 className="mt-4 text-lg font-bold text-card-foreground">Nenhum baralho ainda</h2>
+                                <p className="mt-2 text-sm text-muted-foreground">Crie um baralho acima ou gere flashcards para começar sua coleção.</p>
+                                <Link href="/dashboard" className="mt-5 inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Criar flashcards</Link>
+                            </div>
+                        )}
+                    </section>
+                ) : (
+                    <section id="library-plans" role="tabpanel" aria-label="Planos de estudo">
+                        {planos.length > 0 ? (
+                            <div className="grid gap-4">
+                                {planos.map((plano) => (
+                                    <article key={plano.id} className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                                        <Link href={`/planos/${plano.id}`} className="flex min-w-0 flex-1 items-center gap-4 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-info-bg text-info-fg"><Map className="h-5 w-5" aria-hidden="true" /></span>
+                                            <span className="min-w-0">
+                                                <span className="block truncate text-lg font-bold text-card-foreground">{plano.title}</span>
+                                                <span className="mt-1 block text-sm text-muted-foreground">{plano.difficulty} · {plano.topics?.length || 0} módulos</span>
+                                            </span>
+                                        </Link>
+                                        <button type="button" onClick={() => setPendingDeletion({ kind: "plan", id: plano.id, name: plano.title })} aria-label={`Excluir plano ${plano.title}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-bold text-muted-foreground transition hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Trash2 className="h-4 w-4" aria-hidden="true" />Excluir</button>
+                                    </article>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="rounded-3xl border border-dashed border-border bg-card px-6 py-14 text-center">
+                                <Map className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
+                                <h2 className="mt-4 text-lg font-bold text-card-foreground">Nenhum plano de estudo</h2>
+                                <p className="mt-2 text-sm text-muted-foreground">Gere um roteiro e revise os tópicos antes de estudar.</p>
+                                <Link href="/planos/novo" className="mt-5 inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Criar plano</Link>
+                            </div>
+                        )}
+                    </section>
                 )}
             </div>
-        </div>
+
+            <ConfirmDialog open={pendingDeletion !== null} title={deletionTitle} description={deletionDescription} pending={isDeleting} onCancel={() => setPendingDeletion(null)} onConfirm={() => void confirmDeletion()} />
+        </main>
     );
 }

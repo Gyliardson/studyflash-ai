@@ -17,7 +17,6 @@ export default function UserHUD() {
     const [stats, setStats] = useState({ xp: 0, currentStreak: 0 });
     const [loading, setLoading] = useState(true);
 
-    // Função de carregamento isolada para ser reutilizada
     async function fetchStats() {
         const dados = await obterPerfilUsuario();
         if (dados) {
@@ -27,14 +26,14 @@ export default function UserHUD() {
     }
 
     useEffect(() => {
-        // 1. Carrega na montagem inicial
-        fetchStats();
+        const initialRefresh = window.setTimeout(() => {
+            void fetchStats();
+        }, 0);
 
-        // 2. Adiciona o ouvinte do evento global
         window.addEventListener("user-hud-refresh", fetchStats);
 
-        // 3. Limpeza ao desmontar
         return () => {
+            window.clearTimeout(initialRefresh);
             window.removeEventListener("user-hud-refresh", fetchStats);
         };
     }, []);

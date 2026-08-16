@@ -1,0 +1,304 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - portfolio/revamp-2026
+      - 'work/**'
+  pull_request:
+    branches:
+      - portfolio/revamp-2026
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-quality:
+    name: Frontend lint, typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_generate
+      # Public, synthetic Clerk development key from Clerk's documented key-format example.
+      # It allows static build validation without using a real project credential.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5hY2NvdW50cy5kZXYk
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint security and transaction boundaries
+        run: npx eslint lib/db.ts lib/ai-api.ts lib/ai-failure-policy.ts app/api/ai/gerar/route.ts app/idempotent-actions.ts lib/gamification-transactions.mjs lib/content-creation-transactions.mjs lib/mutation-receipts.mjs lib/study-session-transactions.mjs lib/study-calendar.mjs
+
+      - name: Gate server-only AI boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          dashboard_path='app/(platform)/dashboard/page.tsx'
+          if grep -R "NEXT_PUBLIC_API_URL" app/actions.ts app/idempotent-actions.ts "$dashboard_path" app/api/ai/gerar/route.ts lib/ai-api.ts; then
+            echo "Public AI backend URL leaked into a protected caller" >&2
+            exit 1
+          fi
+          grep -q 'getAiApiUrl()}/api/gerar-plano' app/actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-cards-topico' app/actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-prova' app/actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-plano' app/idempotent-actions.ts
+          grep -q 'getAiApiUrl()}/api/gerar-cards-topico' app/idempotent-actions.ts
+          test "$(grep -o 'getAiApiHeaders(' app/actions.ts | wc -l)" -ge 3
+          test "$(grep -o 'getAiAbortSignal(' app/actions.ts | wc -l)" -ge 3
+          grep -q 'getAiAbortSignal(AI_PDF_PROXY_TIMEOUT_MS)' app/api/ai/gerar/route.ts
+          grep -q 'fetch("/api/ai/gerar"' "$dashboard_path"
+          grep -q 'import "server-only"' lib/ai-api.ts
+          grep -q 'STUDYFLASH_INTERNAL_API_KEY' lib/ai-api.ts
+          grep -q 'X-StudyFlash-Internal-Key' lib/ai-api.ts
+          grep -q 'AI_PROVIDER_TIMEOUT_SECONDS = 8' lib/ai-failure-policy.ts
+          grep -q 'AI_EXAM_FALLBACK_TIMEOUT_MS = 10_000' lib/ai-failure-policy.ts
+          grep -q 'AI_ACTION_TIMEOUT_MS = 12_000' lib/ai-failure-policy.ts
+          grep -q 'AI_PDF_PROXY_TIMEOUT_MS = 15_000' lib/ai-failure-policy.ts
+
+      - name: Run deterministic frontend AI failure policy tests
+        run: node --test --experimental-strip-types tests/ai-failure-policy.test.mjs
+
+      - name: Run deterministic exam timing race tests
+        run: node --test --experimental-strip-types tests/exam-timing.test.mjs
+
+      - name: Gate production gamification wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          actions_path='app/actions.ts'
+          grep -q 'saveFlashcardsForUser' "$actions_path"
+          grep -q 'recordReviewForUser' "$actions_path"
+          grep -q 'completeTopicForUser' "$actions_path"
+          grep -q 'finalizeExamForUser' "$actions_path"
+          grep -q 'saveFlashcardsIdempotentForUser' app/idempotent-actions.ts
+          grep -q 'runMutationWithReceipt' lib/content-creation-transactions.mjs
+          if grep -E 'concederXp|processarStreak|xpJaGanhoHoje|simuladosHoje' "$actions_path"; then
+            echo "Legacy TOCTOU gamification path reintroduced in production actions" >&2
+            exit 1
+          fi
+
+      - name: Gate explicit StudyFlash calendar policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'studyDayRange' lib/gamification-transactions.mjs
+          grep -q 'studyCalendarDayDifference' lib/gamification-transactions.mjs
+          grep -q 'studyCalendarDayDifference' lib/study-session-transactions.mjs
+          grep -q 'America/Sao_Paulo' lib/study-calendar.mjs
+          if grep -E 'startOfLocalDay|localCalendarDayDifference|setHours\(0' lib/gamification-transactions.mjs lib/study-session-transactions.mjs; then
+            echo "Implicit process-local daily boundary reintroduced" >&2
+            exit 1
+          fi
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
+
+  dependency-security:
+    name: Frontend dependency security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Capture complete npm audit evidence
+        shell: bash
+        run: |
+          set -uo pipefail
+          npm audit --json > npm-audit-all.json || true
+          npm audit --omit=dev --json > npm-audit-production.json || true
+
+      - name: Upload dependency audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-audit-${{ github.sha }}
+          path: |
+            frontend/npm-audit-all.json
+            frontend/npm-audit-production.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce reviewed production critical/high policy
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit-production.json', 'utf8'));
+          const policy = JSON.parse(fs.readFileSync('../security/npm-audit-accepted.json', 'utf8'));
+          const accepted = new Map(
+            policy.accepted.map((entry) => [`${entry.package}|${entry.advisory}`, entry])
+          );
+          const blocking = [];
+          const reviewed = [];
+
+          for (const [packageName, vulnerability] of Object.entries(report.vulnerabilities ?? {})) {
+            if (!['critical', 'high'].includes(vulnerability.severity)) continue;
+
+            if (vulnerability.isDirect) {
+              blocking.push(`${packageName}: direct ${vulnerability.severity} vulnerability`);
+              continue;
+            }
+
+            const highAdvisories = (vulnerability.via ?? []).filter(
+              (item) => typeof item === 'object' && ['critical', 'high'].includes(item.severity)
+            );
+
+            if (highAdvisories.length === 0) {
+              blocking.push(`${packageName}: ${vulnerability.severity} transitive vulnerability has no reviewable advisory metadata`);
+              continue;
+            }
+
+            const unaccepted = highAdvisories.filter(
+              (item) => !accepted.has(`${packageName}|${item.url}`)
+            );
+
+            if (unaccepted.length > 0) {
+              for (const item of unaccepted) {
+                blocking.push(`${packageName}: ${item.severity} ${item.url ?? item.title ?? 'unknown advisory'}`);
+              }
+              continue;
+            }
+
+            reviewed.push(`${packageName}: ${highAdvisories.length} explicitly reviewed high/critical advisories`);
+          }
+
+          const counts = report.metadata?.vulnerabilities ?? {};
+          console.log(`Production dependency audit raw counts: critical=${counts.critical ?? 0}, high=${counts.high ?? 0}, moderate=${counts.moderate ?? 0}, low=${counts.low ?? 0}`);
+          for (const item of reviewed) console.log(`Accepted by exact advisory policy: ${item}`);
+
+          if (blocking.length > 0) {
+            console.error('Unresolved policy-relevant production dependency advisories:');
+            for (const item of blocking) console.error(`- ${item}`);
+            process.exit(1);
+          }
+          NODE
+
+  ownership-integration:
+    name: Ownership and gamification (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: studyflash_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d studyflash_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_test
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply migrations to empty disposable PostgreSQL
+        run: npm run db:migrate:deploy
+
+      - name: Verify migration history
+        run: npm run db:migrate:status
+
+      - name: Verify database matches Prisma schema
+        run: npm run db:schema:verify
+
+      - name: Run ownership integration tests
+        run: node --test --experimental-strip-types tests/ownership.test.mjs
+
+      - name: Run gamification concurrency tests
+        run: node --test --experimental-strip-types tests/gamification-concurrency.test.mjs
+
+      - name: Run idempotent content creation tests
+        run: node --test --experimental-strip-types tests/content-creation-idempotency.test.mjs
+
+      - name: Run timezone boundary tests
+        env:
+          TZ: UTC
+        run: node --test --experimental-strip-types tests/timezone-boundaries.test.mjs
+
+  backend-quality:
+    name: Backend syntax and deterministic tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies from locked graph
+        run: pip install -r requirements.txt
+
+      - name: Audit locked backend dependencies
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: requirements.txt
+          no-deps: true
+
+      - name: Compile backend
+        run: python -m compileall -q app tests
+
+      - name: Run backend deterministic tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v

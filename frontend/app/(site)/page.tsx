@@ -1,155 +1,131 @@
 import Link from "next/link";
-import { SignInButton } from "@clerk/nextjs";
-import { auth } from "@clerk/nextjs/server";
+import { ArrowRight, BookOpenCheck, BrainCircuit, FileText, Layers3, ShieldCheck } from "lucide-react";
 
-export default async function LandingPage() {
-  const { userId } = await auth();
+const workflow = [
+  {
+    title: "Transforme seu material",
+    description: "Cole um texto ou envie um PDF para gerar flashcards que você pode revisar antes de salvar.",
+    icon: FileText,
+  },
+  {
+    title: "Organize em decks",
+    description: "Mantenha seus cards em uma coleção persistente e escolha exatamente o que entra em cada sessão.",
+    icon: Layers3,
+  },
+  {
+    title: "Estude e pratique",
+    description: "Revise com repetição espaçada e use simulados com resultado e progresso persistidos pelo servidor.",
+    icon: BookOpenCheck,
+  },
+];
 
+const productProof = [
+  "Geração assistida por IA com revisão antes de salvar",
+  "Sessões de estudo retomáveis e confirmação de revisão antes de avançar",
+  "Simulados com pontuação e XP calculados de forma server-authoritative",
+  "PWA instalável com fallback offline seguro, sem cache de dados da conta",
+];
+
+export default function LandingPage() {
   return (
-    <div className="flex flex-col items-center">
-      {/* Hero Section */}
-      <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48 bg-background">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="flex flex-col items-center space-y-4 text-center">
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none text-foreground">
-                Estude Mais Rápido com Flashcards de IA
-              </h1>
-              <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
-                Transforme seus PDFs e textos em flashcards inteligentes instantaneamente. Otimize seu aprendizado com StudyFlash.
-              </p>
+    <div className="w-full overflow-hidden">
+      <section className="border-b border-border/60 bg-background">
+        <div className="container mx-auto grid min-h-[68vh] max-w-6xl items-center gap-12 px-4 py-16 md:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:py-24">
+          <div className="max-w-3xl">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm">
+              <BrainCircuit className="h-4 w-4 text-primary" aria-hidden="true" />
+              IA para preparar o material. Você continua no controle do estudo.
             </div>
-            <div className="space-x-4">
-              <div className="inline-block">
-                {userId ? (
-                   <Link href="/dashboard">
-                     <button className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
-                       Ir para o Dashboard
-                     </button>
-                   </Link>
-                ) : (
-                   <SignInButton mode="modal">
-                     <button className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50">
-                       Começar Agora
-                     </button>
-                   </SignInButton>
-                )}
+            <h1 className="text-balance text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+              Do material bruto à revisão, em um fluxo de estudo só.
+            </h1>
+            <p className="mt-6 max-w-2xl text-pretty text-lg leading-8 text-muted-foreground md:text-xl">
+              O StudyFlash transforma textos e PDFs em flashcards revisáveis, organiza seus decks e conecta estudo espaçado, simulados e progresso sem esconder quando uma operação ainda não foi salva.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/dashboard"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                Criar material de estudo
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+              <Link
+                href="#como-funciona"
+                className="inline-flex h-12 items-center justify-center rounded-xl border border-border bg-card px-6 text-sm font-bold text-foreground shadow-sm transition hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                Ver como funciona
+              </Link>
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Conteúdo gerado por IA pode conter erros. Revise os cards antes de usá-los como material de aprendizagem.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-border bg-card p-5 shadow-xl shadow-black/5 md:p-7">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Fluxo StudyFlash</p>
+                <h2 className="mt-1 text-xl font-bold text-card-foreground">Da fonte à prática</h2>
               </div>
-              <div className="inline-block">
-                 <Link href="#features">
-                    <button className="inline-flex h-12 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 text-foreground">
-                      Saiba Mais
-                    </button>
-                 </Link>
-              </div>
+              <ShieldCheck className="h-7 w-7 text-primary" aria-hidden="true" />
+            </div>
+            <div className="mt-5 space-y-3">
+              {productProof.map((item, index) => (
+                <div key={item} className="flex gap-3 rounded-2xl border border-border/70 bg-background/70 p-4">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-extrabold text-primary">
+                    {index + 1}
+                  </span>
+                  <p className="text-sm font-medium leading-6 text-foreground">{item}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3 lg:gap-12">
-            <div className="flex flex-col items-center space-y-4 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                <svg
-                  className="h-8 w-8 text-primary"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M13 10V3L4 14h7v7l9-11h-7z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-foreground">Geração Instantânea</h3>
-              <p className="text-muted-foreground">
-                Crie decks completos em segundos a partir de qualquer material de estudo.
-              </p>
-            </div>
-            <div className="flex flex-col items-center space-y-4 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                <svg
-                  className="h-8 w-8 text-primary"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-foreground">Foco no Conteúdo</h3>
-              <p className="text-muted-foreground">
-                A IA extrai os pontos chave para você não perder tempo resumindo.
-              </p>
-            </div>
-            <div className="flex flex-col items-center space-y-4 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                <svg
-                  className="h-8 w-8 text-primary"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-foreground">Estude em Qualquer Lugar</h3>
-              <p className="text-muted-foreground">
-                Acesse seus flashcards no computador ou celular com sincronização automática.
-              </p>
-            </div>
+      <section id="como-funciona" className="bg-muted/35 py-16 md:py-24">
+        <div className="container mx-auto max-w-6xl px-4 md:px-6">
+          <div className="max-w-2xl">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Como funciona</p>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-foreground md:text-4xl">
+              Um caminho claro entre criar, organizar e praticar.
+            </h2>
+            <p className="mt-4 text-lg leading-8 text-muted-foreground">
+              Cada etapa tem uma função explícita: a IA acelera a preparação, enquanto coleção, estudo e simulados mantêm o trabalho revisável e persistente.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {workflow.map(({ title, description, icon: Icon }, index) => (
+              <article key={title} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <span className="text-xs font-extrabold text-muted-foreground">0{index + 1}</span>
+                </div>
+                <h3 className="mt-6 text-xl font-bold text-card-foreground">{title}</h3>
+                <p className="mt-3 leading-7 text-muted-foreground">{description}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Social Proof */}
-      <section className="w-full py-12 md:py-24 lg:py-32 bg-background">
-        <div className="container mx-auto px-4 md:px-6">
-          <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl text-center mb-12 text-foreground">
-            Quem usa recomenda
-          </h2>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:gap-12">
-             <div className="flex flex-col p-6 space-y-4 rounded-xl border border-border bg-card shadow-sm">
-               <p className="text-muted-foreground italic">
-                 &quot;O StudyFlash salvou meu semestre! Consegui resumir livros inteiros em flashcards em minutos.&quot;
-               </p>
-               <div className="flex items-center space-x-4">
-                 <div className="h-10 w-10 rounded-full bg-secondary"></div>
-                 <div>
-                   <p className="text-sm font-semibold text-card-foreground">Ana Paula Costa</p>
-                   <p className="text-xs text-muted-foreground">Estudante de Medicina</p>
-                 </div>
-               </div>
-             </div>
-             <div className="flex flex-col p-6 space-y-4 rounded-xl border border-border bg-card shadow-sm">
-               <p className="text-muted-foreground italic">
-                 &quot;Incrível para revisar para concursos. A qualidade dos cards gerados é surpreendente.&quot;
-               </p>
-               <div className="flex items-center space-x-4">
-                 <div className="h-10 w-10 rounded-full bg-secondary"></div>
-                 <div>
-                   <p className="text-sm font-semibold text-card-foreground">Lucas Rodrigues</p>
-                   <p className="text-xs text-muted-foreground">Concurseiro</p>
-                 </div>
-               </div>
-             </div>
+      <section className="border-t border-border bg-background py-14 md:py-18">
+        <div className="container mx-auto flex max-w-6xl flex-col gap-6 px-4 md:px-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-2xl font-extrabold tracking-tight text-foreground md:text-3xl">Comece pelo material que você já tem.</h2>
+            <p className="mt-2 text-muted-foreground">Abra o ambiente de criação, gere uma primeira versão e revise antes de adicionar os cards à sua coleção.</p>
           </div>
+          <Link
+            href="/dashboard"
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Abrir StudyFlash
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
         </div>
       </section>
     </div>
