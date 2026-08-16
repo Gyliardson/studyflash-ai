@@ -124,15 +124,13 @@ test("expected AI provider-unavailable failure stays inline without client excep
   const userId = fixtureOwner.userId;
   const beforeFlashcards = await prisma.flashcard.count({ where: { userId } });
   const pageErrors: string[] = [];
-  const providerConsoleErrors: string[] = [];
+  const clientConsoleErrors: string[] = [];
   const providerBodyMarker = "provider-secret-body-must-not-leak";
   const sourceText = "A mitose possui etapas ordenadas e produz duas células-filhas geneticamente equivalentes.";
 
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error" && message.text().includes(providerBodyMarker)) {
-      providerConsoleErrors.push(message.text());
-    }
+    if (message.type() === "error") clientConsoleErrors.push(message.text());
   });
   await page.route("**/api/ai/gerar", async (route) => {
     await route.fulfill({
@@ -144,11 +142,12 @@ test("expected AI provider-unavailable failure stays inline without client excep
 
   await signIn(page);
   await page.goto("/dashboard");
+  clientConsoleErrors.length = 0;
   const source = page.getByLabel("Conteúdo para gerar flashcards");
   await source.fill(sourceText);
   await page.getByRole("button", { name: "Gerar Flashcards" }).click();
 
-  const alert = page.getByRole("alert");
+  const alert = page.locator("main").getByRole("alert");
   await expect(alert).toContainText("Não foi possível gerar os cards.");
   await expect(alert).toContainText("A IA está temporariamente indisponível. Tente novamente.");
   await expect(alert).not.toContainText(providerBodyMarker);
@@ -157,7 +156,7 @@ test("expected AI provider-unavailable failure stays inline without client excep
   await expect(page.getByRole("button", { name: "Salvar na minha Coleção" })).toHaveCount(0);
 
   expect(pageErrors).toEqual([]);
-  expect(providerConsoleErrors).toEqual([]);
+  expect(clientConsoleErrors).toEqual([]);
   expect(await prisma.flashcard.count({ where: { userId } })).toBe(beforeFlashcards);
 });
 
