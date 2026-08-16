@@ -116,6 +116,51 @@ test("collection plans tab supports direct deep links and browser history", asyn
   await expect(decksTab).toHaveAttribute("aria-selected", "true");
 });
 
+test("expected AI provider-unavailable failure stays inline without client exception or partial persistence", async ({ page }) => {
+  const fixtureOwner = await prisma.deck.findFirstOrThrow({
+    where: { nome: E2E_DECK_NAME },
+    select: { userId: true },
+  });
+  const userId = fixtureOwner.userId;
+  const beforeFlashcards = await prisma.flashcard.count({ where: { userId } });
+  const pageErrors: string[] = [];
+  const providerConsoleErrors: string[] = [];
+  const providerBodyMarker = "provider-secret-body-must-not-leak";
+  const sourceText = "A mitose possui etapas ordenadas e produz duas células-filhas geneticamente equivalentes.";
+
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error" && message.text().includes(providerBodyMarker)) {
+      providerConsoleErrors.push(message.text());
+    }
+  });
+  await page.route("**/api/ai/gerar", async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: providerBodyMarker }),
+    });
+  });
+
+  await signIn(page);
+  await page.goto("/dashboard");
+  const source = page.getByLabel("Conteúdo para gerar flashcards");
+  await source.fill(sourceText);
+  await page.getByRole("button", { name: "Gerar Flashcards" }).click();
+
+  const alert = page.getByRole("alert");
+  await expect(alert).toContainText("Não foi possível gerar os cards.");
+  await expect(alert).toContainText("A IA está temporariamente indisponível. Tente novamente.");
+  await expect(alert).not.toContainText(providerBodyMarker);
+  await expect(source).toHaveValue(sourceText);
+  await expect(page.getByRole("button", { name: "Gerar Flashcards" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Salvar na minha Coleção" })).toHaveCount(0);
+
+  expect(pageErrors).toEqual([]);
+  expect(providerConsoleErrors).toEqual([]);
+  expect(await prisma.flashcard.count({ where: { userId } })).toBe(beforeFlashcards);
+});
+
 test("appearance settings change only the supported local theme preference", async ({ page }) => {
   await signIn(page);
   await page.goto("/configuracoes");
