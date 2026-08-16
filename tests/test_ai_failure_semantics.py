@@ -5,6 +5,8 @@ import os
 import unittest
 from unittest.mock import Mock, patch
 
+from fastapi.testclient import TestClient
+
 from app.ai_errors import (
     AIInvalidInputError,
     AIInvalidOutputError,
@@ -16,9 +18,14 @@ from app.ai_provider import (
     DEFAULT_PROVIDER_TIMEOUT_SECONDS,
     GroqAIProvider,
     _provider_timeout_seconds,
+    get_ai_provider,
     invoke_with_bounded_fallback,
 )
-from app.main import _ai_http_exception
+from app.main import _ai_http_exception, app
+
+
+TEST_INTERNAL_KEY = "studyflash-internal-test-key-0000000000000000"
+PROVIDER_SECRET_MARKER = "provider-secret-must-not-leak"
 
 
 class StatusError(RuntimeError):
@@ -32,6 +39,17 @@ class OutputParserException(RuntimeError):
 
 
 class AIFailureSemanticsTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        get_ai_provider.cache_clear()
+
+    def _post_flashcards(self, *, text: str = "Mitose divide uma célula em duas células-filhas."):
+        client = TestClient(app, raise_server_exceptions=False)
+        return client.post(
+            "/api/gerar",
+            headers={"X-StudyFlash-Internal-Key": TEST_INTERNAL_KEY},
+            data={"texto": text},
+        )
+
     def test_primary_rate_limit_uses_exactly_one_backup(self) -> None:
         primary = Mock(side_effect=StatusError(429, "secret provider text"))
         backup = Mock(return_value="ok")
@@ -104,6 +122,77 @@ class AIFailureSemanticsTests(unittest.TestCase):
         for call in chat_groq.call_args_list:
             self.assertEqual(call.kwargs["timeout"], 7.5)
             self.assertEqual(call.kwargs["max_retries"], 0)
+
+    @patch("app.ai_provider.ChatGroq")
+    def test_missing_provider_config_is_typed_before_client_construction(self, chat_groq: Mock) -> None:
+        with patch.dict(os.environ, {"STUDYFLASH_INTERNAL_API_KEY": TEST_INTERNAL_KEY}, clear=False):
+            os.environ.pop("GROQ_API_KEY", None)
+            get_ai_provider.cache_clear()
+
+            with self.assertRaises(AIProviderUnavailableError):
+                get_ai_provider()
+
+        chat_groq.assert_not_called()
+
+    @patch("app.ai_provider.ChatGroq")
+    def test_missing_provider_config_endpoint_returns_sanitized_503(self, chat_groq: Mock) -> None:
+        with patch.dict(os.environ, {"STUDYFLASH_INTERNAL_API_KEY": TEST_INTERNAL_KEY}, clear=False):
+            os.environ.pop("GROQ_API_KEY", None)
+            get_ai_provider.cache_clear()
+            response = self._post_flashcards()
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json(),
+            {"detail": "O serviço de IA está temporariamente indisponível."},
+        )
+        self.assertNotIn("GROQ_API_KEY", response.text)
+        chat_groq.assert_not_called()
+
+    @patch("app.ai_provider.ChatGroq", side_effect=ValueError(f"invalid config: {PROVIDER_SECRET_MARKER}"))
+    def test_invalid_provider_constructor_returns_sanitized_503(self, chat_groq: Mock) -> None:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "STUDYFLASH_INTERNAL_API_KEY": TEST_INTERNAL_KEY,
+                    "GROQ_API_KEY": PROVIDER_SECRET_MARKER,
+                },
+                clear=False,
+            ),
+            patch("builtins.print") as print_mock,
+        ):
+            get_ai_provider.cache_clear()
+            response = self._post_flashcards()
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.json(),
+            {"detail": "O serviço de IA está temporariamente indisponível."},
+        )
+        self.assertNotIn(PROVIDER_SECRET_MARKER, response.text)
+        self.assertNotIn("invalid config", response.text)
+        logged = " ".join(str(arg) for call in print_mock.call_args_list for arg in call.args)
+        self.assertNotIn(PROVIDER_SECRET_MARKER, logged)
+        chat_groq.assert_called_once()
+
+    @patch("app.ai_provider.ChatGroq", side_effect=RuntimeError(f"unexpected defect: {PROVIDER_SECRET_MARKER}"))
+    def test_unexpected_provider_constructor_bug_remains_generic_500(self, chat_groq: Mock) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "STUDYFLASH_INTERNAL_API_KEY": TEST_INTERNAL_KEY,
+                "GROQ_API_KEY": PROVIDER_SECRET_MARKER,
+            },
+            clear=False,
+        ):
+            get_ai_provider.cache_clear()
+            response = self._post_flashcards()
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {"detail": "Erro interno ao processar solicitação."})
+        self.assertNotIn(PROVIDER_SECRET_MARKER, response.text)
+        chat_groq.assert_called_once()
 
     def test_fastapi_mapping_is_typed_and_never_echoes_exception_text(self) -> None:
         cases = [
