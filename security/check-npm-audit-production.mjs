@@ -407,13 +407,16 @@ function resolveHighSeverityLeaves(report, packageName, stack = []) {
   return leaves;
 }
 
+function leafKey(leaf) {
+  return `${leaf.package}|${leaf.advisory}|${leaf.severity}`;
+}
+
 function highSeverityLeafMap(report) {
   const leaves = new Map();
   for (const [packageName, vulnerability] of Object.entries(report.vulnerabilities)) {
     if (!FAIL_SEVERITIES.has(vulnerability.severity)) continue;
     for (const leaf of resolveHighSeverityLeaves(report, packageName)) {
-      const key = `${leaf.package}|${leaf.advisory}|${leaf.severity}`;
-      leaves.set(key, leaf);
+      leaves.set(leafKey(leaf), leaf);
     }
   }
   return leaves;
@@ -422,15 +425,25 @@ function highSeverityLeafMap(report) {
 export function validateAuditPair(fullReport, productionReport) {
   const fullLeaves = highSeverityLeafMap(fullReport);
   const prodLeaves = highSeverityLeafMap(productionReport);
-  for (const key of prodLeaves.keys()) {
+  for (const [key, prodLeaf] of prodLeaves.entries()) {
     assert(fullLeaves.has(key), `npm audit evidence mismatch: production advisory ${key} is absent from full audit`);
+
+    const fullVulnerability = fullReport.vulnerabilities[prodLeaf.package];
+    const productionVulnerability = productionReport.vulnerabilities[prodLeaf.package];
+    assert(fullVulnerability, `npm audit evidence mismatch: full audit is missing vulnerability node for ${prodLeaf.package}`);
+    assert(productionVulnerability, `npm audit evidence mismatch: omit-dev audit is missing vulnerability node for ${prodLeaf.package}`);
+
+    const fullNodes = new Set(fullVulnerability.nodes);
+    for (const node of productionVulnerability.nodes) {
+      assert(fullNodes.has(node), `npm audit evidence mismatch: omit-dev node ${node} for ${prodLeaf.package} is absent from full audit vulnerability nodes`);
+    }
   }
   return { fullLeaves, prodLeaves };
 }
 
-function classifyLeaf({ leaf, productionReport, manifest, lockfile, provenance, runtimeEvidence }) {
-  const vulnerability = productionReport.vulnerabilities[leaf.package];
-  assert(vulnerability, `classification: missing vulnerability node for ${leaf.package}`);
+function classifyLeaf({ leaf, fullReport, manifest, lockfile, provenance, runtimeEvidence }) {
+  const vulnerability = fullReport.vulnerabilities[leaf.package];
+  assert(vulnerability, `classification: full audit is missing vulnerability node for ${leaf.package}`);
   const nodeRecords = vulnerability.nodes.map((node) => {
     const lockEntry = lockfile.packages[node];
     assert(lockEntry, `classification: audited node ${node} is missing from package-lock.json`);
@@ -493,7 +506,7 @@ export function evaluatePolicy({ fullReport, productionReport, manifest, lockfil
   validateManifest(manifest);
   validateLockfile(lockfile, manifest);
   validateAcceptedPolicy(acceptedPolicy);
-  const { prodLeaves } = validateAuditPair(fullReport, productionReport);
+  const { fullLeaves, prodLeaves } = validateAuditPair(fullReport, productionReport);
   const { provenance } = buildLockProvenance(lockfile, manifest);
 
   const accepted = new Set(acceptedPolicy.accepted.map((entry) => `${entry.package}|${entry.advisory}`));
@@ -501,9 +514,9 @@ export function evaluatePolicy({ fullReport, productionReport, manifest, lockfil
   const blocking = [];
   const reviewed = [];
 
-  for (const leaf of prodLeaves.values()) {
-    const classification = classifyLeaf({ leaf, productionReport, manifest, lockfile, provenance, runtimeEvidence });
-    const result = { ...leaf, ...classification };
+  for (const [key, leaf] of fullLeaves.entries()) {
+    const classification = classifyLeaf({ leaf, fullReport, manifest, lockfile, provenance, runtimeEvidence });
+    const result = { ...leaf, ...classification, presentInProductionAudit: prodLeaves.has(key) };
     results.push(result);
 
     if (classification.category === 'UNRESOLVED') {
@@ -511,19 +524,14 @@ export function evaluatePolicy({ fullReport, productionReport, manifest, lockfil
       continue;
     }
 
-    if (classification.category !== 'PRODUCTION_RUNTIME') continue;
-
-    const directProduction = Object.hasOwn(manifest.dependencies ?? {}, leaf.package);
-    if (directProduction) {
-      blocking.push(`${leaf.package}: direct root production-runtime ${leaf.severity} ${leaf.advisory}`);
+    if (classification.category === 'PRODUCTION_RUNTIME') {
+      blocking.push(`${leaf.package}: production-runtime ${leaf.severity} ${leaf.advisory}`);
       continue;
     }
 
     const exactKey = `${leaf.package}|${leaf.advisory}`;
     if (accepted.has(exactKey)) {
-      reviewed.push(`${leaf.package}: exact reviewed runtime transitive advisory ${leaf.advisory}`);
-    } else {
-      blocking.push(`${leaf.package}: unaccepted production-runtime ${leaf.severity} ${leaf.advisory}`);
+      reviewed.push(`${leaf.package}: exact reviewed non-runtime ${classification.category} advisory ${leaf.advisory}`);
     }
   }
 
@@ -566,15 +574,16 @@ export function runCli(argv = process.argv.slice(2)) {
     console.log(`Runtime evidence: traces=${runtimeEvidence.traceFiles.length}, traceNodes=${runtimeEvidence.traceRuntimeNodes.size}, bundleNodes=${runtimeEvidence.bundleRuntimeNodes.size}, bundlePackages=${runtimeEvidence.observedBundlePackages.size}`);
 
     for (const result of outcome.results) {
+      const membership = result.presentInProductionAudit ? 'present-in-omit-dev' : 'full-only';
       if (result.category === 'PRODUCTION_RUNTIME') {
-        console.log(`PRODUCTION RUNTIME ${result.severity.toUpperCase()}: package=${result.package} advisory=${result.advisory} rationale=${result.rationale}`);
+        console.log(`PRODUCTION RUNTIME ${result.severity.toUpperCase()}: package=${result.package} advisory=${result.advisory} auditMembership=${membership} rationale=${result.rationale}`);
       } else if (result.category === 'UNRESOLVED') {
-        console.error(`UNRESOLVED ${result.severity.toUpperCase()}: package=${result.package} advisory=${result.advisory} rationale=${result.rationale}`);
+        console.error(`UNRESOLVED ${result.severity.toUpperCase()}: package=${result.package} advisory=${result.advisory} auditMembership=${membership} rationale=${result.rationale}`);
       } else {
-        console.log(`TOOLING ${result.severity.toUpperCase()} — NON-RUNTIME BLOCKER CLASSIFICATION: package=${result.package} advisory=${result.advisory} classification=${result.category} rationale=${result.rationale}; vulnerability remains present and should be replaced by the supported upstream patch when available`);
+        console.log(`TOOLING ${result.severity.toUpperCase()} — NON-RUNTIME BLOCKER CLASSIFICATION: package=${result.package} advisory=${result.advisory} auditMembership=${membership} classification=${result.category} rationale=${result.rationale}; vulnerability remains present and should be replaced by the supported upstream patch when available`);
       }
     }
-    for (const item of outcome.reviewed) console.log(`Accepted by exact advisory policy: ${item}`);
+    for (const item of outcome.reviewed) console.log(`Reviewed tooling advisory (exact policy match): ${item}`);
 
     if (!outcome.ok) {
       console.error('Unresolved policy-relevant dependency advisories:');
