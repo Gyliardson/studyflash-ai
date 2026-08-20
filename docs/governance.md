@@ -4,17 +4,19 @@ StudyFlash uses a staged promotion model. GitHub is the authoritative record of 
 
 ## Promotion path
 
-Normal engineering changes follow:
+The current engineering promotion topology is:
 
-`main` -> `portfolio/revamp-2026` -> `work/<issue>-<slug>` -> pull request -> `portfolio/revamp-2026`.
+`work/*` -> pull request -> `portfolio/revamp-2026` -> pull request -> `main`.
 
-`main` is the release branch. `portfolio/revamp-2026` is the controlled integration branch. Work branches must not bypass the integration pull-request path. The final integration-to-`main` pull request is created only after clean-room validation, governance reconciliation, and the independent adversarial release audit. Automation must never merge that final pull request.
+`main` is the release branch. `portfolio/revamp-2026` remains the controlled integration branch. Work branches must not bypass the integration pull-request path, and only `portfolio/revamp-2026` is eligible to promote into `main` under the Trusted Promotion Anchor.
 
-Before final certification, the integration candidate must also contain the current `main` history. If `main` advances independently while professionalization is in progress, reconcile that history through a reviewed work-branch pull request, resolve overlapping release-facing files deliberately, and re-run the exact-SHA deterministic matrix. Do not defer branch divergence or conflict resolution to the final `portfolio/revamp-2026` -> `main` pull request, because that would create an unvalidated merge result.
+The initial 2026 professionalization candidate has already completed its integration-to-`main` promotion. That completed historical promotion does not retire the integration branch or weaken the evergreen topology above. Future candidates continue to require the checks, review and promotion controls applicable to their target branch; automation must not merge a release promotion on its own.
+
+Before a future integration-to-`main` promotion is certified, the integration candidate must contain the current `main` history. If `main` advances independently, reconcile that history through a reviewed work-branch pull request, resolve overlapping release-facing files deliberately, and re-run the exact-SHA deterministic matrix. Do not defer branch divergence or conflict resolution to the final `portfolio/revamp-2026` -> `main` pull request, because that would create an unvalidated merge result.
 
 ## Required deterministic evidence
 
-The release candidate must be validated at its exact head SHA. The eight deterministic workflow gates are:
+A promotion candidate must be validated at its exact head SHA. The eight deterministic workflow gates are:
 
 - `Secret Scan / Git history secret scan`
 - `CI / Frontend lint, typecheck and build`
@@ -86,4 +88,4 @@ Legacy provider-specific positioning is no longer used as the repository descrip
 
 ## Verification rule
 
-Source documentation is not sufficient evidence for governance state. Final certification must re-read the active rulesets, required checks, Private Vulnerability Reporting state, repository metadata, exact candidate SHA, and corresponding successful checks from GitHub.
+Source documentation is not sufficient evidence for governance state. Any release certification must re-read the active rulesets, required checks, Private Vulnerability Reporting state, repository metadata, exact candidate SHA, and corresponding successful checks from GitHub.

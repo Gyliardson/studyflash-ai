@@ -85,4 +85,6 @@ Authenticated Browser E2E additionally requires the documented Clerk development
 
 ## Release interpretation
 
-A green clean-room workflow proves that the exact tested repository SHA can bootstrap from fresh state using its committed application dependency locks and pass the deterministic domain/browser matrix against disposable infrastructure. It does **not** claim that GitHub's hosted runner image or maintained PostgreSQL 16 patch tag is bit-for-bit immutable, and it does **not** by itself authorize promotion to `main`. Final promotion still requires repository governance/rulesets and the adversarial audit tracked by the professionalization program.
+A green clean-room workflow proves that the exact tested repository SHA can bootstrap from fresh state using its committed application dependency locks and pass the deterministic domain/browser matrix against disposable infrastructure. It does **not** claim that GitHub's hosted runner image or maintained PostgreSQL 16 patch tag is bit-for-bit immutable.
+
+Clean-room success is evidence, not automatic authorization to merge or promote. Any promotion still depends on the repository's current governance, required exact-SHA checks and review requirements for the target branch.
