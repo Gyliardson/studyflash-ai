@@ -2,7 +2,7 @@
 
 StudyFlash is an AI-assisted study application for turning source material into flashcards, spaced-review sessions, study plans and server-authoritative exams.
 
-The portfolio version is being hardened around reproducible PostgreSQL migrations, authenticated ownership boundaries, deterministic critical tests, bounded AI failure semantics, accessibility and recoverable/idempotent mutations.
+The repository is maintained around reproducible PostgreSQL migrations, authenticated ownership boundaries, deterministic critical tests, bounded AI failure semantics, accessibility and recoverable/idempotent mutations.
 
 ## What is implemented
 
@@ -32,7 +32,7 @@ FastAPI
   |
   v
 AIProvider abstraction
-  +--> real provider in production
+  +--> Groq in production
   +--> deterministic fake/provider policy in critical tests
 ```
 
@@ -175,6 +175,6 @@ StudyFlash is publicly visible for portfolio and evaluation purposes but is **no
 
 ## Project status
 
-The professionalization work is staged on `portfolio/revamp-2026`. `main` is not automatically promoted. Final promotion requires clean-room verification, governance checks and an adversarial audit of the complete integration diff.
+The professionalized portfolio baseline has been promoted to `main`. Ongoing engineering changes continue through the controlled `work/*` -> `portfolio/revamp-2026` -> `main` promotion topology, with exact-SHA validation and repository governance determining merge eligibility.
 
 Historical changelog entries describe earlier project states and should not be interpreted as stronger guarantees than the current documented contracts and tests.
