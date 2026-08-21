@@ -80,4 +80,4 @@ A real-provider smoke test may be added separately, but it must remain optional/
 
 ## Failure semantics
 
-Generated output is not considered valid merely because a provider returned it. In particular, an exam question must contain exactly four unique alternatives and must include the stored correct answer. Provider failure or invalid generated output is surfaced as an error at the backend boundary; downstream application fallback behavior is documented separately in [`ai-failure-policy.md`](ai-failure-policy.md).
+Generated output is not considered valid merely because a provider returned it. In particular, an exam question must contain exactly four unique alternatives and must include the stored correct answer. Provider failure or invalid generated output is surfaced as an error at the backend boundary; downstream application fallback behavior is documented separately in [`../correctness/AI_FAILURE_POLICY.md`](../correctness/AI_FAILURE_POLICY.md).

@@ -51,7 +51,7 @@ npm run db:schema:verify
 
 Application startup must not rely on `prisma db push` as a replacement for the checked-in migration history. CI and Browser E2E use disposable PostgreSQL and must not connect to production Neon.
 
-See [`database.md`](database.md) for migration history and the Supabase → PostgreSQL/Neon inventory.
+See [`../architecture/DATABASE.md`](../architecture/DATABASE.md) for migration history and the Supabase → PostgreSQL/Neon inventory.
 
 ## Clerk provisioning
 
