@@ -160,7 +160,7 @@ npm run db:schema:verify
 - 学習プラン/トピックの AI リトライでは、最初の同時試行時にリモート推論呼び出しが重複する場合がありますが、対応する DB 効果は 1 つのみ commit できます。
 - ユーザーごとの timezone 設定が永続化されていないため、日単位の gamification は現在固定 `America/Sao_Paulo` timezone を使用します。
 - CI は使い捨て/開発インフラ上のリポジトリ契約を証明しますが、本番 Neon、Clerk、Groq、hosting、domain 設定を証明しません。
-- 現在のリポジトリメディアが検証済み replacement を待っているため、キュレーション済み portfolio screenshot はここには埋め込んでいません。
+- ルート README のポートフォリオスクリーンショットは、記載された合成 Browser E2E キャプチャ SHA を示すものであり、現在の本番ホスティング、構成、実ユーザーデータの状態を証明するものではありません。出典は [MEDIA.md](../../operations/MEDIA.md) を参照してください。
 
 ## ライセンス
 
