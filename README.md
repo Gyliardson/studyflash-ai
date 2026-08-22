@@ -8,8 +8,8 @@ StudyFlash turns study material into flashcards, resumable review sessions, stud
 
 <strong>English</strong> · <a href="docs/i18n/pt-BR/README.md">Português</a> · <a href="docs/i18n/ja/README.md">日本語</a> · <a href="docs/i18n/es/README.md">Español</a>
 
-[![StudyFlash CI](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml)
-[![Clean Room](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml/badge.svg?branch=main)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml)
+[![Integration CI](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml/badge.svg?branch=portfolio%2Frevamp-2026)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml?query=branch%3Aportfolio%2Frevamp-2026)
+[![Clean Room](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml/badge.svg?branch=portfolio%2Frevamp-2026)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml?query=branch%3Aportfolio%2Frevamp-2026)
 [![License](https://img.shields.io/badge/license-Proprietary-lightgrey.svg)](LICENSE)
 
 </div>
