@@ -38,6 +38,22 @@ The repository favors narrow, testable claims over broad AI or reliability promi
 - Install as a PWA with cached static assets and a deliberately network-authoritative protected-data policy.
 - Exercise desktop/mobile flows with Playwright and serious/critical accessibility checks.
 
+## Product preview
+
+These are real StudyFlash application states captured by authenticated synthetic Playwright fixtures, not mockups or production-user screenshots. The durable files below are byte-for-byte PNG copies from Browser E2E #405 at exact source SHA `0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`; they are visual portfolio evidence for that capture source, not merge evidence for the current head. See [media provenance](docs/operations/MEDIA.md) for source artifact identity, dimensions, hashes, and validation.
+
+### Create flashcards — desktop
+
+[![StudyFlash create-flashcards screen on desktop](docs/media/create-flashcards-desktop-light.png)](docs/media/create-flashcards-desktop-light.png)
+
+### Profile — mobile
+
+<p align="center">
+  <a href="docs/media/profile-mobile-light.png">
+    <img src="docs/media/profile-mobile-light.png" alt="StudyFlash profile screen on mobile" width="320">
+  </a>
+</p>
+
 ## Architecture
 
 ```mermaid
@@ -147,6 +163,7 @@ Useful entry points:
 - [Exam integrity](docs/correctness/EXAM_INTEGRITY.md)
 - [Clean-room verification](docs/operations/CLEAN_ROOM.md)
 - [Deployment runbook](docs/operations/DEPLOY.md)
+- [Media provenance and capture policy](docs/operations/MEDIA.md)
 - [Dependency verification](docs/assurance/DEPENDENCIES.md)
 - [Repository governance](docs/assurance/GOVERNANCE.md)
 - [Security policy](SECURITY.md)
@@ -160,7 +177,7 @@ Useful entry points:
 - AI-backed plan/topic retries can duplicate the remote inference call during a concurrent first attempt even though only one supported database effect may commit.
 - Calendar-day gamification currently uses the fixed `America/Sao_Paulo` timezone because no per-user timezone preference is persisted.
 - CI proves repository contracts against disposable/development infrastructure; it does not prove live production Neon, Clerk, Groq, hosting, or domain configuration.
-- Curated portfolio screenshots are intentionally not embedded here while the current repository media artifacts await validated replacement.
+- Portfolio screenshots document the cited synthetic Browser E2E capture SHA; they do not prove current live hosting, production configuration, or production-user state.
 
 ## License
 

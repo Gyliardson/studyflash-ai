@@ -160,7 +160,7 @@ Puntos de entrada útiles:
 - Los reintentos respaldados por IA para planes/temas pueden duplicar la llamada de inferencia remota durante un primer intento concurrente, aunque solo un efecto soportado en la base de datos puede confirmarse.
 - Las reglas de gamificación por día usan actualmente el timezone fijo `America/Sao_Paulo`, porque no se persiste una preferencia de timezone por usuario.
 - El CI demuestra contratos del repositorio contra infraestructura desechable/de desarrollo; no demuestra la configuración real de Neon, Clerk, Groq, hosting o dominio en producción.
-- Las capturas curadas de portafolio no se incrustan aquí mientras los artefactos de medios actuales del repositorio esperan un reemplazo validado.
+- Las capturas de portafolio mostradas en el README canónico documentan el SHA citado de captura Browser E2E sintética; no demuestran la configuración ni el estado vivo de producción. La procedencia está en [MEDIA.md](../../operations/MEDIA.md).
 
 ## Licencia
 
