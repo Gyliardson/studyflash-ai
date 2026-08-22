@@ -8,7 +8,7 @@ The capture contract lives in `frontend/e2e/tests/product-ux.spec.ts`. It attach
 
 ## Restored portfolio evidence
 
-The public README uses durable PNG derivatives of the already-reviewed Browser E2E artifact for exact source SHA `0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`.
+The public README uses byte-identical source PNGs from the already-reviewed Browser E2E artifact for exact source SHA `0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`.
 
 Source evidence:
 
@@ -19,12 +19,12 @@ Source evidence:
 - source branch recorded by GitHub Actions: `work/26-portfolio-docs-brand`;
 - source data: authenticated synthetic Playwright fixtures only.
 
-The artifact was downloaded again for issue #88 and the proposed screenshots were inspected at full resolution before restoration. To avoid repeating the broken WebP pipeline while keeping repository media compact, each approved source PNG is encoded as a 64-color indexed-palette PNG using median-cut quantization with dithering disabled. This changes encoding bytes only: there is no resize, crop, content edit, blur, sharpening, annotation, or product-state alteration.
+The artifact was downloaded again for issue #88 and the proposed screenshots were inspected at full resolution before restoration. Each approved source PNG is copied byte-for-byte into the repository without re-encoding, palette reduction, resize, crop, content editing, blur, sharpening, annotation, or product-state alteration. This preserves the maximum fidelity available from the authoritative Browser E2E artifact.
 
-| Durable repository file | Source attachment | Capture viewport | Full-page dimensions | Source PNG bytes / SHA-256 | Durable PNG bytes / SHA-256 |
-| --- | --- | ---: | ---: | --- | --- |
-| `docs/media/create-flashcards-desktop-light.png` | `dashboard-desktop-light` | 1440×1000 | 1440×1213 | 65,466 / `478f58c8ad5ab6647f109e2a542c3e560c6b0fa76ee44891a835b153f05d54c8` | 22,263 / `5620573a19a8a64bc1e16d58528f45f6db6a8e0c3a5387d9a619d2f6f0fe827c` |
-| `docs/media/profile-mobile-light.png` | `profile-mobile-light` | 390×844 | 390×1244 | 75,733 / `d1b39da568ef4a83d07c548b4d1978ef85d15979b4e8bea59c1ccf33c04c8409` | 16,631 / `ac01c18f8c683e960cb6520ccaa117f980914f3a7bf67a41fa6d91070533de4a` |
+| Durable repository file | Artifact path | Source attachment | Capture viewport | Full-page dimensions | PNG bytes / SHA-256 |
+| --- | --- | --- | ---: | ---: | --- |
+| `docs/media/create-flashcards-desktop-light.png` | `playwright-report/data/e7dd1e6961a2f2724e3c825644ed00f1af5f3ecd.png` | `dashboard-desktop-light` | 1440×1000 | 1440×1213 | 65,466 / `478f58c8ad5ab6647f109e2a542c3e560c6b0fa76ee44891a835b153f05d54c8` |
+| `docs/media/profile-mobile-light.png` | `playwright-report/data/dbf7b92ee30bf8c17651eb486925aa2d5009227e.png` | `profile-mobile-light` | 390×844 | 390×1244 | 75,733 / `d1b39da568ef4a83d07c548b4d1978ef85d15979b4e8bea59c1ccf33c04c8409` |
 
 The desktop attachment is named `dashboard-desktop-light` by the deterministic test, but the captured route is the actual StudyFlash create-material surface shown in the README. The durable filename describes the visible product state rather than inventing a different screen.
 
@@ -33,9 +33,9 @@ The desktop attachment is named `dashboard-desktop-light` by the deterministic t
 Both restored durable files:
 
 1. begin with the canonical PNG signature `89 50 4E 47 0D 0A 1A 0A`;
-2. decode successfully as non-interlaced 8-bit indexed-color PNG images;
+2. decode successfully as non-interlaced 8-bit truecolor PNG images;
 3. preserve the original full-page pixel dimensions from the Browser E2E artifact;
-4. were visually inspected at full resolution after optimization for clipping, overflow, text legibility, blur/compression artifacts, loading/error states, exposed secrets/credentials, and real-user identifiers;
+4. were visually inspected at full resolution for clipping, overflow, text legibility, blur/compression artifacts, loading/error states, exposed secrets/credentials, and real-user identifiers;
 5. contain only synthetic test state appropriate for portfolio documentation;
 6. use repository-relative README image and click targets that resolve to the same durable files.
 
@@ -64,7 +64,7 @@ Screenshots are evidence of the cited synthetic Browser E2E capture source only.
 2. Require the workflow to pass.
 3. Download the Browser E2E artifact.
 4. Inspect every proposed screenshot at full resolution.
-5. Prefer PNG for durable repository evidence; if optimization or re-encoding is necessary, preserve content/dimensions and validate the declared format, magic bytes, decoder readability, hashes, and visual quality.
+5. Prefer the original source PNG for durable repository evidence. If lossless optimization becomes necessary, require a deterministic command, preserve content and dimensions, and validate format, magic bytes, decoder readability, hashes, and visual quality.
 6. Copy only approved screenshots to durable repository media paths.
 7. Record exact-SHA/run/artifact provenance, source/durable dimensions, hashes, and visual-review notes here.
 8. Update README references only after durable files validate locally and resolve in GitHub.
