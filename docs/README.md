@@ -27,7 +27,7 @@ Reproducible setup, deployment, and portfolio-evidence handling.
 
 - [`operations/CLEAN_ROOM.md`](operations/CLEAN_ROOM.md) — fresh-checkout bootstrap and deterministic candidate proof.
 - [`operations/DEPLOY.md`](operations/DEPLOY.md) — production topology, required configuration, database provisioning, and rollback principles.
-- [`operations/MEDIA.md`](operations/MEDIA.md) — screenshot capture/provenance rules and the status of retained portfolio media.
+- [`operations/MEDIA.md`](operations/MEDIA.md) — screenshot capture policy, exact artifact provenance, restored PNG inventory, validation hashes, and public-presentation boundary.
 
 ## Assurance
 
@@ -43,7 +43,7 @@ Repository-level dependency and promotion controls.
 
 ## Localized landing pages
 
-The root English README is canonical. The following pages are natural-language equivalents of its public product/engineering presentation; technical guarantees, limitations, AI/privacy boundaries, and license meaning must remain semantically aligned.
+The root English README is canonical. The following pages are natural-language equivalents of its public product/engineering presentation; technical guarantees, limitations, AI/privacy boundaries, and license meaning must remain semantically aligned. The canonical README owns the visual screenshot presentation so the translated pages do not duplicate large media embeds; screenshot provenance remains language-independent in [`operations/MEDIA.md`](operations/MEDIA.md).
 
 - [English](../README.md)
 - [Português](i18n/pt-BR/README.md)
