@@ -6,7 +6,7 @@
 
 O StudyFlash transforma materiais de estudo em flashcards, sessões de revisão retomáveis, planos de estudo e simulados com autoridade no servidor, mantendo a IA remota atrás de uma fronteira exclusivamente server-side e as garantias críticas de correção independentes da disponibilidade de um modelo ao vivo.
 
-[English](../../../README.md) · [Português](README.md) · [日本語](../ja/README.md) · [Español](../es/README.md)
+<a href="../../../README.md">English</a> · <strong>Português</strong> · <a href="../ja/README.md">日本語</a> · <a href="../es/README.md">Español</a>
 
 [![StudyFlash CI](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml)
 [![Clean Room](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml/badge.svg?branch=main)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml)

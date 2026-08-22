@@ -6,7 +6,7 @@
 
 StudyFlash は学習素材からフラッシュカード、再開可能な復習セッション、学習プラン、サーバー権威型の模擬試験を作成します。リモート AI はサーバー専用の境界の内側に置かれ、重要な正しさの保証はライブモデルの可用性に依存しません。
 
-[English](../../../README.md) · [Português](../pt-BR/README.md) · [日本語](README.md) · [Español](../es/README.md)
+<a href="../../../README.md">English</a> · <a href="../pt-BR/README.md">Português</a> · <strong>日本語</strong> · <a href="../es/README.md">Español</a>
 
 [![StudyFlash CI](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml)
 [![Clean Room](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml/badge.svg?branch=main)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml)
