@@ -27,14 +27,16 @@ A screenshot set is acceptable as release/portfolio evidence only when all of th
 
 The curated #26 media was sourced from candidate SHA `0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`, which passed Browser E2E #405 together with CI #561 and Study Session Integrity #276. Artifact `browser-e2e-0fdda9a71a9c23ec77d63d4ce31c195ef9605c95` was downloaded and its representative desktop/mobile, light/dark, study/exam/create/profile/navigation captures were visually inspected before curation.
 
-## Curated repository media
+## Current retained repository media
 
-The repository keeps a deliberately small portfolio set rather than duplicating the complete expiring Playwright artifact:
+The repository still retains these historical portfolio binary paths:
 
-- `docs/media/create-flashcards-desktop-light.webp` — desktop/light creation surface, downscaled from the reviewed exact-SHA artifact without cropping or content alteration;
-- `docs/media/profile-mobile-light.webp` — mobile/light profile surface from the same reviewed artifact.
+- `docs/media/create-flashcards-desktop-light.webp`;
+- `docs/media/profile-mobile-light.webp`.
 
-The WebP copies are presentation derivatives of the reviewed screenshots. Compression/downscaling must keep text readable and must never crop or restyle the UI to hide defects. Full-resolution evidence remains available in the corresponding Browser E2E artifact while retained by GitHub Actions.
+Current repository-byte validation shows that neither retained binary starts with the required WebP `RIFF....WEBP` signature, neither is identified as a supported image by a real decoder, and both are detected only as generic binary data. They are therefore **not accepted as current portfolio evidence** and are intentionally not embedded in the public README.
+
+The binaries remain untouched in this documentation-only change so provenance is preserved for the dedicated media-restoration follow-up. They must be replaced only by deterministically recaptured, visually reviewed files whose actual encoding matches their extension.
 
 ## Refresh procedure
 
@@ -42,6 +44,8 @@ The WebP copies are presentation derivatives of the reviewed screenshots. Compre
 2. Require the workflow to pass.
 3. Download the Browser E2E artifact.
 4. Inspect every proposed screenshot at full resolution.
-5. Copy only approved screenshots to the durable media paths.
-6. Update this provenance record and README references if filenames change.
-7. Re-run CI/Browser E2E if committing media or documentation changes moves the PR head; merge eligibility always belongs to the new exact head.
+5. Encode approved durable copies in the declared image format and validate magic bytes plus decoder readability.
+6. Copy only approved screenshots to the durable media paths.
+7. Record exact-SHA/run/artifact provenance and visual-review notes here.
+8. Restore README references only after the durable files are validated in GitHub rendering.
+9. Re-run CI/Browser E2E if committing media or documentation changes moves the PR head; merge eligibility always belongs to the new exact head.

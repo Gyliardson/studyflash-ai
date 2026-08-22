@@ -1,66 +1,88 @@
+<div align="center">
+
 # StudyFlash
 
-StudyFlash is an AI-assisted study application for turning source material into flashcards, spaced-review sessions, study plans and server-authoritative exams.
+**AI-assisted study engineered for correctness under retries and failure.**
 
-The repository is maintained around reproducible PostgreSQL migrations, authenticated ownership boundaries, deterministic critical tests, bounded AI failure semantics, accessibility and recoverable/idempotent mutations.
+StudyFlash turns study material into flashcards, resumable review sessions, study plans, and server-authoritative practice exams while keeping remote AI behind a server-only boundary and critical correctness guarantees independent from live model availability.
 
-## What is implemented
+[English](README.md) · [Português](docs/i18n/pt-BR/README.md) · [日本語](docs/i18n/ja/README.md) · [Español](docs/i18n/es/README.md)
 
-- Flashcard generation from text and PDF through a protected FastAPI AI boundary.
-- Decks, study plans and topic-based material organization.
-- Spaced repetition with resumable study sessions and server-authoritative XP/streak updates.
-- Exam attempts with persisted server-side question snapshots, server-authoritative scoring and idempotent finalization.
-- Retry-safe content creation: repeated ambiguous saves converge without duplicate cards/plans/topic content or duplicate creation XP.
-- Clerk authentication and owner-scoped PostgreSQL access.
-- Installable PWA shell with an explicit network-authoritative offline policy.
-- Desktop/mobile browser coverage with Playwright and serious/critical Axe accessibility gates.
+[![StudyFlash CI](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/ci.yml)
+[![Clean Room](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml/badge.svg?branch=main)](https://github.com/Gyliardson/studyflash-ai/actions/workflows/clean-room.yml)
+[![License](https://img.shields.io/badge/license-Proprietary-lightgrey.svg)](LICENSE)
+
+</div>
+
+## Overview
+
+StudyFlash is a Next.js and FastAPI study platform backed by Clerk authentication and PostgreSQL/Prisma persistence. AI assists bounded content-generation flows, while authentication, ownership, persistence, scoring, XP/streak updates, retries, study-session state, and PWA behavior remain ordinary application logic with deterministic verification.
+
+The repository favors narrow, testable claims over broad AI or reliability promises. Remote model output is validated before acceptance, ambiguous mutations are recovered through durable server state where implemented, and critical CI does not depend on a live LLM.
+
+## Why StudyFlash?
+
+| AI-assisted learning | Correctness under retry/failure | Deterministic assurance |
+| --- | --- | --- |
+| Generate flashcards, plans, topic cards, and exam alternatives through a bounded server-side provider abstraction. | Durable mutation receipts, resumable study sessions, server-authoritative exams, and owner-scoped persistence protect supported flows from duplicate or forged effects. | Scripted AI providers, disposable PostgreSQL, browser tests, accessibility gates, and clean-room verification exercise critical contracts without requiring remote model success. |
+
+## Core capabilities
+
+- Generate flashcards from text and from bounded text extracted from uploaded PDFs.
+- Organize cards into decks, study plans, and plan topics.
+- Run spaced-review sessions that can resume from persisted server state.
+- Create practice exams with persisted server-side question snapshots and canonical server scoring.
+- Recover supported content-creation flows after ambiguous responses without duplicating the committed database effect or creation XP.
+- Track XP, streaks, levels, and review progress with explicit calendar rules.
+- Authenticate with Clerk and enforce user ownership across PostgreSQL-backed application data.
+- Install as a PWA with cached static assets and a deliberately network-authoritative protected-data policy.
+- Exercise desktop/mobile flows with Playwright and serious/critical accessibility checks.
 
 ## Architecture
 
-```text
-Browser
-  |
-  v
-Next.js 16 / React 19
-  |  Clerk auth + Server Actions / same-origin routes
-  |  Prisma 7
-  +---------------------------> PostgreSQL
-  |
-  | X-StudyFlash-Internal-Key (server only)
-  v
-FastAPI
-  |
-  v
-AIProvider abstraction
-  +--> Groq in production
-  +--> deterministic fake/provider policy in critical tests
+```mermaid
+flowchart LR
+    Browser["Browser"] -->|HTTPS / Server Actions| Next["Next.js 16 / React 19"]
+    Browser -->|Sign in / session| Clerk["Clerk"]
+    Next -->|Server-side auth verification| Clerk
+    Next -->|Prisma 7| DB["PostgreSQL"]
+    Next -->|X-StudyFlash-Internal-Key\nserver only| API["FastAPI"]
+    API --> Provider["AIProvider"]
+    Provider -->|Production inference| Groq["Groq"]
 ```
 
-The browser never receives the internal FastAPI credential and should not call the AI backend directly. PostgreSQL is configured through `DATABASE_URL`; production targets Neon, while local development, CI and Browser E2E use ordinary disposable PostgreSQL rather than production infrastructure.
+The browser does not receive `GROQ_API_KEY`, `CLERK_SECRET_KEY`, or `STUDYFLASH_INTERNAL_API_KEY`, and it does not call the FastAPI AI service directly. `DATABASE_URL` is server-side; production targets Neon PostgreSQL, while local verification and CI use ordinary disposable PostgreSQL.
 
-## Repository map
+## Technical highlights
 
-- `frontend/` — Next.js application, Prisma schema/migrations and Playwright project.
-- `app/` — FastAPI AI service.
-- `tests/` — deterministic backend tests.
-- `docs/` — focused architecture, database, AI, PWA and correctness contracts.
-- `.github/workflows/` — deterministic CI, Browser E2E, integrity and clean-room gates.
-- `security/` — reviewed dependency-security policy evidence.
+- **Server-only AI credential boundary.** Next.js is the browser-facing application boundary; the internal FastAPI credential and Groq credential remain server-side.
+- **Deterministic AI test provider.** Critical AI behavior is tested with injected scripted providers rather than a live Groq request.
+- **Resumable study.** Persisted study sessions and per-card commit state allow supported review sessions to recover from interruption without treating the browser as authoritative state.
+- **Server-authoritative exams.** Attempts snapshot questions, expected answers, and options server-side; the browser submits selections, not trusted score/correctness fields.
+- **Idempotent exam finalization.** A completed owned attempt resolves to its canonical persisted `ExamSession`; retries cannot grant exam XP twice or rewrite the completed result.
+- **Retry-safe content creation.** Durable `MutationReceipt` records converge supported ambiguous create/save retries on one committed database effect. Concurrent first AI-backed requests may still perform duplicate remote inference; the guarantee applies to persisted effects, not exactly-once provider calls.
+- **Owner-scoped database access.** User identity is attached to stored entities and database helpers/tests reject cross-user deck, topic, card, study, and exam relationships.
+- **PWA network-authoritative semantics.** Static assets may be cached, but authenticated HTML/data and mutations are not treated as offline-authoritative or silently queued by the service worker.
+- **Clean-room validation.** A fresh checkout boots the locked backend/frontend dependency graphs, applies migrations to empty PostgreSQL, builds production Next.js, starts FastAPI, and runs the deterministic browser/test matrix with development or synthetic infrastructure.
 
-## Local setup
+## AI & privacy boundary
 
-### Prerequisites
+Production inference uses **Groq** behind `app.ai_provider.AIProvider`. Depending on the feature, source text, bounded text extracted from PDFs, plan/topic labels, or an existing flashcard question and correct answer can be sent for inference. Raw PDF binaries are processed by FastAPI and are not sent to Groq by the current implementation.
 
-- Node.js 22
-- Python 3.12
-- PostgreSQL 16-compatible database
-- a Clerk **development** project for authenticated local/browser flows
+AI output is not authoritative factual truth. Structured output is schema/domain-validated before acceptance, and provider failures have bounded application semantics. Repository code does **not** prove provider-side zero retention, zero logging, or model-training guarantees. See [AI provider boundary](docs/architecture/AI.md) and [AI failure policy](docs/correctness/AI_FAILURE_POLICY.md).
 
-Do not use production Clerk, Neon or AI credentials for tests.
+## Quick Start
 
-### 1. Backend
+### Requirements
 
-From the repository root:
+- Node.js **22**
+- Python **3.12**
+- PostgreSQL **16-compatible** database
+- Clerk **development** project for authenticated local/browser flows
+
+Use development/synthetic credentials only. Do not use production Clerk, Neon, or AI secrets in tests.
+
+### Backend
 
 ```bash
 python -m venv .venv
@@ -71,15 +93,9 @@ cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-Required backend environment names are documented in `.env.example`:
+The root [`.env.example`](.env.example) documents the FastAPI/Groq boundary. `GROQ_API_KEY` and `STUDYFLASH_INTERNAL_API_KEY` are server-only.
 
-- `GROQ_API_KEY` — server-only real provider credential; not required by deterministic critical tests.
-- `STUDYFLASH_INTERNAL_API_KEY` — server-only shared credential expected from the Next.js server.
-- `AI_PROVIDER_TIMEOUT_SECONDS` — provider timeout policy.
-- `CORS_ORIGINS` — explicit allowed development/browser origins.
-- `MAX_PDF_BYTES` — PDF upload size ceiling.
-
-### 2. Frontend and database
+### Frontend and database
 
 ```bash
 cd frontend
@@ -92,26 +108,24 @@ npm run db:schema:verify
 npm run dev
 ```
 
-Frontend environment names:
+The frontend [`frontend/.env.example`](frontend/.env.example) documents PostgreSQL, Clerk, and server-only FastAPI configuration. Never prefix `AI_API_URL` or `STUDYFLASH_INTERNAL_API_KEY` with `NEXT_PUBLIC_`.
 
-- `DATABASE_URL` — canonical PostgreSQL runtime + Prisma CLI connection string.
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — public Clerk development/project identifier.
-- `CLERK_SECRET_KEY` — server-only Clerk credential.
-- `AI_API_URL` — server-only FastAPI origin, normally `http://127.0.0.1:8000` locally.
-- `STUDYFLASH_INTERNAL_API_KEY` — server-only value matching the backend.
+For the reproducible candidate bootstrap, use the [clean-room runbook](docs/operations/CLEAN_ROOM.md).
 
-Never prefix `AI_API_URL` or `STUDYFLASH_INTERNAL_API_KEY` with `NEXT_PUBLIC_`.
+## Quality & assurance
 
-## Verification
+Repository verification covers backend syntax/tests, frontend lint/typecheck/build, dependency policy, PostgreSQL ownership and gamification behavior, resumable study integrity, Browser E2E, accessibility, secret scanning, PWA contracts, and clean-room bootstrap. Critical AI verification uses deterministic providers and fixtures rather than live-provider success.
 
-Representative deterministic checks:
+Merge/release evidence belongs to the **exact candidate SHA**. A moved head invalidates evidence from the previous SHA, and clean-room success is evidence rather than automatic merge authorization. Current promotion and required-check policy is documented in [Repository governance](docs/assurance/GOVERNANCE.md).
+
+Representative local checks:
 
 ```bash
-# backend, from repo root
+# repository root
 python -m compileall -q app tests
 python -m unittest discover -s tests -p 'test_*.py' -v
 
-# frontend, from frontend/
+# frontend/
 npm run lint
 npx tsc --noEmit
 npm run build
@@ -119,62 +133,39 @@ npm run db:migrate:status
 npm run db:schema:verify
 ```
 
-Database-backed CI additionally runs ownership, gamification, retry/idempotency and timezone-boundary suites against disposable PostgreSQL. Browser E2E applies the checked-in migrations to an empty database, builds the production frontend and exercises public/authenticated, accessibility, study, exam, mutation recovery and PWA paths.
+## Documentation
 
-The dedicated clean-room gate proves a fresh checkout can install dependencies, bootstrap an empty PostgreSQL database, start FastAPI, build/start the production frontend and execute the deterministic browser/test matrix without production infrastructure. See [`docs/clean-room.md`](docs/clean-room.md).
+[Technical documentation](docs/README.md) is organized by architecture, correctness contracts, operations, assurance, and localized landing pages.
 
-Critical gates do **not** depend on a remote LLM. See [`docs/ai.md`](docs/ai.md) and [`docs/ai-failure-policy.md`](docs/ai-failure-policy.md).
+Useful entry points:
 
-## Correctness and security contracts
+- [AI provider and data boundary](docs/architecture/AI.md)
+- [Database and migration policy](docs/architecture/DATABASE.md)
+- [PWA / offline contract](docs/architecture/PWA_OFFLINE_CONTRACT.md)
+- [AI failure policy](docs/correctness/AI_FAILURE_POLICY.md)
+- [Content-creation idempotency](docs/correctness/CONTENT_CREATION_IDEMPOTENCY.md)
+- [Exam integrity](docs/correctness/EXAM_INTEGRITY.md)
+- [Clean-room verification](docs/operations/CLEAN_ROOM.md)
+- [Deployment runbook](docs/operations/DEPLOY.md)
+- [Dependency verification](docs/assurance/DEPENDENCIES.md)
+- [Repository governance](docs/assurance/GOVERNANCE.md)
+- [Security policy](SECURITY.md)
 
-- Database / Neon migration policy: [`docs/database.md`](docs/database.md)
-- AI provider and server-only trust boundary: [`docs/ai.md`](docs/ai.md)
-- Bounded AI failure behavior: [`docs/ai-failure-policy.md`](docs/ai-failure-policy.md)
-- Exam integrity / exactly-once finalization: [`docs/exam-integrity.md`](docs/exam-integrity.md)
-- Retry-safe content creation: [`docs/content-creation-idempotency.md`](docs/content-creation-idempotency.md)
-- StudyFlash calendar/streak policy: [`docs/gamification-time-policy.md`](docs/gamification-time-policy.md)
-- PWA/offline contract: [`docs/pwa-offline-contract.md`](docs/pwa-offline-contract.md)
-- Dependency-security policy: [`docs/dependencies.md`](docs/dependencies.md)
-- Clean-room release verification: [`docs/clean-room.md`](docs/clean-room.md)
-- Deployment/operator notes: [`docs/deploy.md`](docs/deploy.md)
-- Portfolio media provenance/capture policy: [`docs/media.md`](docs/media.md)
-- Vulnerability disclosure policy: [`SECURITY.md`](SECURITY.md)
+## Limitations
 
-## PWA / offline scope
+- StudyFlash uses remote Groq inference in production; it does not implement local LLM inference, Ollama, RAG, embeddings, vector retrieval, fine-tuning, or multi-provider routing.
+- Generated content can be incomplete or incorrect and is not represented as factual authority.
+- The installable PWA is **not** an offline-first data application. Protected reads and writes remain network-authoritative, and the service worker does not provide an offline write queue.
+- The local exam-option fallback uses existing flashcard content and may use randomized selection/shuffling; it is not a deterministic runtime AI replacement.
+- AI-backed plan/topic retries can duplicate the remote inference call during a concurrent first attempt even though only one supported database effect may commit.
+- Calendar-day gamification currently uses the fixed `America/Sao_Paulo` timezone because no per-user timezone preference is persisted.
+- CI proves repository contracts against disposable/development infrastructure; it does not prove live production Neon, Clerk, Groq, hosting, or domain configuration.
+- Curated portfolio screenshots are intentionally not embedded here while the current repository media artifacts await validated replacement.
 
-StudyFlash is installable, but authenticated study data and mutations remain network-authoritative. The service worker must not silently queue authenticated writes or present stale protected data as authoritative. See [`docs/pwa-offline-contract.md`](docs/pwa-offline-contract.md) for the exact proven behavior.
+## License
 
-## Deployment model
+StudyFlash is publicly visible for portfolio, evaluation, educational review, and transparency purposes, but it is **not open source**. The repository is distributed under the proprietary terms in [LICENSE](LICENSE). No permission to use, copy, modify, distribute, sublicense, sell, commercially exploit, or create derivative works is granted except with prior express written permission from the copyright holder. Third-party components retain their own licenses.
 
-The intended production topology is:
+## Author
 
-- Next.js frontend/server: Vercel-compatible deployment.
-- FastAPI AI service: independent Python service.
-- PostgreSQL: Neon via `DATABASE_URL`.
-- Authentication: Clerk.
-
-Deployments must provision migrations separately from application startup and keep the Next.js → FastAPI shared credential server-only. The repository does not require CI to connect to production Neon. See [`docs/deploy.md`](docs/deploy.md).
-
-## Portfolio evidence
-
-Deterministic Playwright runs generate desktop/mobile product screenshots and preserve Browser E2E reports/artifacts in GitHub Actions. The curated repository copies below come from synthetic Browser E2E candidate `0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`, which passed CI #561, Study Session Integrity #276 and Browser E2E #405 before visual inspection and curation. Full provenance and refresh rules are documented in [`docs/media.md`](docs/media.md).
-
-### Desktop — create study material
-
-![StudyFlash desktop creation flow](docs/media/create-flashcards-desktop-light.webp)
-
-### Mobile — profile and progress
-
-![StudyFlash mobile profile and progress](docs/media/profile-mobile-light.webp)
-
-## Security and license
-
-Please report vulnerabilities according to [`SECURITY.md`](SECURITY.md) and avoid publishing credentials, personal data or exploit details in public issues.
-
-StudyFlash is publicly visible for portfolio and evaluation purposes but is **not open source**. The repository is distributed under the proprietary terms in [`LICENSE`](LICENSE); third-party dependencies retain their own licenses.
-
-## Project status
-
-The professionalized portfolio baseline has been promoted to `main`. Ongoing engineering changes continue through the controlled `work/*` -> `portfolio/revamp-2026` -> `main` promotion topology, with exact-SHA validation and repository governance determining merge eligibility.
-
-Historical changelog entries describe earlier project states and should not be interpreted as stronger guarantees than the current documented contracts and tests.
+**Gyliardson Keitison** · [GitHub](https://github.com/Gyliardson) · [LinkedIn](https://www.linkedin.com/in/gyliardson-keitison)
