@@ -160,7 +160,7 @@ Entradas úteis:
 - Retries com IA para planos/tópicos podem duplicar a chamada de inferência remota durante uma primeira tentativa concorrente, embora apenas um efeito suportado no banco possa ser confirmado.
 - Regras de gamificação por dia atualmente usam o timezone fixo `America/Sao_Paulo`, pois nenhuma preferência de timezone por usuário é persistida.
 - O CI comprova contratos do repositório contra infraestrutura descartável/de desenvolvimento; não comprova configuração real de Neon, Clerk, Groq, hosting ou domínio em produção.
-- Screenshots curados de portfólio não são incorporados aqui enquanto os artefatos atuais de mídia do repositório aguardam substituição validada.
+- Os screenshots de portfólio exibidos no README canônico documentam o SHA citado de captura Browser E2E sintética; não comprovam configuração ou estado ao vivo de produção. A proveniência está em [MEDIA.md](../../operations/MEDIA.md).
 
 ## Licença
 
