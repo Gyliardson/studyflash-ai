@@ -1,51 +1,71 @@
 # StudyFlash portfolio media
 
-StudyFlash portfolio screenshots are generated from authenticated synthetic Playwright fixtures. They must never use real user data, production credentials or ad-hoc manual state.
+StudyFlash portfolio screenshots are generated from authenticated synthetic Playwright fixtures. They must never use real user data, production credentials, invented mockups, or ad-hoc manual state.
 
 ## Canonical capture source
 
-The capture contract lives in `frontend/e2e/tests/product-ux.spec.ts`. It attaches full-page screenshots with animations disabled for these representative surfaces:
+The capture contract lives in `frontend/e2e/tests/product-ux.spec.ts`. It attaches full-page screenshots with animations disabled for representative product surfaces. This media-restoration change does not modify that capture code or any runtime/product behavior.
 
-- `dashboard-desktop-light` — 1440×1000 viewport;
-- `settings-desktop-dark` — 1440×1000 viewport;
-- `collection-mobile-dark` — 390×844 viewport with the real mobile navigation open;
-- `profile-mobile-light` — 390×844 viewport;
-- `study-desktop-light` — 1440×1000 viewport;
-- `exam-desktop-light` — 1440×1000 viewport.
+## Restored portfolio evidence
 
-Additional Browser E2E specs may attach screenshots for failure/recovery or creation flows, but final portfolio media should prefer stable representative surfaces unless a specific behavior needs evidence.
+The durable screenshots used by the public README are copied byte-for-byte from the already-reviewed Browser E2E artifact for exact source SHA `0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`.
 
-## Evidence provenance
+Source evidence:
 
-A screenshot set is acceptable as release/portfolio evidence only when all of the following are recorded:
+- Browser E2E run: **#405** (`run_id=31855555526`), conclusion **success**;
+- artifact: `browser-e2e-0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`;
+- artifact id: `9238945803`;
+- artifact digest: `sha256:29b5fd7d2df5571d1a2a8aa2bd940f8c983f3c3f2fd712aa1b2774e3778ab81b`;
+- source branch recorded by GitHub Actions: `work/26-portfolio-docs-brand`;
+- source data: authenticated synthetic Playwright fixtures only.
 
-1. exact Git commit SHA;
-2. Browser E2E run number/URL or artifact identity;
-3. successful authenticated Browser E2E + accessibility execution for that same SHA;
-4. synthetic test identity/data only;
-5. visual inspection for clipping, overflow, unintended secrets/identifiers, loading/error artifacts and responsive regressions.
+The artifact was downloaded again for issue #88 and its proposed files were inspected at full resolution before restoration. The durable repository copies are not re-encoded, resized, cropped, sharpened, blurred, or otherwise restyled.
 
-The curated #26 media was sourced from candidate SHA `0fdda9a71a9c23ec77d63d4ce31c195ef9605c95`, which passed Browser E2E #405 together with CI #561 and Study Session Integrity #276. Artifact `browser-e2e-0fdda9a71a9c23ec77d63d4ce31c195ef9605c95` was downloaded and its representative desktop/mobile, light/dark, study/exam/create/profile/navigation captures were visually inspected before curation.
+| Durable repository file | Source attachment | Capture viewport | Full-page PNG dimensions | Bytes | SHA-256 |
+| --- | --- | ---: | ---: | ---: | --- |
+| `docs/media/create-flashcards-desktop-light.png` | `dashboard-desktop-light` | 1440×1000 | 1440×1213 | 65,466 | `478f58c8ad5ab6647f109e2a542c3e560c6b0fa76ee44891a835b153f05d54c8` |
+| `docs/media/profile-mobile-light.png` | `profile-mobile-light` | 390×844 | 390×1244 | 75,733 | `d1b39da568ef4a83d07c548b4d1978ef85d15979b4e8bea59c1ccf33c04c8409` |
 
-## Current retained repository media
+The desktop attachment is named `dashboard-desktop-light` by the deterministic test, but the captured route is the actual StudyFlash create-material surface shown in the README. The durable filename therefore describes the visible product state rather than inventing a different screen.
 
-The repository still retains these historical portfolio binary paths:
+## Validation
 
-- `docs/media/create-flashcards-desktop-light.webp`;
-- `docs/media/profile-mobile-light.webp`.
+Both restored files:
 
-Current repository-byte validation shows that neither retained binary starts with the required WebP `RIFF....WEBP` signature, neither is identified as a supported image by a real decoder, and both are detected only as generic binary data. They are therefore **not accepted as current portfolio evidence** and are intentionally not embedded in the public README.
+1. begin with the canonical PNG signature `89 50 4E 47 0D 0A 1A 0A`;
+2. decode successfully as non-interlaced 8-bit RGB PNG images;
+3. preserve their original full-page dimensions from the Browser E2E artifact;
+4. were visually inspected for clipping, overflow, blur/compression artifacts, loading/error states, exposed secrets/credentials, and real-user identifiers;
+5. contain only synthetic test state appropriate for portfolio documentation;
+6. are linked with repository-relative paths so the README image and click targets resolve to the same durable files.
 
-The binaries remain untouched in this documentation-only change so provenance is preserved for the dedicated media-restoration follow-up. They must be replaced only by deterministically recaptured, visually reviewed files whose actual encoding matches their extension.
+The desktop create surface is intentionally a stable empty-input state. The mobile profile shows synthetic level/XP/streak values and a synthetic placeholder initial; it is not represented as production-user data.
+
+## Historical invalid media
+
+The repository previously retained two files with `.webp` extensions:
+
+- `docs/media/create-flashcards-desktop-light.webp` — Git blob `b57fc621c979c2933c6456ebe4bfc93a212cff5c`, 14,997 bytes;
+- `docs/media/profile-mobile-light.webp` — Git blob `896b06763d0efc6e5d85aafd45f932d9785664e2`, 14,998 bytes.
+
+Those blobs do not start with the required WebP `RIFF....WEBP` signature and are not decodable as supported image data. GitHub blob identity also shows the same invalid binaries were already present at historical documentation head `9d9bd50c337d3224400ddd0caaff9c7237262d28`, so that head cannot be used as a source for restoration despite earlier review notes describing WebP inspection.
+
+Issue #88 removes those undecodable binaries rather than retaining broken files in the public media directory. Their provenance remains recoverable from Git history and is recorded above; the public README points only to validated PNG assets.
+
+## Presentation policy
+
+The root English `README.md` is the canonical public visual landing page and embeds the two restored screenshots in a restrained product-preview section. Localized landing pages do not duplicate the image embeds; they retain the same technical claims and link back to this provenance policy when describing visual evidence.
+
+Screenshots are evidence of the cited synthetic Browser E2E capture source only. They do not prove current live hosting, production configuration, live provider availability, or production-user state.
 
 ## Refresh procedure
 
-1. Run Browser E2E on the exact candidate SHA.
+1. Run Browser E2E on the exact candidate SHA intended as a new capture source.
 2. Require the workflow to pass.
 3. Download the Browser E2E artifact.
 4. Inspect every proposed screenshot at full resolution.
-5. Encode approved durable copies in the declared image format and validate magic bytes plus decoder readability.
-6. Copy only approved screenshots to the durable media paths.
-7. Record exact-SHA/run/artifact provenance and visual-review notes here.
-8. Restore README references only after the durable files are validated in GitHub rendering.
-9. Re-run CI/Browser E2E if committing media or documentation changes moves the PR head; merge eligibility always belongs to the new exact head.
+5. Keep the original PNG when possible; if re-encoding is necessary, validate the declared format, magic bytes, decoder readability, and visual quality.
+6. Copy only approved screenshots to durable repository media paths.
+7. Record exact-SHA/run/artifact provenance, dimensions, hashes, and visual-review notes here.
+8. Update README references only after durable files validate locally and resolve in GitHub.
+9. Re-run exact-head checks after committing media/documentation changes; merge eligibility belongs to the new candidate SHA, not to the historical capture source.
