@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - portfolio/revamp-2026
-      - 'work/**'
   pull_request:
     branches:
       - portfolio/revamp-2026
@@ -71,11 +70,11 @@ jobs:
 
       - name: Install application dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --no-audit
 
       - name: Install browser test dependencies
         working-directory: frontend/e2e
-        run: npm ci
+        run: npm ci --no-audit
 
       - name: Generate Prisma client
         working-directory: frontend
