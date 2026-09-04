@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - portfolio/revamp-2026
-      - 'work/**'
   pull_request:
     branches:
       - portfolio/revamp-2026
@@ -42,7 +41,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit
 
       - name: Generate Prisma client
         run: npx prisma generate
@@ -120,7 +119,7 @@ jobs:
   dependency-security:
     name: Frontend dependency security
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/studyflash_generate
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5hY2NvdW50cy5kZXYk
@@ -140,21 +139,60 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit
 
       - name: Capture complete npm audit evidence
         shell: bash
         run: |
-          set -uo pipefail
-          set +e
-          npm audit --json > npm-audit-all.json
-          all_status=$?
-          npm audit --omit=dev --json > npm-audit-production.json
-          production_status=$?
-          set -e
-          echo "npm audit capture exit statuses: all=${all_status}, omit-dev=${production_status}"
-          # Non-zero is expected when genuine vulnerabilities exist. The classifier
-          # below validates JSON/schema/error responses and fails closed on audit errors.
+          set -euo pipefail
+
+          capture_audit() {
+            local output="$1"
+            shift
+            local attempt status
+
+            for attempt in 1 2 3; do
+              echo "npm audit attempt ${attempt}/3 for ${output}"
+              set +e
+              timeout 90s npm audit "$@" --json > "${output}.tmp"
+              status=$?
+              set -e
+
+              if node - "${output}.tmp" <<'NODE'
+          const fs = require('node:fs');
+          const file = process.argv[2];
+          try {
+            const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+            const infrastructureError =
+              !report ||
+              typeof report !== 'object' ||
+              Array.isArray(report) ||
+              Object.prototype.hasOwnProperty.call(report, 'error') ||
+              Object.prototype.hasOwnProperty.call(report, 'errors');
+            process.exit(infrastructureError ? 1 : 0);
+          } catch {
+            process.exit(1);
+          }
+          NODE
+              then
+                mv "${output}.tmp" "${output}"
+                echo "Valid npm audit report captured (exit=${status})."
+                return 0
+              fi
+
+              mv "${output}.tmp" "${output}"
+              echo "npm audit infrastructure response was invalid (exit=${status})." >&2
+              if [ "${attempt}" -lt 3 ]; then
+                sleep $((attempt * 10))
+              fi
+            done
+
+            echo "npm audit remained unavailable after 3 attempts; preserving the last response so the classifier fails closed." >&2
+            return 0
+          }
+
+          capture_audit npm-audit-all.json
+          capture_audit npm-audit-production.json --omit=dev
 
       - name: Upload dependency audit evidence
         if: always()
@@ -221,7 +259,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit
 
       - name: Generate Prisma client
         run: npx prisma generate
