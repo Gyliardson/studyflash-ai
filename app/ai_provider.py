@@ -125,10 +125,11 @@ class GroqAIProvider:
 
     FLASHCARD_SYSTEM = """
 Você é um ASSISTENTE DE ESTUDO rigoroso.
-Crie flashcards apenas sobre a matéria técnica do texto.
+Crie de 1 a 5 flashcards apenas sobre a matéria técnica do texto.
 Ignore conteúdo motivacional, administrativo, horários e suporte.
-Se não houver conteúdo educativo suficiente, retorne uma lista vazia.
-Retorne de 1 a 5 flashcards quando houver conteúdo suficiente.
+Use somente informações presentes no texto e nunca invente fatos.
+Se houver pouco conteúdo educativo, gere apenas 1 flashcard objetivo com o conteúdo disponível.
+Priorize qualidade sobre quantidade.
 """
 
     PLAN_SYSTEM = """
@@ -178,8 +179,9 @@ Não use 'todas as anteriores' e não invente IDs.
         prompt = ChatPromptTemplate.from_messages(
             [("system", system_prompt), ("human", human_prompt)]
         )
-        primary_chain = prompt | self._primary.with_structured_output(schema)
-        backup_chain = prompt | self._backup.with_structured_output(schema)
+        structured_kwargs = {"method": "json_schema", "strict": True}
+        primary_chain = prompt | self._primary.with_structured_output(schema, **structured_kwargs)
+        backup_chain = prompt | self._backup.with_structured_output(schema, **structured_kwargs)
         return invoke_with_bounded_fallback(
             lambda: primary_chain.invoke(values),
             lambda: backup_chain.invoke(values),
