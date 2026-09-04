@@ -117,15 +117,28 @@ class AIFailureSemanticsTests(unittest.TestCase):
             with self.subTest(value=value), patch.dict(os.environ, {"AI_PROVIDER_TIMEOUT_SECONDS": value}):
                 self.assertEqual(_provider_timeout_seconds(), DEFAULT_PROVIDER_TIMEOUT_SECONDS)
 
+    def test_groq_model_defaults_match_supported_models(self) -> None:
+        self.assertEqual(GroqAIProvider.PRIMARY_MODEL, "openai/gpt-oss-120b")
+        self.assertEqual(GroqAIProvider.BACKUP_MODEL, "openai/gpt-oss-20b")
+
     @patch("app.ai_provider.ChatGroq")
-    def test_groq_clients_have_explicit_timeout_and_zero_sdk_retries(self, chat_groq: Mock) -> None:
+    def test_groq_clients_have_explicit_timeout_zero_retries_and_model_overrides(
+        self, chat_groq: Mock
+    ) -> None:
         with patch.dict(
             os.environ,
-            {"AI_PROVIDER_TIMEOUT_SECONDS": "7.5", "GROQ_API_KEY": "test-provider-key"},
+            {
+                "AI_PROVIDER_TIMEOUT_SECONDS": "7.5",
+                "GROQ_API_KEY": "test-provider-key",
+                "GROQ_PRIMARY_MODEL": "test-primary-model",
+                "GROQ_BACKUP_MODEL": "test-backup-model",
+            },
         ):
             GroqAIProvider()
 
         self.assertEqual(chat_groq.call_count, 2)
+        self.assertEqual(chat_groq.call_args_list[0].kwargs["model_name"], "test-primary-model")
+        self.assertEqual(chat_groq.call_args_list[1].kwargs["model_name"], "test-backup-model")
         for call in chat_groq.call_args_list:
             self.assertEqual(call.kwargs["timeout"], 7.5)
             self.assertEqual(call.kwargs["max_retries"], 0)
