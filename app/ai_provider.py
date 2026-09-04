@@ -120,8 +120,8 @@ def invoke_with_bounded_fallback(
 class GroqAIProvider:
     """Production provider adapter. Remote clients are created only when requested."""
 
-    PRIMARY_MODEL = "llama-3.3-70b-versatile"
-    BACKUP_MODEL = "llama-3.1-8b-instant"
+    PRIMARY_MODEL = "openai/gpt-oss-120b"
+    BACKUP_MODEL = "openai/gpt-oss-20b"
 
     FLASHCARD_SYSTEM = """
 Você é um ASSISTENTE DE ESTUDO rigoroso.
@@ -152,14 +152,16 @@ Não use 'todas as anteriores' e não invente IDs.
             raise AIProviderUnavailableError("AI provider configuration is unavailable")
 
         timeout = _provider_timeout_seconds()
+        primary_model = os.getenv("GROQ_PRIMARY_MODEL", self.PRIMARY_MODEL).strip() or self.PRIMARY_MODEL
+        backup_model = os.getenv("GROQ_BACKUP_MODEL", self.BACKUP_MODEL).strip() or self.BACKUP_MODEL
         client_kwargs = {
             "temperature": 0,
             "timeout": timeout,
             "max_retries": 0,
         }
         try:
-            self._primary = ChatGroq(model_name=self.PRIMARY_MODEL, **client_kwargs)
-            self._backup = ChatGroq(model_name=self.BACKUP_MODEL, **client_kwargs)
+            self._primary = ChatGroq(model_name=primary_model, **client_kwargs)
+            self._backup = ChatGroq(model_name=backup_model, **client_kwargs)
         except (ValidationError, ValueError) as exc:
             # Client-construction validation is an operational configuration failure.
             # Do not catch arbitrary exceptions here: programming defects must remain 500s.

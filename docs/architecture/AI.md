@@ -5,8 +5,8 @@ StudyFlash keeps model-provider code behind `app.ai_provider.AIProvider`. Produc
 ## Production provider and models
 
 - Provider: **Groq**.
-- Primary model: `llama-3.3-70b-versatile`.
-- Backup model: `llama-3.1-8b-instant`.
+- Primary model default: `openai/gpt-oss-120b`.
+- Backup model default: `openai/gpt-oss-20b`.
 - Provider SDK retries: `max_retries=0`.
 - Default provider timeout: **8 seconds** via `AI_PROVIDER_TIMEOUT_SECONDS`.
 
@@ -69,6 +69,8 @@ The primary/backup Groq model policy is bounded fallback within the same provide
 ## Configuration
 
 Production Groq access uses the provider's standard `GROQ_API_KEY` environment variable. Never expose it through a `NEXT_PUBLIC_` variable or commit it to the repository.
+
+`GROQ_PRIMARY_MODEL` and `GROQ_BACKUP_MODEL` are optional server-side overrides. When unset or blank, StudyFlash uses the defaults documented above. This allows a supported Groq model rotation without changing application code.
 
 The existing `STUDYFLASH_INTERNAL_API_KEY` is a separate server-to-server authorization credential for the Next.js -> FastAPI boundary; it is not a model-provider credential.
 
