@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider localization={ptPT}>
+    <ClerkProvider localization={ptPT} signInUrl="/sign-in" signUpUrl="/sign-up">
       <html lang="pt" suppressHydrationWarning>
         <body className={inter.className}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
